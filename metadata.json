@@ -1,0 +1,6 @@
+{
+  "name": "Mwongozo wa Biashara ya WiFi",
+  "description": "Mwongozo kamili, orodha ya vifaa, mifumo ya vocha na kikokotoo cha mtaji na faida kwa kuanzisha biashara ya WiFi Hotspot na ISP.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

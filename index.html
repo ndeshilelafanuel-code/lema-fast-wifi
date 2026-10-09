@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="sw">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/lema-logo.svg" />
+    <title>Mwongozo wa Biashara ya WiFi</title>
+    <meta name="description" content="Mwongozo kamili, orodha ya vifaa, mifumo ya vocha na kikokotoo cha mtaji na faida kwa kuanzisha biashara ya WiFi Hotspot na ISP." />
+    <meta property="og:title" content="Mwongozo wa Biashara ya WiFi" />
+    <meta property="og:description" content="Mwongozo kamili, orodha ya vifaa, mifumo ya vocha na kikokotoo cha mtaji na faida kwa kuanzisha biashara ya WiFi Hotspot na ISP." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // In AI Studio iframe preview, direct WebSocket HMR is disabled.
+      // Intercept WebSocket creation for vite-hmr to prevent connection failure errors.
+      (function() {
+        var OrigWebSocket = window.WebSocket;
+        if (OrigWebSocket) {
+          window.WebSocket = function(url, protocols) {
+            var urlStr = String(url || '');
+            var protoStr = String(protocols || '');
+            if (urlStr.indexOf('vite-hmr') !== -1 || protoStr.indexOf('vite-hmr') !== -1 || urlStr.indexOf(':24678') !== -1) {
+              var target = new EventTarget();
+              var mock = {
+                readyState: 1,
+                OPEN: 1,
+                CLOSED: 3,
+                CONNECTING: 0,
+                CLOSING: 2,
+                send: function() {},
+                close: function() {},
+                addEventListener: function(type, listener, options) {
+                  target.addEventListener(type, listener, options);
+                  if (type === 'open') {
+                    setTimeout(function() {
+                      try { listener({ type: 'open' }); } catch (e) {}
+                    }, 0);
+                  }
+                },
+                removeEventListener: function(type, listener, options) {
+                  target.removeEventListener(type, listener, options);
+                },
+                dispatchEvent: function(e) { return target.dispatchEvent(e); }
+              };
+              return mock;
+            }
+            return new OrigWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = OrigWebSocket.prototype;
+          window.WebSocket.CONNECTING = OrigWebSocket.CONNECTING;
+          window.WebSocket.OPEN = OrigWebSocket.OPEN;
+          window.WebSocket.CLOSING = OrigWebSocket.CLOSING;
+          window.WebSocket.CLOSED = OrigWebSocket.CLOSED;
+        }
+
+        window.addEventListener('unhandledrejection', function(event) {
+          var reason = event && event.reason;
+          var str = String((reason && (reason.message || reason.stack)) || reason || '');
+          if (str.indexOf('WebSocket') !== -1 || str.indexOf('@vite/client') !== -1) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+
+        window.addEventListener('error', function(event) {
+          var str = String(event.message || '');
+          if (str.indexOf('WebSocket') !== -1 || (event.filename && event.filename.indexOf('@vite/client') !== -1)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
+  </head>
+  <body class="bg-stone-50 text-stone-900 antialiased selection:bg-amber-500/20 selection:text-amber-900 font-sans">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
