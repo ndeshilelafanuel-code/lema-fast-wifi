@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <!-- Background / Glow Filters -->
+    <filter id="lemaGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="softShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0066ff" flood-opacity="0.35" />
+    </filter>
+    <filter id="textShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0044aa" flood-opacity="0.3" />
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="wifiBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D2FF" />
+      <stop offset="50%" stop-color="#0080FF" />
+      <stop offset="100%" stop-color="#0044FF" />
+    </linearGradient>
+
+    <linearGradient id="swooshGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="45%" stop-color="#0084FF" />
+      <stop offset="100%" stop-color="#0044FF" />
+    </linearGradient>
+
+    <linearGradient id="letterLGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="40%" stop-color="#F0F4FA" />
+      <stop offset="80%" stop-color="#D8E2EE" />
+      <stop offset="100%" stop-color="#BAC7D8" />
+    </linearGradient>
+
+    <linearGradient id="letterLShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9BB0C9" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#4B6584" stop-opacity="0.5" />
+    </linearGradient>
+
+    <linearGradient id="fastBlueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0077FF" />
+      <stop offset="60%" stop-color="#0099FF" />
+      <stop offset="100%" stop-color="#00D2FF" />
+    </linearGradient>
+
+    <linearGradient id="lemaTextGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="65%" stop-color="#E2E8F0" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+
+    <linearGradient id="lemaTextStrokeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#94A3B8" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+  </defs>
+
+  <!-- ==================== EMBLEM (UPPER SECTION) ==================== -->
+  <g transform="translate(400, 260)">
+    <!-- Ambient Blue Core Glow -->
+    <circle cx="0" cy="0" r="160" fill="url(#wifiBlueGrad)" opacity="0.08" filter="url(#lemaGlow)" />
+
+    <!-- 1. The Orbiting Swoosh Crescent -->
+    <!-- Sweeps from bottom-left around under the L and up right -->
+    <path d="M -190 30 
+             C -230 -20, -180 -100, -90 -140
+             C -130 -90, -160 -10, -120 40
+             C -70 100, 30 115, 120 70
+             C 170 45, 195 10, 195 10
+             C 195 10, 150 70, 70 95
+             C -20 120, -130 90, -190 30 Z" 
+          fill="url(#swooshGrad)" 
+          filter="url(#softShadow)" />
+
+    <!-- 2. The Wi-Fi Signal Arcs (Top-Right) -->
+    <g transform="translate(50, -60)" filter="url(#softShadow)">
+      <!-- Outer Arc -->
+      <path d="M -100 -50 A 130 130 0 0 1 100 -50" 
+            fill="none" 
+            stroke="url(#wifiBlueGrad)" 
+            stroke-width="26" 
+            stroke-linecap="round" />
+
+      <!-- Middle Arc -->
+      <path d="M -70 -15 A 90 90 0 0 1 70 -15" 
+            fill="none" 
+            stroke="url(#wifiBlueGrad)" 
+            stroke-width="24" 
+            stroke-linecap="round" />
+
+      <!-- Inner Arc -->
+      <path d="M -40 20 A 50 50 0 0 1 40 20" 
+            fill="none" 
+            stroke="url(#wifiBlueGrad)" 
+            stroke-width="22" 
+            stroke-linecap="round" />
+
+      <!-- Broadcast Center Dot -->
+      <circle cx="0" cy="55" r="20" fill="url(#wifiBlueGrad)" />
+    </g>
+
+    <!-- 3. The 3D Metallic Letter 'L' (Center-Left) -->
+    <!-- Stylized beveled futuristic L -->
+    <g filter="url(#softShadow)">
+      <!-- L Base Drop Shadow / Depth bevel -->
+      <path d="M -150 -130 
+               L -80 -130 
+               L -40 40 
+               L 55 40 
+               L 45 90 
+               L -180 90 
+               Z" 
+            fill="url(#letterLShadow)" 
+            transform="translate(4, 6)" />
+
+      <!-- Front Surface of 'L' -->
+      <path d="M -150 -130 
+               L -80 -130 
+               L -40 40 
+               L 55 40 
+               L 45 90 
+               L -180 90 
+               Z" 
+            fill="url(#letterLGrad)" 
+            stroke="#FFFFFF" 
+            stroke-width="4" 
+            stroke-linejoin="round" />
+
+      <!-- High-gloss Bevel Highlight Edge -->
+      <path d="M -150 -130 L -80 -130 L -120 40 L -40 40 L 55 40" 
+            fill="none" 
+            stroke="#FFFFFF" 
+            stroke-width="4" 
+            opacity="0.9" />
+
+      <!-- Inner shading facet for 3D realism -->
+      <path d="M -115 40 L -40 40 L 45 90 L -140 90 Z" 
+            fill="url(#letterLShadow)" 
+            opacity="0.3" />
+    </g>
+
+    <!-- Lower Orbit Swoosh Front Tail Accent -->
+    <path d="M -175 45 C -90 115, 60 115, 175 40 C 90 95, -60 95, -145 40 Z" 
+          fill="url(#swooshGrad)" 
+          opacity="0.85" />
+  </g>
+
+  <!-- ==================== TYPOGRAPHY (LOWER SECTION) ==================== -->
+  <g transform="translate(400, 560)">
+    <!-- 1. "LEMA" (Bold Futuristic Modern with Blue Triangle inside 'A') -->
+    <g filter="url(#textShadow)">
+      <text x="-1" y="0" 
+            font-family="'Plus Jakarta Sans', 'Space Grotesk', -apple-system, sans-serif" 
+            font-size="122" 
+            font-weight="900" 
+            letter-spacing="14" 
+            text-anchor="middle" 
+            fill="url(#lemaTextGrad)" 
+            stroke="url(#lemaTextStrokeGrad)" 
+            stroke-width="2" 
+            stroke-linejoin="round"
+            font-style="italic">
+        LEMA
+      </text>
+
+      <!-- Vibrant Blue Triangle Accent Inside 'A' Counter -->
+      <polygon points="182,-38 171,-16 193,-16" fill="#0080FF" />
+    </g>
+
+    <!-- 2. "FAST WiFi" Line -->
+    <g transform="translate(0, 72)">
+      <!-- Speed streaks on the left of FAST -->
+      <g stroke="url(#fastBlueGrad)" stroke-width="5" stroke-linecap="round">
+        <line x1="-240" y1="-28" x2="-165" y2="-28" />
+        <line x1="-225" y1="-12" x2="-170" y2="-12" />
+        <line x1="-250" y1="4" x2="-180" y2="4" />
+      </g>
+
+      <!-- "FAST" in Electric Speed Blue -->
+      <text x="-155" y="0" 
+            font-family="'Space Grotesk', 'Plus Jakarta Sans', sans-serif" 
+            font-size="64" 
+            font-weight="900" 
+            letter-spacing="4" 
+            font-style="italic" 
+            fill="url(#fastBlueGrad)">
+        FAST
+      </text>
+
+      <!-- "WiFi" in Silver-White / Soft Blue Chrome Outline -->
+      <text x="35" y="0" 
+            font-family="'Space Grotesk', 'Plus Jakarta Sans', sans-serif" 
+            font-size="64" 
+            font-weight="800" 
+            letter-spacing="5" 
+            fill="#FFFFFF" 
+            stroke="#94A3B8" 
+            stroke-width="1.8">
+        WiFi
+      </text>
+    </g>
+
+    <!-- 3. Slogan: "— CONNECTING YOU FASTER —" -->
+    <g transform="translate(0, 116)">
+      <!-- Left Cyan Line -->
+      <line x1="-215" y1="-7" x2="-145" y2="-7" stroke="#0099FF" stroke-width="3" stroke-linecap="round" />
+      
+      <!-- Text Slogan -->
+      <text x="0" y="0" 
+            font-family="'Plus Jakarta Sans', sans-serif" 
+            font-size="19" 
+            font-weight="700" 
+            letter-spacing="9" 
+            text-anchor="middle" 
+            fill="#64748B">
+        CONNECTING YOU FASTER
+      </text>
+
+      <!-- Right Cyan Line -->
+      <line x1="145" y1="-7" x2="215" y2="-7" stroke="#0099FF" stroke-width="3" stroke-linecap="round" />
+    </g>
+  </g>
+</svg>
