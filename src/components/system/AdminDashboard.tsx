@@ -52,7 +52,8 @@ import {
   Bot,
   ListFilter,
   QrCode,
-  Compass
+  Compass,
+  Save
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -459,6 +460,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [claimApSite, setClaimApSite] = useState<string>('Mshikamano Site');
   const [isClaimingAp, setIsClaimingAp] = useState<boolean>(false);
   const [apClaimStep, setApClaimStep] = useState<string>('');
+
+  // Payment Gateway Configuration states (Mobile Money STK-Push)
+  const [gatewayProvider, setGatewayProvider] = useState<'zenopay' | 'azampay' | 'selcom' | 'test'>('zenopay');
+  const [gatewayApiKey, setGatewayApiKey] = useState<string>('');
+  const [gatewaySecretKey, setGatewaySecretKey] = useState<string>('');
+  const [isGatewayLive, setIsGatewayLive] = useState<boolean>(false);
+  const [testPushPhone, setTestPushPhone] = useState<string>('0653 578 184');
+  const [isTestingPush, setIsTestingPush] = useState<boolean>(false);
+  const [testPushResult, setTestPushResult] = useState<string | null>(null);
+  const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/v1/payments/config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.gateway) setGatewayProvider(data.gateway);
+        if (data.isLive !== undefined) setIsGatewayLive(data.isLive);
+      })
+      .catch(() => {});
+  }, []);
 
   // Lema AI AP Adoption Wizard States
   const [showAiApWizard, setShowAiApWizard] = useState<boolean>(false);
@@ -3909,6 +3930,204 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Mobile Money STK-Push & Webhook Gateway Configuration */}
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-amber-400" />
+                    <span>Otomatiki ya STK-Push & Webhook (M-Pesa / Tigo Pesa / Airtel)</span>
+                  </h3>
+                  <p className="text-xs text-stone-400 mt-1">
+                    Unganisha Gateway ya Tanzania ili mteja anaponunua vocha, pop-up ya PIN itokee moja kwa moja kwenye simu yake bila kuhitaji AP kuwashwa kwanza!
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold text-stone-400">Hali ya Mfumo:</span>
+                  <button
+                    onClick={() => setIsGatewayLive(!isGatewayLive)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      isGatewayLive
+                        ? 'bg-emerald-500 text-stone-950 ring-2 ring-emerald-400'
+                        : 'bg-stone-800 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {isGatewayLive ? '● LIVE PRODUCTION' : '○ SANDBOX / TEST MODE'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Gateway Selection & Keys Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="text-stone-300 font-semibold block mb-1">Mtoa Huduma wa STK-Push (Gateway Provider):</label>
+                  <select
+                    value={gatewayProvider}
+                    onChange={(e) => setGatewayProvider(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-sans focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  >
+                    <option value="zenopay">ZenoPay (zeno.africa) ⭐ - Inapendekezwa zaidi (Tanzania)</option>
+                    <option value="azampay">AzamPay Aggregator (M-Pesa, Airtel, Tigo, Halo)</option>
+                    <option value="selcom">Selcom Paytech (Masterpass & Mobile Money)</option>
+                    <option value="test">Majaribio ya Ndani (Sandbox / Simulator)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-stone-300 font-semibold block mb-1">
+                    {gatewayProvider === 'azampay' ? 'AzamPay Client ID (kutoka developer.azampay.co.tz):' : 'Gateway API Key:'}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder={gatewayProvider === 'azampay' ? 'Weka AzamPay Client ID...' : 'Weka API Key kutoka Dashboard ya Gateway...'}
+                    value={gatewayApiKey}
+                    onChange={(e) => setGatewayApiKey(e.target.value)}
+                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-stone-300 font-semibold block mb-1">
+                    {gatewayProvider === 'azampay' ? 'AzamPay Client Secret:' : 'Gateway Secret Key:'}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder={gatewayProvider === 'azampay' ? 'Weka AzamPay Client Secret...' : 'Weka Secret Key...'}
+                    value={gatewaySecretKey}
+                    onChange={(e) => setGatewaySecretKey(e.target.value)}
+                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-stone-300 font-semibold block mb-1">Lipa Namba / Akaunti ya Kupokea Pesa:</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={settings.payoutAccount}
+                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-800 text-stone-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* AzamPay No-Code Quick-Start Guide Banner */}
+              {gatewayProvider === 'azampay' && (
+                <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 space-y-1.5 animate-fadeIn">
+                  <div className="font-bold flex items-center gap-1.5 text-blue-400 uppercase tracking-wider text-[11px]">
+                    <span>ℹ️ Jinsi ya Kujaribu AzamPay No-Code (Bila Kuandika Code):</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-stone-300">
+                    <li>Fungua akaunti ya bure kwenye <a href="https://developer.azampay.co.tz" target="_blank" rel="noreferrer" className="text-amber-400 underline font-semibold">developer.azampay.co.tz</a> (inachukua dakika 2 tu).</li>
+                    <li>Nenda kwenye <strong>Dashboard ➔ Applications ➔ Create New App</strong> (waza jina mfano <em>LemaFastWiFi</em>).</li>
+                    <li>Utapata mara moja <strong>Client ID</strong> na <strong>Client Secret</strong> za Sandbox (Majaribio ya bure).</li>
+                    <li>Zi-paste kwenye sehemu hizi hapo juu na bonyeza <strong>Hifadhi Mipangilio ya Malipo</strong>!</li>
+                  </ol>
+                </div>
+              )}
+
+              {/* Webhook Callback URL Bar */}
+              <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="space-y-0.5">
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider font-mono">
+                    WEBHOOK CALLBACK URL (Weka hii kwenye Dashboard ya ZenoPay au AzamPay):
+                  </div>
+                  <div className="font-mono text-emerald-400 text-[11px] select-all">
+                    https://lemawifi.online/api/v1/payments/webhook
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText('https://lemawifi.online/api/v1/payments/webhook');
+                    setCopiedWebhook(true);
+                    setTimeout(() => setCopiedWebhook(false), 2000);
+                  }}
+                  className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copiedWebhook ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedWebhook ? 'Imenakiliwa!' : 'Nakili URL'}</span>
+                </button>
+              </div>
+
+              {/* Save Button & Live Test push Box */}
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-stone-800">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/v1/payments/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          gateway: gatewayProvider,
+                          apiKey: gatewayApiKey,
+                          secretKey: gatewaySecretKey,
+                          isLive: isGatewayLive,
+                          merchantNumber: settings.payoutAccount,
+                          accountOwnerName: settings.accountOwnerName
+                        })
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        showToast('Imesasishwa!', 'Mipangilio ya Gateway na Webhook imehifadhiwa kikamilifu!', 'success');
+                      }
+                    } catch (e) {
+                      showToast('Hitilafu', 'Imeshindwa kuwasiliana na server', 'error');
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Hifadhi Mipangilio ya Malipo</span>
+                </button>
+
+                {/* Test STK Push Section */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={testPushPhone}
+                    onChange={(e) => setTestPushPhone(e.target.value)}
+                    placeholder="0653 578 184"
+                    className="px-3 py-1.5 text-xs bg-stone-850 border border-stone-700 rounded-xl text-white font-mono w-36 focus:outline-none"
+                  />
+                  <button
+                    disabled={isTestingPush}
+                    onClick={async () => {
+                      setIsTestingPush(true);
+                      setTestPushResult(null);
+                      try {
+                        const res = await fetch('/api/v1/payments/stk-push', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            phone: testPushPhone,
+                            amount: 500,
+                            packageName: 'Jaribio la STK Push (Saa 2)',
+                            durationHours: 2
+                          })
+                        });
+                        const data = await res.json();
+                        setIsTestingPush(false);
+                        setTestPushResult(data.message);
+                        showToast('STK Push Imetumwa', data.message, 'success');
+                      } catch (e) {
+                        setIsTestingPush(false);
+                        setTestPushResult('Hitilafu: Imeshindwa kutuma');
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>{isTestingPush ? 'Inatuma...' : 'Jaribu Kutuma STK-Push'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {testPushResult && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 animate-fadeIn">
+                  🔔 <strong>Matokeo:</strong> {testPushResult}
+                </div>
+              )}
             </div>
           </div>
         )}

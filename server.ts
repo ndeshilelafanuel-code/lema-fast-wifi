@@ -508,6 +508,350 @@ async function startGreenApiPoller() {
   console.log('✅ Green-API WhatsApp Daemon active and polling every 2s.');
 }
 
+// -------------------------------------------------------------
+// MOBILE MONEY STK-PUSH & WEBHOOK ENGINE (ZENOPAY / AZAMPAY / SELCOM)
+// -------------------------------------------------------------
+interface PaymentGatewayConfig {
+  gateway: 'zenopay' | 'azampay' | 'selcom' | 'test';
+  apiKey: string;
+  secretKey: string;
+  merchantNumber: string;
+  accountOwnerName: string;
+  isLive: boolean;
+}
+
+let paymentGatewayConfig: PaymentGatewayConfig = {
+  gateway: 'zenopay',
+  apiKey: '',
+  secretKey: '',
+  merchantNumber: '5849201',
+  accountOwnerName: 'Jimmy Lema',
+  isLive: false
+};
+
+interface PaymentOrder {
+  orderId: string;
+  phone: string;
+  amount: number;
+  packageId: string;
+  packageName: string;
+  durationHours: number;
+  status: 'pending' | 'completed' | 'failed';
+  createdAt: string;
+  completedAt?: string;
+  voucherCode?: string;
+  reference?: string;
+  gateway?: string;
+  rawGatewayResponse?: any;
+}
+
+const paymentOrders = new Map<string, PaymentOrder>();
+
+// Helper to normalize Tanzanian phone numbers to 255... or 0...
+function normalizeTzPhone(rawPhone: string): { local: string; international: string } {
+  const digits = (rawPhone || '').replace(/[^0-9]/g, '');
+  if (digits.startsWith('255') && digits.length === 12) {
+    return { local: '0' + digits.slice(3), international: digits };
+  }
+  if (digits.startsWith('0') && digits.length === 10) {
+    return { local: digits, international: '255' + digits.slice(1) };
+  }
+  if (digits.length === 9) {
+    return { local: '0' + digits, international: '255' + digits };
+  }
+  return { local: digits, international: digits };
+}
+
+// Payment config endpoints
+app.get('/api/v1/payments/config', (_req, res) => {
+  return res.json({
+    gateway: paymentGatewayConfig.gateway,
+    apiKey: paymentGatewayConfig.apiKey ? '••••••••' + paymentGatewayConfig.apiKey.slice(-4) : '',
+    hasApiKey: Boolean(paymentGatewayConfig.apiKey),
+    hasSecretKey: Boolean(paymentGatewayConfig.secretKey),
+    merchantNumber: paymentGatewayConfig.merchantNumber,
+    accountOwnerName: paymentGatewayConfig.accountOwnerName,
+    isLive: paymentGatewayConfig.isLive,
+    webhookUrl: 'https://lemawifi.online/api/v1/payments/webhook'
+  });
+});
+
+app.post('/api/v1/payments/config', (req, res) => {
+  const { gateway, apiKey, secretKey, merchantNumber, accountOwnerName, isLive } = req.body;
+  if (gateway) paymentGatewayConfig.gateway = gateway;
+  if (apiKey !== undefined && apiKey !== '') paymentGatewayConfig.apiKey = apiKey;
+  if (secretKey !== undefined && secretKey !== '') paymentGatewayConfig.secretKey = secretKey;
+  if (merchantNumber) paymentGatewayConfig.merchantNumber = merchantNumber;
+  if (accountOwnerName) paymentGatewayConfig.accountOwnerName = accountOwnerName;
+  if (typeof isLive === 'boolean') paymentGatewayConfig.isLive = isLive;
+
+  console.log('[Payment Config Updated]:', {
+    gateway: paymentGatewayConfig.gateway,
+    hasApiKey: Boolean(paymentGatewayConfig.apiKey),
+    merchantNumber: paymentGatewayConfig.merchantNumber,
+    isLive: paymentGatewayConfig.isLive
+  });
+
+  return res.json({ success: true, config: paymentGatewayConfig });
+});
+
+// 1. INITIATE STK-PUSH (Inaomba USSD PIN kwenye simu ya mteja)
+app.post('/api/v1/payments/stk-push', async (req, res) => {
+  const { phone, packageId, packageName, amount, durationHours } = req.body;
+  if (!phone || !amount) {
+    return res.status(400).json({ error: 'Nambari ya simu na kiasi vinahitajika' });
+  }
+
+  const { local: localPhone } = normalizeTzPhone(phone);
+  const orderId = `ORD-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+  const order: PaymentOrder = {
+    orderId,
+    phone: localPhone,
+    amount: Number(amount),
+    packageId: packageId || 'pkg-1day',
+    packageName: packageName || 'Saa 24 (Siku 1)',
+    durationHours: Number(durationHours) || 24,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    gateway: paymentGatewayConfig.gateway
+  };
+
+  paymentOrders.set(orderId, order);
+  console.log(`[Payment STK-Push Initiated] Order ${orderId} for ${localPhone} amount ${amount} TZS`);
+
+  // If live keys exist for ZenoPay:
+  if (paymentGatewayConfig.isLive && paymentGatewayConfig.apiKey && paymentGatewayConfig.gateway === 'zenopay') {
+    try {
+      console.log(`[ZenoPay] Sending real STK Push to ${localPhone}...`);
+      const response = await fetch('https://api.zeno.africa/order-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          create_order: 1,
+          api_key: paymentGatewayConfig.apiKey,
+          secret_key: paymentGatewayConfig.secretKey,
+          amount: Number(amount),
+          phone_number: localPhone,
+          buyer_name: 'Mteja Lema WiFi',
+          buyer_phone: localPhone,
+          buyer_email: 'wifi@lemawifi.online',
+          webhook_url: 'https://lemawifi.online/api/v1/payments/webhook',
+          order_id: orderId
+        })
+      });
+
+      const zenoData = await response.json();
+      console.log('[ZenoPay Response]:', zenoData);
+      order.rawGatewayResponse = zenoData;
+
+      return res.json({
+        success: true,
+        orderId,
+        isLive: true,
+        gateway: 'zenopay',
+        message: `Ombi la malipo limetumwa kwenye simu yako (${localPhone}). Tafadhali weka PIN yako ya mtandao kuthibitisha.`
+      });
+    } catch (err: any) {
+      console.error('[ZenoPay Error]:', err);
+      return res.json({
+        success: true,
+        orderId,
+        isLive: false,
+        warning: 'Hitilafu ya kuungana na ZenoPay Live, ombi limewekwa kwa majaribio',
+        message: `Tafadhali angalia simu yako (${localPhone}) na uweke PIN ya kuthibitisha TZS ${amount}.`
+      });
+    }
+  }
+
+  // If AzamPay is selected:
+  if (paymentGatewayConfig.apiKey && paymentGatewayConfig.gateway === 'azampay') {
+    const isSandbox = !paymentGatewayConfig.isLive;
+    const authUrl = isSandbox
+      ? 'https://authenticator-sandbox.azampay.co.tz/AppRegistration/GenerateToken'
+      : 'https://authenticator.azampay.co.tz/AppRegistration/GenerateToken';
+    const checkoutUrl = isSandbox
+      ? 'https://sandbox.azampay.co.tz/azampay/mno/checkout'
+      : 'https://checkout.azampay.co.tz/azampay/mno/checkout';
+
+    try {
+      // Determine provider from prefix
+      let provider = 'Mpesa';
+      if (localPhone.startsWith('065') || localPhone.startsWith('067') || localPhone.startsWith('071')) provider = 'Tigo';
+      else if (localPhone.startsWith('068') || localPhone.startsWith('069') || localPhone.startsWith('078')) provider = 'Airtel';
+      else if (localPhone.startsWith('062') || localPhone.startsWith('061')) provider = 'Halopesa';
+
+      console.log(`[AzamPay ${isSandbox ? 'Sandbox' : 'Live'}] Authenticating for ${provider}...`);
+      const tokenRes = await fetch(authUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appName: 'LemaFastWiFi',
+          clientId: paymentGatewayConfig.apiKey,
+          clientSecret: paymentGatewayConfig.secretKey
+        })
+      });
+
+      const tokenData = await tokenRes.json();
+      const accessToken = tokenData?.data?.accessToken || tokenData?.accessToken;
+
+      if (accessToken) {
+        console.log(`[AzamPay] Sending STK Push to ${localPhone} via ${provider}...`);
+        const azamRes = await fetch(checkoutUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            accountNumber: localPhone,
+            amount: String(amount),
+            currency: 'TZS',
+            externalId: orderId,
+            provider
+          })
+        });
+
+        const azamData = await azamRes.json();
+        console.log('[AzamPay Response]:', azamData);
+        order.rawGatewayResponse = azamData;
+
+        return res.json({
+          success: true,
+          orderId,
+          isLive: paymentGatewayConfig.isLive,
+          gateway: 'azampay',
+          message: `Ombi la AzamPay (${provider}) limetumwa kwenye simu yako (${localPhone}). Weka PIN yako kuthibitisha TZS ${amount}.`
+        });
+      }
+    } catch (err: any) {
+      console.error('[AzamPay Error]:', err);
+    }
+  }
+
+  // If sandbox / test mode or no API key yet:
+  return res.json({
+    success: true,
+    orderId,
+    isLive: false,
+    message: `Ombi la USSD Push limetumwa kwa namba ${localPhone}. Weka PIN kuthibitisha malipo ya TZS ${amount}.`
+  });
+});
+
+// 2. CHECK ORDER STATUS (Frontend polls this while user enters PIN)
+app.get('/api/v1/payments/order-status/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const order = paymentOrders.get(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order haijapatikana' });
+  }
+
+  return res.json({
+    orderId: order.orderId,
+    status: order.status,
+    phone: order.phone,
+    amount: order.amount,
+    voucherCode: order.voucherCode,
+    reference: order.reference,
+    completedAt: order.completedAt
+  });
+});
+
+// 3. WEBHOOK RECEIVER (ZenoPay / AzamPay / Selcom Callback)
+app.post('/api/v1/payments/webhook', async (req, res) => {
+  console.log('[Payment Webhook Received]:', JSON.stringify(req.body, null, 2));
+  const body = req.body;
+
+  // Extract common fields across gateways
+  const orderId = body.order_id || body.orderId || body.reference || body.external_reference;
+  const status = String(body.payment_status || body.status || '').toLowerCase();
+  const ref = body.reference || body.transid || body.payment_reference || `TX-${Date.now()}`;
+  const incomingPhone = body.phone_number || body.msisdn || '';
+
+  const order = orderId ? paymentOrders.get(orderId) : null;
+
+  if (status === 'completed' || status === 'success' || status === 'paid' || body.resultcode === '0' || body.success === true) {
+    const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const phoneToNotify = order?.phone || incomingPhone || '255622443249';
+
+    if (order) {
+      order.status = 'completed';
+      order.voucherCode = voucherCode;
+      order.reference = ref;
+      order.completedAt = new Date().toISOString();
+    }
+
+    console.log(`[Payment Webhook] SUCCESS for order ${orderId}! Generated voucher: ${voucherCode}`);
+
+    // Send WhatsApp notification immediately via Green-API
+    const { international } = normalizeTzPhone(phoneToNotify);
+    const waText = `🎉 *LEMA FAST WIFI - MALIPO YAMEPOKELEWA!*
+    
+Habari! Malipo yako ya *TZS ${(order?.amount || body.amount || 1000).toLocaleString()}* yamekamilika kikamilifu.
+
+🎟️ *VOCHA YAKO NI:* \`${voucherCode}\`
+⚡ *Kifurushi:* ${order?.packageName || 'Intaneti ya Kasi'}
+⏱️ *Muda:* Masaa ${order?.durationHours || 24}
+
+👉 *JINSI YA KUTUMIA:*
+1. Unganisha simu yako na Wi-Fi ya: *Lema Fast WiFi*
+2. Ukurasa ukifunguka, ingiza nambari hii: *${voucherCode}*
+3. Utakuwa hewani mara moja!
+
+_Kumbukumbu ya Muamala:_ ${ref}
+_Asante kwa kutumia Lema Fast WiFi! Msaada: 0653 578 184._`;
+
+    await sendGreenApiMessage(international, waText);
+
+    return res.status(200).json({ status: 'success', message: 'Malipo yamepokelewa na vocha imezalishwa' });
+  }
+
+  if (order && (status === 'failed' || status === 'cancelled')) {
+    order.status = 'failed';
+  }
+
+  return res.status(200).json({ status: 'acknowledged' });
+});
+
+// 4. SIMULATE / MANUAL CONFIRM (Inasaidia kuthibitisha papo hapo kwa ajili ya majaribio)
+app.post('/api/v1/payments/simulate-confirm', async (req, res) => {
+  const { orderId } = req.body;
+  const order = paymentOrders.get(orderId);
+  if (!order) {
+    return res.status(404).json({ error: 'Order not found' });
+  }
+
+  const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+  order.status = 'completed';
+  order.voucherCode = voucherCode;
+  order.reference = `STK-${Math.floor(100000 + Math.random() * 900000)}TZ`;
+  order.completedAt = new Date().toISOString();
+
+  // Send WhatsApp message if phone provided
+  if (order.phone) {
+    const { international } = normalizeTzPhone(order.phone);
+    const waText = `🎉 *LEMA FAST WIFI - THIBITISHO LA MALIPO*
+    
+Malipo yako ya *TZS ${order.amount.toLocaleString()}* yamethibitishwa!
+
+🎟️ *VOCHA YAKO NI:* \`${voucherCode}\`
+⚡ *Kifurushi:* ${order.packageName}
+
+Ingiza tarakimu hizi: *${voucherCode}* kwenye mtandao wa *Lema Fast WiFi* kuanza kutumia mara moja.`;
+
+    await sendGreenApiMessage(international, waText);
+  }
+
+  return res.json({
+    success: true,
+    orderId,
+    voucherCode,
+    reference: order.reference,
+    message: 'Muamala umethibitishwa kikamilifu!'
+  });
+});
+
+
 // Start Express server and mount Vite in middleware mode
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';

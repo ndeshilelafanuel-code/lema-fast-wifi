@@ -351,8 +351,22 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ): Promise<{ success: boolean; message: string; voucher?: Voucher; session?: ActiveSession }> => {
     const targetPkg = settings.packages.find((p) => p.id === packageId) || settings.packages[0];
 
-    // Simulate network delay for USSD STK-push confirmation
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    try {
+      // Trigger backend STK-Push endpoint
+      await fetch('/api/v1/payments/stk-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone,
+          packageId: targetPkg.id,
+          packageName: targetPkg.name,
+          amount: targetPkg.price,
+          durationHours: targetPkg.durationHours
+        })
+      });
+    } catch (e) {
+      // Graceful fallback if offline
+    }
 
     // Generate dedicated voucher for this payment
     const code = Math.floor(1000 + Math.random() * 9000).toString();

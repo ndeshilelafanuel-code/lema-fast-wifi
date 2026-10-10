@@ -143,7 +143,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const selectedPkg = settings.packages.find((p) => p.id === selectedPackageId) || settings.packages[0];
 
   // Initiate Mobile STK Push
-  const handleStartPayment = (e: React.FormEvent) => {
+  const handleStartPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber.trim()) {
       setStatusMessage({ type: 'error', text: 'Tafadhali weka namba yako ya simu kwanza.' });
@@ -152,11 +152,49 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     setIsProcessing(true);
     setStatusMessage(null);
 
-    // Simulate STK push prompt arrival after 600ms
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/v1/payments/stk-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: phoneNumber,
+          packageId: selectedPackageId,
+          packageName: selectedPkg.name,
+          amount: selectedPkg.price,
+          durationHours: selectedPkg.durationHours
+        })
+      });
+      const data = await res.json();
       setIsProcessing(false);
       setShowUssdPrompt(true);
-    }, 600);
+
+      if (data.orderId) {
+        // Poll order status every 1.5 seconds while modal is open
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusRes = await fetch(`/api/v1/payments/order-status/${data.orderId}`);
+            if (statusRes.ok) {
+              const statusData = await statusRes.json();
+              if (statusData.status === 'completed' && statusData.voucherCode) {
+                clearInterval(pollInterval);
+                setShowUssdPrompt(false);
+                redeemVoucher(statusData.voucherCode, phoneNumber);
+                setStatusMessage({
+                  type: 'success',
+                  text: `Malipo ya Tsh ${selectedPkg.price.toLocaleString()} yamekamilika! Umeunganishwa mtandaoni kwa vocha: ${statusData.voucherCode}.`
+                });
+              }
+            }
+          } catch (e) {}
+        }, 1500);
+
+        // Clear after 90 seconds
+        setTimeout(() => clearInterval(pollInterval), 90000);
+      }
+    } catch (err) {
+      setIsProcessing(false);
+      setShowUssdPrompt(true);
+    }
   };
 
   // Confirm PIN on USSD Prompt
