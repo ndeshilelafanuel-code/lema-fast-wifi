@@ -78,6 +78,7 @@ import { AntiTetheringManager } from './AntiTetheringManager';
 import { WhatsAppBotSuite } from './WhatsAppBotSuite';
 import { SmartBandwidthEngine } from './SmartBandwidthEngine';
 import { GisMapModule } from './GisMapModule';
+import { TowerManagementModule } from './TowerManagementModule';
 import { LemaLogo } from '../common/LemaLogo';
 
 export interface SystemAlert {
@@ -290,6 +291,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     vouchers,
     transactions,
     activeSessions,
+    towers,
+    addTower,
     generateVouchers,
     deleteVoucher,
     disconnectSession,
@@ -313,6 +316,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'routers'
     | 'aps'
     | 'sites'
+    | 'towers'
     | 'gis_map'
     | 'equipment'
     | 'inventory'
@@ -390,41 +394,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newAdTitle, setNewAdTitle] = useState('');
   const [newAdSponsor, setNewAdSponsor] = useState('');
 
-  // Interactive Routers & Access Points States (RodLink Style)
+  // Interactive Routers & Access Points States (Real hardware only)
   const [routers, setRouters] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem('lema_wifi_routers');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [
-      {
-        id: 'r-1',
-        name: 'Lema Core Gateway',
-        type: 'TP-Link Omada',
-        site: 'Mshikamano Block B',
-        status: 'connected',
-        nasIp: '192.168.88.1',
-        controllerUrl: 'https://omada.lemawifi.net',
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Filter out legacy dummy mock routers
+        return parsed.filter((r: any) => !r.name?.includes('Lema Core Gateway') && r.id !== 'r-1');
       }
-    ];
+    } catch (e) {}
+    return [];
   });
 
   const [accessPoints, setAccessPoints] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem('lema_wifi_aps');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [
-      {
-        mac: '50:C7:BF:70:E2:B0',
-        name: 'Mnara Kuu - Ruijie AX3000',
-        model: 'Ruijie RG-RAP62-OD AX3000',
-        site: 'Mshikamano Site',
-        status: 'connected',
-        uptime: 'Online tangu jana',
-        ip: '192.168.88.10'
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Filter out legacy dummy Ruijie AP
+        return parsed.filter((ap: any) => 
+          !ap.name?.toLowerCase().includes('ruijie') && 
+          !ap.model?.toLowerCase().includes('ruijie') &&
+          ap.mac !== '50:C7:BF:70:E2:B0'
+        );
       }
-    ];
+    } catch (e) {}
+    return [];
   });
 
   useEffect(() => {
@@ -434,6 +430,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     localStorage.setItem('lema_wifi_aps', JSON.stringify(accessPoints));
   }, [accessPoints]);
+
+  // If selectedApFilter had the dummy Ruijie name, reset it to 'all'
+  useEffect(() => {
+    if (selectedApFilter.toLowerCase().includes('ruijie') || selectedApFilter === '50:C7:BF:70:E2:B0') {
+      setSelectedApFilter('all');
+    }
+  }, [selectedApFilter]);
 
   // Equipment Inventory & QR Scanner States
   const [showQrEquipmentModal, setShowQrEquipmentModal] = useState<boolean>(false);
@@ -919,6 +922,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Sites / Locations</span>
             </button>
             <button
+              onClick={() => setActiveTab('towers')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
+                activeTab === 'towers'
+                  ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
+                  : 'text-stone-400 hover:bg-stone-850 hover:text-stone-200'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Radio className="w-4 h-4 text-amber-400" />
+                <span>Minara ya Mtandao (Towers)</span>
+              </div>
+              <span className="px-1.5 py-0.2 rounded-md text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300">
+                {towers.length}
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('gis_map')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'gis_map'
@@ -1014,7 +1033,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </h1>
             
             {/* Lema Fast WiFi Access Point Dropdown Selector */}
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
               <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Kituo cha WiFi (AP Selector):</span>
               <select
                 value={selectedApFilter}
@@ -1030,6 +1049,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </option>
                 ))}
               </select>
+
+              {accessPoints.length === 0 && (
+                <button
+                  onClick={() => setShowQrEquipmentModal(true)}
+                  className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300/80 rounded-lg text-[10px] font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                  title="Skani au unganisha AP yako halisi ya TP-Link"
+                >
+                  <Plus className="w-3 h-3 text-amber-600" />
+                  <span>Skani / Sajili TP-Link Yako</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1088,6 +1118,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
         </div>
+
+        {/* MODULE: TOWER MANAGEMENT */}
+        {activeTab === 'towers' && (
+          <TowerManagementModule onOpenGisMap={() => setActiveTab('gis_map')} />
+        )}
 
         {/* MODULE: GIS LIVE MAP VIEW */}
         {activeTab === 'gis_map' && (
@@ -3618,6 +3653,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
+        {/* MODULE: TOWERS / MINARA YA MTANDAO */}
+        {activeTab === 'towers' && (
+          <div className="space-y-6 animate-fadeIn">
+            <TowerManagementModule
+              onOpenGisMap={() => setActiveTab('gis_map')}
+              onOpenScanner={() => setShowQrEquipmentModal(true)}
+            />
+          </div>
+        )}
+
+        {/* MODULE: GIS MAP */}
+        {activeTab === 'gis_map' && (
+          <div className="space-y-6 animate-fadeIn">
+            <GisMapModule />
+          </div>
+        )}
+
         {/* 14. MODULE: EQUIPMENT & INVENTORY */}
         {(activeTab === 'equipment' || (activeTab as string) === 'inventory') && (
           <div className="space-y-6 animate-fadeIn">
@@ -4561,7 +4613,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             // 1. Add to equipment inventory
             setEquipmentInventory((prev) => [newEq, ...prev]);
 
-            // 2. If it's an AP, automatically add to accessPoints list
+            // 2. If it's an AP, automatically add to accessPoints list and HotspotContext towers
             if (newEq.category === 'ap') {
               setAccessPoints((prev) => [
                 {
@@ -4573,6 +4625,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 },
                 ...prev
               ]);
+              addTower({
+                name: newEq.name || `Mnara - ${newEq.model}`,
+                location: newEq.site || 'Kituo cha Mtaani',
+                ipAddress: newEq.ipAddress || '192.168.88.10',
+                macAddress: newEq.macAddress,
+                model: newEq.model,
+                coverageRadiusMeters: 200,
+                status: 'online',
+                frequencyBand: 'WiFi 7 / Dual-Band (2.4/5GHz)',
+                txPowerDbm: 28,
+                antennaType: 'Omni-directional 360°',
+                heightMeters: 18,
+                notes: `Kifaa kilichosajiliwa kwa kamera QR scan (Serial: ${newEq.serialNumber})`,
+                coordinates: {
+                  lat: -6.7924 + (Math.random() - 0.5) * 0.04,
+                  lng: 39.2083 + (Math.random() - 0.5) * 0.04,
+                },
+              });
             }
 
             // 3. If it's a router, automatically add to routers list

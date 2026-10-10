@@ -7,8 +7,6 @@ import {
   Zap,
   ShieldCheck,
   Smartphone,
-  Clock,
-  CheckCircle2,
   ArrowRight,
   TrendingUp,
   BatteryCharging,
@@ -16,11 +14,16 @@ import {
   Star,
   PhoneCall,
   LayoutDashboard,
-  BookOpen,
-  Sparkles,
   Radio,
   Cpu,
-  Check
+  Check,
+  Compass,
+  CreditCard,
+  Gauge,
+  Sparkles,
+  Signal,
+  ShieldAlert,
+  Server
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -29,124 +32,116 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) => {
-  const { settings } = useHotspot();
+  const { settings, towers, activeSessions } = useHotspot();
 
   const scrollToPricing = () => {
     const el = document.getElementById('landing-pricing');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const scrollToFeatures = () => {
+    const el = document.getElementById('landing-features');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <div className="text-stone-800 bg-[#fbf9f4] min-h-screen font-sans selection:bg-[#cca43b]/10 selection:text-[#cca43b]">
+    <div className="text-stone-900 bg-[#faf8f5] min-h-screen font-sans selection:bg-amber-400 selection:text-stone-950">
       
-      {/* 1. HERO SECTION (Wotefy Style Header Split) */}
-      <section className="relative overflow-hidden pt-16 pb-20 sm:pt-24 sm:pb-32 border-b border-[#e6e2d3]">
-        {/* Background Ambient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/3 right-10 w-72 h-72 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+      {/* 1. HERO SECTION: Ultra-Modern Split with Cinematic Photography & Interactive Pill-Free Accents */}
+      <section className="relative overflow-hidden pt-12 pb-20 sm:pt-20 sm:pb-28 border-b border-stone-200/80 bg-linear-to-b from-stone-900 via-stone-900 to-stone-950 text-white">
+        {/* Subtle Ambient Radial Lighting */}
+        <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-10 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
             
-            {/* Left Content Column */}
+            {/* Left Column: Provocative Headline & High Conversion CTAs */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              {/* Brand Label */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-900 text-xs font-bold uppercase tracking-wider">
-                <LemaLogo variant="icon" size={18} />
-                <span className="font-extrabold">Lema Fast WiFi Billing SaaS</span>
+              
+              {/* Clean Sub-header kicker without pill box */}
+              <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-amber-400 uppercase">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
+                <span>LEMA FAST WIFI · MFUMO WA KISASA WA HOTSPOT & BILLING</span>
               </div>
 
               {/* Main Headline */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#231f1c] leading-tight text-balance">
-                Sell WiFi With{' '}
-                <span className="text-[#cca43b]">Less Effort,</span>{' '}
-                <span className="underline decoration-wavy decoration-[#cca43b]/50">
-                  More Revenue
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.1] text-balance">
+                Biashara ya WiFi Mtaani Yenye{' '}
+                <span className="text-transparent bg-clip-text bg-linear-to-r from-amber-400 via-amber-300 to-yellow-200">
+                  Faida Kubwa na Udhibiti Kamili
                 </span>
               </h1>
 
               {/* Subheading */}
-              <p className="text-sm sm:text-base text-stone-600 max-w-xl leading-relaxed">
-                Branded captive portal, mobile-money payments (M-Pesa, Tigo Pesa, Airtel Money, Halopesa), and full control of your access points - everything you need to run paid guest Wi-Fi from one dashboard.
+              <p className="text-base sm:text-lg text-stone-300 max-w-xl leading-relaxed font-normal">
+                Badilisha mtandao wako wa TP-Link Omada na MikroTik kuwa mashine ya mapato ya kila siku. Portal ya kisasa ya wateja, malipo ya haraka ya M-Pesa na Tigo Pesa, na ramani ya GIS ya kusimamia minara yako popote ulipo.
               </p>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3.5 pt-2">
+              <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
                   type="button"
-                  onClick={scrollToPricing}
-                  className="px-6 py-3.5 rounded-2xl bg-[#cca43b] hover:bg-[#b89332] text-white font-black text-sm transition-all shadow-lg shadow-[#cca43b]/20 flex items-center gap-2 cursor-pointer"
+                  onClick={() => onNavigate('customer-portal')}
+                  className="px-7 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-sm transition-all shadow-lg shadow-amber-400/20 hover:shadow-amber-400/30 flex items-center gap-2.5 cursor-pointer transform hover:-translate-y-0.5"
                 >
-                  <span>Anza Sasa Bure (Start Free)</span>
+                  <Smartphone className="w-4 h-4 text-stone-950" />
+                  <span>Jaribu Portal ya Wateja</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => onNavigate('admin-dashboard')}
-                  className="px-5 py-3.5 rounded-2xl bg-white hover:bg-stone-50 text-stone-700 font-bold text-xs border border-[#e6e2d3] transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                  className="px-6 py-4 rounded-xl bg-stone-800/90 hover:bg-stone-800 text-stone-200 hover:text-white font-bold text-sm border border-stone-700/80 transition-all cursor-pointer flex items-center gap-2"
                 >
-                  <LayoutDashboard className="w-3.5 h-3.5 text-[#cca43b]" />
-                  <span>Dhibiti Lango (Dashboard)</span>
+                  <LayoutDashboard className="w-4 h-4 text-amber-400" />
+                  <span>Fungua Admin Dashboard</span>
                 </button>
               </div>
 
-              {/* Trust Indicators */}
-              <p className="text-[11px] text-stone-400 font-semibold tracking-wider flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-[#cca43b]" />
-                <span>TRUSTED BY 229+ HOTSPOT RESELLERS ACROSS TANZANIA</span>
-              </p>
+              {/* Value stats inline without pill enclosure */}
+              <div className="pt-4 border-t border-stone-800 flex flex-wrap items-center gap-6 text-xs text-stone-400 font-medium">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Hakuna ada za siri za kila mwezi</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Inafanya kazi na EAP225, EAP610 & MikroTik</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>M-Pesa STK-Push & ZenoPay</span>
+                </div>
+              </div>
             </div>
 
-            {/* Right Mockup Phone Column */}
-            <div className="lg:col-span-5 flex justify-center">
-              {/* Custom Wotefy Captive Portal Mockup on Right */}
-              <div className="w-[280px] h-[540px] bg-stone-900 border-8 border-stone-800 rounded-[36px] shadow-2xl overflow-hidden relative flex flex-col ring-4 ring-[#e6e2d3]">
-                {/* Camera Notch */}
-                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-24 h-3 bg-stone-900 rounded-full z-20" />
+            {/* Right Column: Hero High-Resolution Photographic Showcase */}
+            <div className="lg:col-span-5 relative">
+              <div className="relative rounded-2xl overflow-hidden border border-stone-700/60 shadow-2xl shadow-black/60 group">
+                <img
+                  src="/src/assets/images/hero_wifi_scene_1791617825078.jpg"
+                  alt="Wateja wakifurahia mtandao wa haraka wa Lema Fast WiFi Dar es Salaam"
+                  className="w-full h-[400px] object-cover group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
                 
-                {/* Screen Frame */}
-                <div className="flex-1 bg-[#fcfaf2] p-4 pt-6 space-y-4 text-[11px] overflow-hidden flex flex-col justify-between">
-                  {/* Portal Header */}
-                  <div className="text-center border-b border-stone-200/50 pb-2.5 flex flex-col items-center">
-                    <LemaLogo variant="full" size="sm" theme="light" showSlogan={false} className="mx-auto mb-1" />
-                    <span className="text-[9px] text-stone-400">Lipia kwa M-Pesa uperuzi kwa kasi</span>
-                  </div>
+                {/* Overlay Gradient */}
+                <div className="absolute inset-0 bg-linear-to-t from-stone-950 via-stone-950/20 to-transparent" />
 
-                  {/* Active Card Design Clay */}
-                  <div className="bg-white border border-[#e6e2d3] p-3 rounded-2xl text-center space-y-1 shadow-xs">
-                    <span className="text-[9px] uppercase font-bold text-[#cca43b] tracking-wider block">Majaribio ya Bure (Trial)</span>
-                    <p className="text-[10px] text-stone-500 leading-relaxed font-medium">Pata dakika 15 za bure kupima spidi yetu mara moja!</p>
-                    <button className="w-full mt-1.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg font-black text-[9px] uppercase">
-                      ANZA MAJARIBIO
-                    </button>
-                  </div>
-
-                  {/* Sample Package Cards */}
-                  <div className="space-y-1.5">
-                    <div className="p-2.5 bg-white border border-[#e6e2d3] rounded-xl flex items-center justify-between shadow-xs">
-                      <div>
-                        <strong className="text-stone-800 text-[10px]">Unlimited masaa 2</strong>
-                        <span className="text-[8px] text-stone-400 block font-medium">Muda: 2 Hours · Spidi: 3Mbps</span>
-                      </div>
-                      <span className="px-2.5 py-1 bg-[#cca43b] text-white rounded-lg font-black text-[9px] tracking-tight">Tsh 500</span>
+                {/* Floating Real-Time Indicator Badge */}
+                <div className="absolute bottom-4 left-4 right-4 p-4 rounded-xl bg-stone-900/90 backdrop-blur-md border border-stone-700/70 text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <strong className="text-xs font-bold text-white">Mtandao Upo Hewani</strong>
                     </div>
-
-                    <div className="p-2.5 bg-white border border-[#e6e2d3] rounded-xl flex items-center justify-between shadow-xs ring-1 ring-[#cca43b]">
-                      <div>
-                        <strong className="text-stone-800 text-[10px] flex items-center gap-1">
-                          <span>Unlimited masaa 24</span>
-                          <span className="text-[7px] bg-red-500 text-white px-1 rounded font-bold">HOT</span>
-                        </strong>
-                        <span className="text-[8px] text-stone-400 block font-medium">Muda: 24 Hours · Spidi: 3Mbps</span>
-                      </div>
-                      <span className="px-2.5 py-1 bg-[#cca43b] text-white rounded-lg font-black text-[9px] tracking-tight">Tsh 1,000</span>
-                    </div>
+                    <span className="text-[11px] font-mono text-amber-400 font-bold">Spidi 50 Mbps</span>
                   </div>
-
-                  <div className="text-center text-[8px] text-stone-400 pt-1 border-t border-stone-200/50">
-                    Msaada piga: <span className="font-bold text-stone-600">0653 578 184</span>
-                  </div>
+                  <p className="text-[11px] text-stone-300">
+                    Wateja wanaunganishwa moja kwa moja kupitia simu zao kwa kulipia vocha ya Tsh 500 au Tsh 1,000 papo hapo.
+                  </p>
                 </div>
               </div>
             </div>
@@ -155,62 +150,320 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
         </div>
       </section>
 
-      {/* 2. THREE DYNAMIC LIVE METRICS BAR (Wotefy Style Stats) */}
-      <section className="bg-white border-b border-[#e6e2d3] py-8">
+      {/* 2. REAL-TIME STATS TICKER (Sleek Minimal Typography) */}
+      <section className="bg-white border-b border-stone-200/80 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center divide-y sm:divide-y-0 sm:divide-x divide-stone-200">
-            <div className="p-2">
-              <span className="text-3xl sm:text-4xl font-black text-[#cca43b] font-mono block">229+</span>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider mt-1 block">Active Hotspot Resellers</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-left">
+            <div className="border-l-2 border-amber-400 pl-4">
+              <span className="text-3xl sm:text-4xl font-black text-stone-950 font-mono tracking-tight block">99.9%</span>
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-1 block">Uimara wa Mfumo (Uptime)</span>
             </div>
-            <div className="p-2">
-              <span className="text-3xl sm:text-4xl font-black text-stone-800 font-mono block">823+</span>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider mt-1 block">Configured Wi-Fi APs</span>
+            <div className="border-l-2 border-emerald-500 pl-4">
+              <span className="text-3xl sm:text-4xl font-black text-stone-950 font-mono tracking-tight block">&lt; 3 Sek</span>
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-1 block">Muda wa Kupokea Vocha</span>
             </div>
-            <div className="p-2">
-              <span className="text-3xl sm:text-4xl font-black text-emerald-600 font-mono block">99.9%</span>
-              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider mt-1 block">SaaS Platform Uptime</span>
+            <div className="border-l-2 border-sky-500 pl-4">
+              <span className="text-3xl sm:text-4xl font-black text-stone-950 font-mono tracking-tight block">200m+</span>
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-1 block">Mzingo wa Coverage kwa Mnara</span>
+            </div>
+            <div className="border-l-2 border-stone-900 pl-4">
+              <span className="text-3xl sm:text-4xl font-black text-stone-950 font-mono tracking-tight block">Tsh 0</span>
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider mt-1 block">Gharama ya Kuanza Majaribio</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. HARDWARE INTEGRATION: BUILT FOR REAL VENUES (TP-Link Omada & Access Points Grid) */}
-      <section className="py-16 sm:py-24 bg-[#fbf9f4] border-b border-[#e6e2d3]">
+      {/* 3. VISUAL FEATURE SHOWCASE 1: MINARA & RAMANI YA GIS (Telecommunication Hardware & Coverage) */}
+      <section id="landing-features" className="py-20 sm:py-28 bg-[#faf8f5] border-b border-stone-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Visual Image Card with Hardware Photo */}
+            <div className="lg:col-span-6 relative">
+              <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-xl group">
+                <img
+                  src="/src/assets/images/telecom_tower_antenna_1791617835995.jpg"
+                  alt="Mnara wa TP-Link Omada Outdoor na antena za wireless"
+                  className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-stone-950/80 via-transparent to-transparent" />
+                <div className="absolute bottom-5 left-5 right-5 text-white">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Radio className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Outdoor Hardware Ready</span>
+                  </div>
+                  <h4 className="text-lg font-bold">TP-Link Omada EAP & MikroTik Metal</h4>
+                  <p className="text-xs text-stone-300">Antena za mzingo wa mita 200 zenye nguvu ya kupenya kuta na kutoa huduma kwa wateja wengi kwa wakati mmoja.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content Details */}
+            <div className="lg:col-span-6 space-y-6 text-left">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-600 uppercase tracking-wider">
+                <Compass className="w-4 h-4" />
+                <span>Teknolojia ya GIS & Live Map</span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl font-black text-stone-900 tracking-tight leading-tight">
+                Simamia Kila Mnara na Access Point Kwenye Ramani ya GIS
+              </h2>
+
+              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
+                Hakuna tena kubahatisha kama mnara wako una umeme au waya umeng'oka. Dashibodi yetu inakuonyesha ramani ya GIS yenye duara la mita 200, taa za kijani au nyekundu za afya ya kifaa, na idadi ya wateja waliopo hewani kwa sekunde hiyo hiyo.
+              </p>
+
+              <div className="space-y-3.5 pt-2">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
+                    <Check className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <strong className="text-stone-900 text-sm font-bold block">Taa za Hali ya Mtandao (Live Status)</strong>
+                    <span className="text-stone-500 text-xs">Taa ya kijani inamaanisha AP ipo hewani; nyekundu inakuonya umeme umekatika au waya umechomoka mara moja.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 mt-0.5">
+                    <Compass className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <strong className="text-stone-900 text-sm font-bold block">Mzingo wa Coverage wa Mita 200</strong>
+                    <span className="text-stone-500 text-xs">Ona eneo kamili ambalo mtandao wako unafika mtaani ili ujue wapi pa kuongeza mnara mpya.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-sky-100 text-sky-800 shrink-0 mt-0.5">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <strong className="text-stone-900 text-sm font-bold block">Idadi ya Wateja Halisi (Live Connected Clients)</strong>
+                    <span className="text-stone-500 text-xs">Jua ni wateja wangapi wapo hewani kwa kila mnara ili udhibiti msongamano na kasi ya mtandao.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('admin-dashboard')}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-700 transition-colors cursor-pointer"
+                >
+                  <span>Angalia Ramani ya GIS Kwenye Dashibodi</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 4. VISUAL FEATURE SHOWCASE 2: MALIPO YA SIMU (M-Pesa, Tigo, Airtel, Halopesa) */}
+      <section className="py-20 sm:py-28 bg-white border-b border-stone-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Content Details */}
+            <div className="lg:col-span-6 space-y-6 text-left order-2 lg:order-1">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 uppercase tracking-wider">
+                <CreditCard className="w-4 h-4" />
+                <span>Malipo ya Papo kwa Hapo</span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl font-black text-stone-900 tracking-tight leading-tight">
+                Mteja Analipia Vocha kwa M-Pesa na Kuunganishwa Mara Moja
+              </h2>
+
+              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
+                Ondoa usumbufu wa kugawa vocha za karatasi na kutoa chenji. Mteja anapounganisha simu yake kwenye WiFi, ukurasa wa malipo unajitokeza. Anaingiza namba yake ya simu, anapokea ombi la PIN ya M-Pesa (STK Push), na vocha inafunguka kiotomatiki.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="p-4 rounded-xl bg-stone-50 border border-stone-200">
+                  <strong className="text-stone-900 text-sm font-bold block mb-1">M-Pesa & Tigo Pesa</strong>
+                  <span className="text-stone-500 text-xs">Uunganishaji wa moja kwa moja kupitia Vodacom & Tigo APIs.</span>
+                </div>
+                <div className="p-4 rounded-xl bg-stone-50 border border-stone-200">
+                  <strong className="text-stone-900 text-sm font-bold block mb-1">Airtel & HaloPesa</strong>
+                  <span className="text-stone-500 text-xs">Inasaidia mitandao yote 4 mikubwa ya simu Tanzania.</span>
+                </div>
+                <div className="p-4 rounded-xl bg-stone-50 border border-stone-200">
+                  <strong className="text-stone-900 text-sm font-bold block mb-1">SMS ya Vocha</strong>
+                  <span className="text-stone-500 text-xs">Mteja anapokea ujumbe mfupi wa namba ya vocha kwa dharura.</span>
+                </div>
+                <div className="p-4 rounded-xl bg-stone-50 border border-stone-200">
+                  <strong className="text-stone-900 text-sm font-bold block mb-1">Pesa Moja kwa Moja</strong>
+                  <span className="text-stone-500 text-xs">Mapato yote yanaingia kwenye akaunti yako au Till namba yako.</span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('customer-portal')}
+                  className="px-6 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                >
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span>Tazama Jinsi Mteja Anavyonunua Vocha</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Visual Image Card with Smartphone Payment Screen */}
+            <div className="lg:col-span-6 relative order-1 lg:order-2">
+              <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-xl group">
+                <img
+                  src="/src/assets/images/mobile_money_pay_1791617847899.jpg"
+                  alt="Uthibitisho wa malipo ya simu ya M-Pesa kwa vocha ya Wi-Fi"
+                  className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-stone-950/80 via-transparent to-transparent" />
+                <div className="absolute bottom-5 left-5 right-5 text-white">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">STK Push Technology</span>
+                  </div>
+                  <h4 className="text-lg font-bold">Malipo ya Haraka Bila Foleni</h4>
+                  <p className="text-xs text-stone-300">Mfumo unafanya kazi masaa 24 hata ukiwa umelala au uko safarini.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 5. VISUAL FEATURE SHOWCASE 3: DASHIBODI YA USIMAMIZI & BANDWIDTH SHAPING */}
+      <section className="py-20 sm:py-28 bg-[#faf8f5] border-b border-stone-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            {/* Visual Image Card: Operations Center / Network Desk */}
+            <div className="lg:col-span-6 relative">
+              <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-xl group">
+                <img
+                  src="/src/assets/images/network_operations_desk_1791617859620.jpg"
+                  alt="Msimamizi wa mtandao akitazama dashibodi ya bandwidth na takwimu za hotspot"
+                  className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-stone-950/80 via-transparent to-transparent" />
+                <div className="absolute bottom-5 left-5 right-5 text-white">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Gauge className="w-4 h-4 text-sky-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-sky-400">Bandwidth Shaper Engine</span>
+                  </div>
+                  <h4 className="text-lg font-bold">Udhibiti wa Kasi na Mgawanyo Sawa</h4>
+                  <p className="text-xs text-stone-300">Zuia mteja mmoja asimalize bando au asilete spidi ndogo kwa watumiaji wengine.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content Details */}
+            <div className="lg:col-span-6 space-y-6 text-left">
+              <div className="flex items-center gap-2 text-xs font-bold text-sky-700 uppercase tracking-wider">
+                <Gauge className="w-4 h-4" />
+                <span>Usimamizi wa Kitaalamu</span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl font-black text-stone-900 tracking-tight leading-tight">
+                Udhibiti Kamili wa Bandwidth, Vifurushi, na Wateja Waliounganishwa
+              </h2>
+
+              <p className="text-stone-600 text-sm sm:text-base leading-relaxed">
+                Kila mteja anapewa spidi maalum (kama 3Mbps au 5Mbps) na muda halisi unaohesabiwa kiotomatiki. Muda wake ukiisha, mtandao unakatika papo hapo hadi anunue vocha mpya.
+              </p>
+
+              <div className="space-y-3.5 pt-2">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-sky-100 text-sky-800 shrink-0 mt-0.5">
+                    <Gauge className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <strong className="text-stone-900 text-sm font-bold block">Smart Bandwidth Shaper</strong>
+                    <span className="text-stone-500 text-xs">Punguza spidi kwa wateja wanaopakua mafaili makubwa ili YouTube na WhatsApp za wengine ziendelee kwa kasi.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <strong className="text-stone-900 text-sm font-bold block">Orodha ya Wateja Walio Hewani (Live Sessions)</strong>
+                    <span className="text-stone-500 text-xs">Ona IP, MAC address, na kiasi cha MBs kilichotumiwa na kila simu au kompyuta iliyounganishwa.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-100 text-amber-800 shrink-0 mt-0.5">
+                    <Server className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <strong className="text-stone-900 text-sm font-bold block">Uzalishaji na Uchapishaji wa Vocha</strong>
+                    <span className="text-stone-500 text-xs">Tengeneza na chapisha vocha za karatasi (Batch Print) zenye QR Code kwa ajili ya maduka na vibanda vya mtaani.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('admin-dashboard')}
+                  className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dhibiti Mtandao Wako Sasa</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 6. HARDWARE COMPATIBILITY: TP-LINK OMADA & MIKROTIK */}
+      <section className="py-16 sm:py-24 bg-white border-b border-stone-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           
           <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-[#cca43b] uppercase tracking-wider">Adopted & Fully Integrated</span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#231f1c]">Built for Real Venues</h2>
+            <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block">Vifaa Vinavyoungwa Mkono</span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-stone-950">Inafanya Kazi na Vifaa Vyako Vyote vya Hotspot</h2>
             <p className="text-sm text-stone-500">
-              From indoor ceiling APs to high-power outdoor Wi-Fi antennas — Lema Fast WiFi pairs seamlessly with the entire TP-Link Omada and RouterOS family of products.
+              Hakuna haja ya kubadilisha vifaa vyako ulivyonavyo. Mfumo wetu unaunganishwa moja kwa moja na mifumo ya TP-Link Omada na MikroTik RouterOS.
             </p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-xs font-bold">
             {[
-              { id: '1', name: 'JetStream Switch', desc: 'Managed POE Switch', rating: '4.8', icon: <Cpu className="w-5 h-5 text-stone-500" /> },
-              { id: '2', name: 'EAP245 Indoor', desc: 'Ceiling Access Point', rating: '4.9', icon: <Radio className="w-5 h-5 text-stone-500" /> },
-              { id: '3', name: 'EAP610 Outdoor', desc: 'Wi-Fi 6 Outdoor AP', rating: '4.9', icon: <Wifi className="w-5 h-5 text-emerald-500 animate-pulse" /> },
-              { id: '4', name: 'EAP225 Outdoor', desc: 'Gigabit AC1200 AP', rating: '4.7', icon: <Radio className="w-5 h-5 text-stone-500" /> },
-              { id: '5', name: 'EAP110 Outdoor', desc: 'AC300 Outdoor AP', rating: '4.6', icon: <Wifi className="w-5 h-5 text-stone-500" /> },
-              { id: '6', name: 'ER605 Gateway', desc: 'Multi-WAN VPN Router', rating: '4.8', icon: <Cpu className="w-5 h-5 text-stone-500" /> },
+              { id: '1', name: 'TP-Link EAP225', desc: 'Outdoor AC1200 AP', type: 'Access Point', badge: 'Omada' },
+              { id: '2', name: 'TP-Link EAP610', desc: 'Outdoor Wi-Fi 6 AP', type: 'Access Point', badge: 'Wi-Fi 6' },
+              { id: '3', name: 'TP-Link EAP110', desc: 'Outdoor 300Mbps AP', type: 'Access Point', badge: 'Budget' },
+              { id: '4', name: 'MikroTik hEX', desc: 'Gigabit Core Router', type: 'Router', badge: 'RouterOS' },
+              { id: '5', name: 'MikroTik RB4011', desc: 'High Bandwidth Router', type: 'Core Gateway', badge: 'Heavy Load' },
+              { id: '6', name: 'TP-Link ER605', desc: 'Omada Multi-WAN VPN', type: 'Gateway', badge: 'Dual WAN' },
             ].map((hw) => (
               <div
                 key={hw.id}
-                className="bg-white border border-[#e6e2d3] rounded-2xl p-4 space-y-3 hover:shadow-md transition-shadow relative flex flex-col justify-between"
+                className="bg-[#faf8f5] border border-stone-200/90 rounded-2xl p-4 space-y-3 hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between"
               >
                 <div className="space-y-1.5">
-                  <div className="w-9 h-9 rounded-xl bg-stone-50 flex items-center justify-center border border-stone-100">
-                    {hw.icon}
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-stone-200 shadow-xs">
+                    <Wifi className="w-5 h-5 text-amber-500" />
                   </div>
-                  <strong className="text-xs font-black text-stone-800 block truncate">{hw.name}</strong>
-                  <span className="text-[10px] text-stone-400 font-medium block truncate">{hw.desc}</span>
+                  <strong className="text-xs font-black text-stone-900 block truncate">{hw.name}</strong>
+                  <span className="text-[10px] text-stone-500 font-medium block truncate">{hw.desc}</span>
                 </div>
                 
-                <div className="flex items-center justify-between border-t border-stone-100 pt-2 text-[10px]">
-                  <span className="text-amber-500 font-bold">★ {hw.rating}</span>
-                  <span className="text-[8px] bg-stone-100 text-stone-500 px-1 rounded">Omada</span>
+                <div className="flex items-center justify-between border-t border-stone-200/80 pt-2 text-[10px]">
+                  <span className="text-stone-400">{hw.type}</span>
+                  <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">{hw.badge}</span>
                 </div>
               </div>
             ))}
@@ -219,170 +472,173 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
         </div>
       </section>
 
-      {/* 4. PRICING & SAAS SUBSCRIPTION PLANS (Wotefy Style Scaled Plans) */}
-      <section id="landing-pricing" className="py-16 sm:py-24 border-b border-[#e6e2d3] bg-[#fbf9f4]">
+      {/* 7. PRICING & SUBSCRIPTION PACKAGES */}
+      <section id="landing-pricing" className="py-20 sm:py-28 border-b border-stone-200/80 bg-[#faf8f5]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           
           <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-[#cca43b] uppercase tracking-wider block">Plans that scale with you</span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#231f1c]">Plans That Scale With You</h2>
+            <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block">Vifurushi vya Usimamizi</span>
+            <h2 className="text-3xl sm:text-4xl font-black text-stone-950">Chagua Kifurushi Kinacholingana na Mtandao Wako</h2>
             <p className="text-sm text-stone-500">
-              Chagua kifurushi cha kujiunga na mfumo wetu wa usimamizi (SaaS Profile) kulingana na ukubwa wa mtandao wako mtaani kwako.
+              Anza bure kujaribu mfumo, au jiunge na vifurushi vyenye uwezo mkubwa kadri mtandao wako unavyotanuka mtaani.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-stretch">
             
-            {/* Plan 1: SSD Starter */}
-            <div className="bg-white border border-[#e6e2d3] rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-xs hover:border-[#cca43b] transition-colors relative">
+            {/* Plan 1: Starter Free */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xs hover:border-amber-400 transition-colors">
               <div className="space-y-4">
                 <div>
-                  <strong className="text-sm uppercase font-bold text-stone-400 block tracking-wider">SSD Starter</strong>
-                  <h3 className="text-2xl font-black text-stone-800 pt-1">Free</h3>
-                  <span className="text-[10px] text-stone-400 font-semibold block">Perfect for new resellers - 7 Days</span>
+                  <strong className="text-xs uppercase font-bold text-stone-400 block tracking-wider">Majaribio (Starter)</strong>
+                  <h3 className="text-2xl font-black text-stone-900 pt-1">Bure</h3>
+                  <span className="text-[11px] text-stone-500 font-semibold block">Siku 7 za majaribio bila malipo</span>
                 </div>
 
-                <ul className="space-y-2 text-xs text-stone-600 font-medium border-t border-stone-100 pt-4">
+                <ul className="space-y-2.5 text-xs text-stone-600 border-t border-stone-100 pt-4">
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>1 Access point maximum</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Access Point 1</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Unlimited active clients</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Wateja wasio na kikomo</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Customizable captive branding</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Portal ya Kisasa ya Lema</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Live client monitoring logs</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Ramani ya Majaribio</span>
                   </li>
                 </ul>
               </div>
 
               <button
                 onClick={() => onNavigate('admin-dashboard')}
-                className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-xl text-xs uppercase cursor-pointer"
+                className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs uppercase cursor-pointer transition-colors"
               >
-                Anza Sasa (Start Free)
+                Anza Sasa Bure
               </button>
             </div>
 
-            {/* Plan 2: SSD Growth (Most Popular) */}
-            <div className="bg-white border-2 border-[#cca43b] rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-xl relative scale-[1.03]">
-              {/* Popular Badge */}
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#cca43b] text-white px-3 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider">
-                MOST POPULAR
+            {/* Plan 2: Growth (Most Popular) */}
+            <div className="bg-white border-2 border-amber-400 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xl relative scale-[1.02]">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-stone-950 px-3 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider">
+                KIFURUSHI BORA
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <strong className="text-sm uppercase font-bold text-[#cca43b] block tracking-wider">SSD Growth</strong>
-                  <h3 className="text-2xl font-black text-stone-800 pt-1">TSH 15,000 <span className="text-xs font-normal text-stone-400">/mo</span></h3>
-                  <span className="text-[10px] text-stone-400 font-semibold block">Best for established hotspots</span>
+                  <strong className="text-xs uppercase font-bold text-amber-600 block tracking-wider">Growth</strong>
+                  <h3 className="text-2xl font-black text-stone-900 pt-1">Tsh 15,000 <span className="text-xs font-normal text-stone-400">/mwezi</span></h3>
+                  <span className="text-[11px] text-stone-500 font-semibold block">Inafaa minara 1 hadi 5 mtaani</span>
                 </div>
 
-                <ul className="space-y-2 text-xs text-stone-600 font-medium border-t border-stone-100 pt-4">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>1 Site (Local access limits)</span>
+                <ul className="space-y-2.5 text-xs text-stone-700 border-t border-stone-100 pt-4">
+                  <li className="flex items-center gap-2 font-semibold">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Hadi Minara / APs 5</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>5 Access points maximum</span>
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Ramani ya GIS ya Minara Live</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>SMS Notifications Integration</span>
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Malipo ya M-Pesa & Tigo STK</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Interim update accounting logs</span>
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>SMS za Vocha kwa Wateja</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Smart Bandwidth Limiter</span>
                   </li>
                 </ul>
               </div>
 
               <button
                 onClick={() => onNavigate('admin-dashboard')}
-                className="w-full py-3 bg-[#cca43b] hover:bg-[#b89332] text-white font-black rounded-xl text-xs uppercase cursor-pointer shadow-md"
+                className="w-full py-3 bg-amber-400 hover:bg-amber-300 text-stone-950 font-black rounded-xl text-xs uppercase cursor-pointer shadow-md transition-colors"
               >
-                Gusa Upate (Get Started)
+                Chagua Kifurushi Hiki
               </button>
             </div>
 
-            {/* Plan 3: SSD Power */}
-            <div className="bg-white border border-[#e6e2d3] rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-xs hover:border-[#cca43b] transition-colors relative">
+            {/* Plan 3: Pro */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xs hover:border-amber-400 transition-colors">
               <div className="space-y-4">
                 <div>
-                  <strong className="text-sm uppercase font-bold text-stone-400 block tracking-wider">SSD Power</strong>
-                  <h3 className="text-2xl font-black text-stone-800 pt-1">TSH 25,000 <span className="text-xs font-normal text-stone-400">/mo</span></h3>
-                  <span className="text-[10px] text-stone-400 font-semibold block">For larger multi-AP sites</span>
+                  <strong className="text-xs uppercase font-bold text-stone-400 block tracking-wider">Pro Business</strong>
+                  <h3 className="text-2xl font-black text-stone-900 pt-1">Tsh 25,000 <span className="text-xs font-normal text-stone-400">/mwezi</span></h3>
+                  <span className="text-[11px] text-stone-500 font-semibold block">Mtandao mkubwa wa mtaa mzima</span>
                 </div>
 
-                <ul className="space-y-2 text-xs text-stone-600 font-medium border-t border-stone-100 pt-4">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>1 Site structure maximum</span>
+                <ul className="space-y-2.5 text-xs text-stone-600 border-t border-stone-100 pt-4">
+                  <li className="flex items-center gap-2 font-semibold">
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Hadi Minara / APs 15</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>15 Access points maximum</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Multi-site Network Routing</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Live Wi-Fi (Omada/Mikrotik)</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Ripoti za Fedha & Faida</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Advanced developer API limits</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Kikokotoo cha ROI & Break-even</span>
                   </li>
                 </ul>
               </div>
 
               <button
                 onClick={() => onNavigate('admin-dashboard')}
-                className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-xl text-xs uppercase cursor-pointer"
+                className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs uppercase cursor-pointer transition-colors"
               >
-                Gusa Upate (Get Started)
+                Chagua Pro
               </button>
             </div>
 
-            {/* Plan 4: SSD Ultra */}
-            <div className="bg-white border border-[#e6e2d3] rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-xs hover:border-[#cca43b] transition-colors relative">
+            {/* Plan 4: Ultra Enterprise */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-6 flex flex-col justify-between space-y-6 shadow-xs hover:border-amber-400 transition-colors">
               <div className="space-y-4">
                 <div>
-                  <strong className="text-sm uppercase font-bold text-stone-400 block tracking-wider">SSD Ultra</strong>
-                  <h3 className="text-2xl font-black text-stone-800 pt-1">TSH 50,000 <span className="text-xs font-normal text-stone-400">/mo</span></h3>
-                  <span className="text-[10px] text-stone-400 font-semibold block">Unlimited multi-site networks</span>
+                  <strong className="text-xs uppercase font-bold text-stone-400 block tracking-wider">Ultra Enterprise</strong>
+                  <h3 className="text-2xl font-black text-stone-900 pt-1">Tsh 50,000 <span className="text-xs font-normal text-stone-400">/mwezi</span></h3>
+                  <span className="text-[11px] text-stone-500 font-semibold block">Minara isiyo na idadi maalum</span>
                 </div>
 
-                <ul className="space-y-2 text-xs text-stone-600 font-medium border-t border-stone-100 pt-4">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Unlimited Sites / Locations</span>
+                <ul className="space-y-2.5 text-xs text-stone-600 border-t border-stone-100 pt-4">
+                  <li className="flex items-center gap-2 font-semibold">
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Minara na APs bila kikomo</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Unlimited Access points adopts</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Dedicated SMS Gateway</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Full API integrations support</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Usaidizi wa kipaumbele 24/7</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#cca43b] shrink-0" />
-                    <span>Dedicated priority SMS server</span>
+                    <Check className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Custom Brand & Subdomain</span>
                   </li>
                 </ul>
               </div>
 
               <button
                 onClick={() => onNavigate('admin-dashboard')}
-                className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-xl text-xs uppercase cursor-pointer"
+                className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs uppercase cursor-pointer transition-colors"
               >
-                Gusa Upate (Get Started)
+                Chagua Ultra
               </button>
             </div>
 
@@ -391,78 +647,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
         </div>
       </section>
 
-      {/* 5. DYNAMIC FEATURES COMPARISON BLOCK */}
-      <section className="py-16 sm:py-20 bg-white border-b border-[#e6e2d3]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block">Hotspot Advantages</span>
-            <h2 className="text-2xl sm:text-3xl font-black text-[#231f1c]">Kwanini Kuchagua WiFi Yetu Mtaani?</h2>
-            <p className="text-sm text-stone-500">Tofauti yetu kubwa na vifurushi vya dharura vya mitandao ya simu.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-3xl bg-[#fbf9f4] border border-[#e6e2d3] space-y-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-[#cca43b]/20 flex items-center justify-center text-[#cca43b]">
-                <Zap className="w-5 h-5 animate-pulse" />
-              </div>
-              <h3 className="text-base font-bold text-stone-800">No Data Cap Anxiety</h3>
-              <p className="text-xs text-stone-500 leading-relaxed font-medium">
-                Vifurushi vya kawaida vya simu vinamalizika haraka sana ukiangalia video za HD. Kwenye WiFi yetu unanunua muda safi (Saa 2 au 24) usio na kikomo cha data!
-              </p>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-[#fbf9f4] border border-[#e6e2d3] space-y-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600">
-                <BatteryCharging className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-stone-800">24/7 Power Security</h3>
-              <p className="text-xs text-stone-500 leading-relaxed font-medium">
-                Vifaa vyetu vya mtaani vina betri maalum za dharura (Backup Batteries). Hata umeme wa TANESCO ukikatika mtaani, intaneti inaendelea kuwaka kwa utulivu!
-              </p>
-            </div>
-
-            <div className="p-6 rounded-3xl bg-[#fbf9f4] border border-[#e6e2d3] space-y-3">
-              <div className="w-10 h-10 rounded-2xl bg-sky-50 flex items-center justify-center border border-sky-100 text-sky-600">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-stone-800">Encrypted isolated browsing</h3>
-              <p className="text-xs text-stone-500 leading-relaxed font-medium">
-                Teknolojia ya MikroTik & Omada Client Isolation inalinda taarifa na vifaa vyako dhidi ya kuingiliwa na kifaa kingine chochote kwenye mtandao wetu mkuu.
-              </p>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* 6. HELP CALL TO ACTION FOOTER */}
-      <section className="py-14 bg-[#fbf9f4]">
+      {/* 8. FOOTER CALL TO ACTION */}
+      <section className="py-16 bg-stone-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="p-8 sm:p-10 rounded-3xl bg-[#231f1c] text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
+          <div className="p-8 sm:p-12 rounded-3xl bg-linear-to-r from-stone-950 via-stone-900 to-stone-950 border border-stone-800 flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl">
             <div className="space-y-2 text-center md:text-left">
-              <h3 className="text-xl sm:text-2xl font-black">Unahitaji Msaada au Vocha ya Mwezi?</h3>
-              <p className="text-xs sm:text-sm text-stone-400 max-w-xl font-medium">
-                Wasiliana nasi moja kwa moja kwa WhatsApp au Simu namba: {settings.supportPhone}. Tuko tayari kukuhudumia na kukupa muongozo bora zaidi.
+              <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <Sparkles className="w-4 h-4" />
+                <span>Anza Leo Hii Mtaani Kwako</span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-black">Je, Uko Tayari Kuanza Kuuza WiFi Yenye Faida?</h3>
+              <p className="text-xs sm:text-sm text-stone-400 max-w-xl font-normal leading-relaxed">
+                Wasiliana nasi au piga simu namba <span className="font-bold text-amber-400">{settings.supportPhone}</span> kwa msaada wa kusanidi vifaa vyako na kuanza kupokea malipo moja kwa moja.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
               <a
                 href={`tel:${settings.supportPhone.replace(/\s+/g, '')}`}
-                className="px-5 py-3 rounded-xl bg-[#cca43b] hover:bg-[#b89332] text-white font-black text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                className="px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
               >
                 <PhoneCall className="w-4 h-4" />
-                <span>{settings.supportPhone}</span>
+                <span>Piga {settings.supportPhone}</span>
               </a>
 
               <button
                 type="button"
-                onClick={() => onNavigate('guide')}
-                className="px-4 py-3 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-300 hover:text-white font-bold text-xs border border-stone-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                onClick={() => onNavigate('admin-dashboard')}
+                className="px-5 py-3.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white font-bold text-xs border border-stone-700 transition-colors flex items-center gap-2 cursor-pointer"
               >
-                <BookOpen className="w-4 h-4 text-[#cca43b]" />
-                <span>Mwongozo wa Kiufundi</span>
+                <LayoutDashboard className="w-4 h-4 text-amber-400" />
+                <span>Fungua Admin Dashboard</span>
               </button>
             </div>
           </div>

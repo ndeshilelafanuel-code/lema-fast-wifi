@@ -58,6 +58,28 @@ export interface ActiveSession {
   bytesUp: number;
 }
 
+export interface NetworkTower {
+  id: string;
+  name: string;
+  location: string;
+  ipAddress: string;
+  macAddress?: string;
+  model: string;
+  coverageRadiusMeters: number;
+  status: 'online' | 'offline' | 'maintenance';
+  frequencyBand: string;
+  txPowerDbm?: number;
+  antennaType?: string;
+  heightMeters?: number;
+  notes?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  installedAt: string;
+  lastPingMs?: number;
+}
+
 export interface HotspotSettings {
   hotspotName: string;
   tagline: string;

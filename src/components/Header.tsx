@@ -10,7 +10,6 @@ import {
   Zap,
   LayoutDashboard,
   Smartphone,
-  BookOpen,
   Home,
   Lock
 } from 'lucide-react';
@@ -89,18 +88,6 @@ export const Header: React.FC<HeaderProps> = ({
               <Lock className="w-3.5 h-3.5" />
               <span>{lang === 'sw' ? 'Admin' : 'Admin'}</span>
             </button>
-
-            <button
-              onClick={() => onViewChange('guide')}
-              className={`flex items-center gap-1.5 px-3 py-1 font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                appView === 'guide'
-                  ? 'bg-stone-700 text-white shadow-xs'
-                  : 'text-stone-400 hover:text-white'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>{lang === 'sw' ? 'Mwongozo' : 'Blueprint'}</span>
-            </button>
           </div>
         </div>
 
@@ -163,14 +150,6 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               Portal
-            </button>
-            <button
-              onClick={() => onViewChange('guide')}
-              className={`px-2 py-1 rounded ${
-                appView === 'guide' ? 'bg-stone-700 text-white' : 'text-stone-400'
-              }`}
-            >
-              Guide
             </button>
           </div>
 

@@ -5,6 +5,7 @@ import {
   PaymentTransaction,
   ActiveSession,
   HotspotSettings,
+  NetworkTower,
 } from '../types';
 
 interface HotspotContextType {
@@ -13,6 +14,10 @@ interface HotspotContextType {
   vouchers: Voucher[];
   transactions: PaymentTransaction[];
   activeSessions: ActiveSession[];
+  towers: NetworkTower[];
+  addTower: (tower: Omit<NetworkTower, 'id' | 'installedAt'>) => NetworkTower;
+  updateTower: (id: string, updates: Partial<NetworkTower>) => void;
+  deleteTower: (id: string) => void;
   generateVouchers: (packageId: string, count: number) => Voucher[];
   redeemVoucher: (code: string, phone?: string) => { success: boolean; message: string; session?: ActiveSession };
   processMobilePayment: (
@@ -96,6 +101,8 @@ const SEED_TRANSACTIONS: PaymentTransaction[] = [];
 
 const SEED_ACTIVE_SESSIONS: ActiveSession[] = [];
 
+const DEFAULT_TOWERS: NetworkTower[] = [];
+
 const HotspotContext = createContext<HotspotContextType | undefined>(undefined);
 
 export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -167,6 +174,18 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Network Towers State (Managed via HotspotContext)
+  const [towers, setTowers] = useState<NetworkTower[]>(() => {
+    try {
+      const saved = localStorage.getItem('wifi_hotspot_towers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter((t: NetworkTower) => t.id !== 'tower-1' && !t.name.includes('Town Center'));
+      }
+    } catch (e) {}
+    return DEFAULT_TOWERS;
+  });
+
   // Save to localStorage whenever state changes
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_settings', JSON.stringify(settings));
@@ -183,6 +202,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(activeSessions));
   }, [activeSessions]);
+
+  useEffect(() => {
+    localStorage.setItem('wifi_hotspot_towers', JSON.stringify(towers));
+  }, [towers]);
 
   useEffect(() => {
     if (currentClientSession) {
@@ -416,11 +439,31 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const addTower = (towerData: Omit<NetworkTower, 'id' | 'installedAt'>): NetworkTower => {
+    const newTower: NetworkTower = {
+      ...towerData,
+      id: `tower-${Date.now()}`,
+      installedAt: new Date().toISOString(),
+      lastPingMs: towerData.lastPingMs || Math.floor(Math.random() * 8) + 2,
+    };
+    setTowers((prev) => [newTower, ...prev]);
+    return newTower;
+  };
+
+  const updateTower = (id: string, updates: Partial<NetworkTower>) => {
+    setTowers((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+  };
+
+  const deleteTower = (id: string) => {
+    setTowers((prev) => prev.filter((t) => t.id !== id));
+  };
+
   const resetDemoData = () => {
     setSettings(DEFAULT_SETTINGS);
     setVouchers(SEED_VOUCHERS);
     setTransactions(SEED_TRANSACTIONS);
     setActiveSessions(SEED_ACTIVE_SESSIONS);
+    setTowers(DEFAULT_TOWERS);
     setCurrentClientSession(null);
     localStorage.clear();
   };
@@ -433,6 +476,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         vouchers,
         transactions,
         activeSessions,
+        towers,
+        addTower,
+        updateTower,
+        deleteTower,
         generateVouchers,
         redeemVoucher,
         processMobilePayment,
