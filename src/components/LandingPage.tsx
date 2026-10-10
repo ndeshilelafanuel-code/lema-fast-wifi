@@ -25,6 +25,10 @@ import {
   ShieldAlert,
   Server
 } from 'lucide-react';
+import heroWifiSceneImg from '../assets/images/hero_wifi_scene_1791617825078.jpg';
+import telecomTowerImg from '../assets/images/telecom_tower_antenna_1791617835995.jpg';
+import mobileMoneyPayImg from '../assets/images/mobile_money_pay_1791617847899.jpg';
+import networkOperationsDeskImg from '../assets/images/network_operations_desk_1791617859620.jpg';
 
 interface LandingPageProps {
   lang: Language;
@@ -121,7 +125,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
             <div className="lg:col-span-5 relative">
               <div className="relative rounded-2xl overflow-hidden border border-stone-700/60 shadow-2xl shadow-black/60 group">
                 <img
-                  src="/src/assets/images/hero_wifi_scene_1791617825078.jpg"
+                  src={heroWifiSceneImg}
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/hero_wifi_scene_1791617825078.jpg';
+                  }}
                   alt="Wateja wakifurahia mtandao wa haraka wa Lema Fast WiFi Dar es Salaam"
                   className="w-full h-[400px] object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -183,7 +190,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
             <div className="lg:col-span-6 relative">
               <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-xl group">
                 <img
-                  src="/src/assets/images/telecom_tower_antenna_1791617835995.jpg"
+                  src={telecomTowerImg}
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/telecom_tower_antenna_1791617835995.jpg';
+                  }}
                   alt="Mnara wa TP-Link Omada Outdoor na antena za wireless"
                   className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -318,7 +328,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
             <div className="lg:col-span-6 relative order-1 lg:order-2">
               <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-xl group">
                 <img
-                  src="/src/assets/images/mobile_money_pay_1791617847899.jpg"
+                  src={mobileMoneyPayImg}
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/mobile_money_pay_1791617847899.jpg';
+                  }}
                   alt="Uthibitisho wa malipo ya simu ya M-Pesa kwa vocha ya Wi-Fi"
                   className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"
@@ -348,7 +361,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
             <div className="lg:col-span-6 relative">
               <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-xl group">
                 <img
-                  src="/src/assets/images/network_operations_desk_1791617859620.jpg"
+                  src={networkOperationsDeskImg}
+                  onError={(e) => {
+                    e.currentTarget.src = '/images/network_operations_desk_1791617859620.jpg';
+                  }}
                   alt="Msimamizi wa mtandao akitazama dashibodi ya bandwidth na takwimu za hotspot"
                   className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
                   referrerPolicy="no-referrer"

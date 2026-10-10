@@ -2,6 +2,7 @@ import React from 'react';
 import { Language, SystemMode } from '../types';
 import { LemaLogo } from './common/LemaLogo';
 import { CheckCircle2, ArrowRight, ShieldCheck, Zap, Radio, Server, Receipt, Smartphone } from 'lucide-react';
+import heroWifiNetworkImg from '../assets/images/hero_wifi_network_1791031760999.jpg';
 
 interface HeroSectionProps {
   lang: Language;
@@ -249,7 +250,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="lg:col-span-5">
             <div className="relative rounded-2xl overflow-hidden border border-stone-700/80 bg-stone-800 shadow-2xl">
               <img
-                src="/src/assets/images/hero_wifi_network_1791031760999.jpg"
+                src={heroWifiNetworkImg}
+                onError={(e) => {
+                  e.currentTarget.src = '/images/hero_wifi_network_1791031760999.jpg';
+                }}
                 alt="Outdoor telecom tower with wireless antennas in East African town"
                 referrerPolicy="no-referrer"
                 className="w-full h-72 sm:h-80 lg:h-88 object-cover"

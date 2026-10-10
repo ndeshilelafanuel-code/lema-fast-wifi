@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Language, EquipmentItem, SystemMode } from '../types';
 import { EQUIPMENT_ITEMS } from '../data/wifiGuideData';
 import { Check, Info, AlertTriangle, Layers, DollarSign, RotateCcw, Radio } from 'lucide-react';
+import hardwareNetworkGearImg from '../assets/images/hardware_network_gear_1791031774960.jpg';
 
 interface EquipmentChecklistProps {
   lang: Language;
@@ -115,7 +116,10 @@ export const EquipmentChecklist: React.FC<EquipmentChecklistProps> = ({ lang, sy
           {/* Real studio hardware photograph */}
           <div className="lg:col-span-5 rounded-xl overflow-hidden border border-stone-300 bg-stone-900 shadow-sm relative group">
             <img
-              src="/src/assets/images/hardware_network_gear_1791031774960.jpg"
+              src={hardwareNetworkGearImg}
+              onError={(e) => {
+                e.currentTarget.src = '/images/hardware_network_gear_1791031774960.jpg';
+              }}
               alt="MikroTik RouterBOARD and outdoor access point hardware equipment"
               referrerPolicy="no-referrer"
               className="w-full h-64 lg:h-full object-cover"
