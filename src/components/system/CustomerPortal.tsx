@@ -16,8 +16,10 @@ import {
   LogOut,
   Sparkles,
   MessageSquare,
-  Bot
+  Bot,
+  Zap
 } from 'lucide-react';
+import { BandwidthVisualizationWidget } from './BandwidthVisualizationWidget';
 
 interface CustomerPortalProps {
   lang: Language;
@@ -48,6 +50,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const [simulatedDataUsedMb, setSimulatedDataUsedMb] = useState<number>(0);
   const [isSpeakingVoice, setIsSpeakingVoice] = useState<boolean>(false);
   const [showAiPortalHelp, setShowAiPortalHelp] = useState<boolean>(false);
+  const [showBandwidthVisualizer, setShowBandwidthVisualizer] = useState<boolean>(false);
 
   const toggleVoiceGuide = () => {
     if (isSpeakingVoice) {
@@ -359,6 +362,14 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               </p>
             </div>
 
+            {/* Smart Dynamic Bandwidth & Bursting Visualization */}
+            <BandwidthVisualizationWidget
+              sustainedSpeedMbps={3}
+              burstSpeedMbps={15}
+              burstDurationSec={10}
+              isCompact={true}
+            />
+
             <div className="bg-stone-850 rounded-xl p-4 border border-stone-800 space-y-2.5 text-xs">
               <div className="flex justify-between border-b border-stone-800 pb-2">
                 <span className="text-stone-400">Namba ya Vocha / Code:</span>
@@ -369,8 +380,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                 <span className="font-mono text-stone-300">{currentClientSession.ipAddress}</span>
               </div>
               <div className="flex justify-between border-b border-stone-800 pb-2">
-                <span className="text-stone-400">Spidi ya Mtandao:</span>
-                <span className="font-mono text-stone-300">{currentClientSession.speedLimit}</span>
+                <span className="text-stone-400">Kasi ya Intaneti (Speed):</span>
+                <span className="font-mono text-emerald-400 font-bold">{currentClientSession.speedLimit}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-stone-400">Hali ya Token (Accounting):</span>
@@ -498,8 +509,12 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                                 </span>
                               )}
                             </p>
-                            <p className="text-[10px] text-stone-400">
-                              Muda: {pkg.durationHours} Hours · Spidi: {pkg.speedDownload}
+                            <p className="text-[10px] text-stone-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <span>Muda: {pkg.durationHours}h · Spidi: {pkg.speedDownload}</span>
+                              <span className="text-[9px] bg-amber-500/15 text-amber-400 font-mono font-bold px-1 rounded flex items-center gap-0.5 border border-amber-500/30">
+                                <Zap className="w-2.5 h-2.5 text-amber-400" />
+                                <span>Burst 15M</span>
+                              </span>
                             </p>
                           </div>
                           <span className="text-xs font-mono font-bold text-[#cca43b]">
@@ -508,6 +523,42 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Speed Bursting Teaser Drawer Button */}
+                  <div className="mt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowBandwidthVisualizer(!showBandwidthVisualizer)}
+                      className="w-full flex items-center justify-between p-2.5 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 rounded-xl text-left hover:border-amber-500/40 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                          <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-bold text-amber-300 group-hover:text-amber-200 flex items-center gap-1.5">
+                            <span>Tazama Spidi: Burst (15 Mbps) vs Sustained (3 Mbps)</span>
+                          </p>
+                          <p className="text-[9px] text-stone-400">
+                            Fungua video papo hapo bila kubuffer kwa sekunde 10 za mwanzo
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-400 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
+                        {showBandwidthVisualizer ? 'Funga ▲' : 'Jaribu Mita ▼'}
+                      </span>
+                    </button>
+
+                    {showBandwidthVisualizer && (
+                      <div className="mt-2.5 animate-fadeIn">
+                        <BandwidthVisualizationWidget
+                          sustainedSpeedMbps={3}
+                          burstSpeedMbps={15}
+                          burstDurationSec={10}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -51,7 +51,8 @@ import {
   MessageSquare,
   Bot,
   ListFilter,
-  QrCode
+  QrCode,
+  Compass
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -75,6 +76,8 @@ import { QrEquipmentScannerModal, ScannedEquipment } from './QrEquipmentScannerM
 import { InventoryModule } from './InventoryModule';
 import { AntiTetheringManager } from './AntiTetheringManager';
 import { WhatsAppBotSuite } from './WhatsAppBotSuite';
+import { SmartBandwidthEngine } from './SmartBandwidthEngine';
+import { GisMapModule } from './GisMapModule';
 import { LemaLogo } from '../common/LemaLogo';
 
 export interface SystemAlert {
@@ -310,6 +313,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'routers'
     | 'aps'
     | 'sites'
+    | 'gis_map'
     | 'equipment'
     | 'inventory'
     | 'invoices'
@@ -320,6 +324,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'whatsapp_bot'
     | 'binding'
     | 'anti_tethering'
+    | 'smart_bandwidth'
     | 'ssid_lan'
     | 'saas_management'
   >('dashboard');
@@ -791,6 +796,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
             </button>
             <button
+              onClick={() => setActiveTab('smart_bandwidth')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
+                activeTab === 'smart_bandwidth'
+                  ? 'bg-[#cca43b] text-white shadow-md font-bold'
+                  : 'text-stone-300 hover:bg-[#352f2c] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span>Smart Bandwidth & Burst</span>
+              </div>
+              <span className="px-1.5 py-0.2 rounded-md text-[8px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                BURST
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('ssid_lan')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'ssid_lan'
@@ -896,6 +917,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               <Building className="w-4 h-4" />
               <span>Sites / Locations</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('gis_map')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
+                activeTab === 'gis_map'
+                  ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
+                  : 'text-stone-400 hover:bg-stone-850 hover:text-stone-200'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Compass className="w-4 h-4 text-emerald-400" />
+                <span>Ramani ya GIS (Live Map)</span>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </button>
             <button
               onClick={() => setActiveTab('equipment')}
@@ -1053,6 +1088,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
         </div>
+
+        {/* MODULE: GIS LIVE MAP VIEW */}
+        {activeTab === 'gis_map' && (
+          <GisMapModule />
+        )}
 
         {/* 1. MODULE: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
@@ -2893,6 +2933,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* LEMA FAST WIFI ANTI-TETHERING & DEVICE FINGERPRINTING MODULE */}
         {activeTab === 'anti_tethering' && (
           <AntiTetheringManager
+            hotspotName={settings.hotspotName || 'Lema Fast WiFi'}
+            onShowToast={showToast}
+          />
+        )}
+
+        {/* LEMA FAST WIFI SMART DYNAMIC BANDWIDTH & SPEED BURSTING ENGINE (FAIR USAGE POLICY) */}
+        {activeTab === 'smart_bandwidth' && (
+          <SmartBandwidthEngine
             hotspotName={settings.hotspotName || 'Lema Fast WiFi'}
             onShowToast={showToast}
           />
