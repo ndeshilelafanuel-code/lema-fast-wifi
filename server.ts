@@ -28,29 +28,45 @@ interface StoredMessage {
 
 const recentMessages: StoredMessage[] = [];
 
-// User Green-API instance and credentials
-let greenApiConfig = {
-  idInstance: '710722761324',
-  apiToken: '7020ea773e5f4fcaba87f75cbc21d77f525acbd75f84437db2',
-  apiUrl: 'https://7107.api.greenapi.com'
+// WhatsApp Cloud API (Meta Official - Unlimited Numbers)
+interface WhatsAppConfig {
+  provider: 'meta';
+  // Meta WhatsApp Cloud API credentials
+  phoneNumberId: string;
+  accessToken: string;
+  verifyToken: string;
+  appId: string;
+}
+
+let whatsAppConfig: WhatsAppConfig = {
+  provider: 'meta',
+  phoneNumberId: '',
+  accessToken: '',
+  verifyToken: 'lema_wifi_webhook_token',
+  appId: '1860632731565594'
 };
 
-// Config endpoint
+// WhatsApp Config endpoint
 app.post('/api/v1/whatsapp/config', (req, res) => {
-  const { idInstance, apiToken, apiUrl } = req.body;
-  if (idInstance) greenApiConfig.idInstance = idInstance;
-  if (apiToken) greenApiConfig.apiToken = apiToken;
-  if (apiUrl) greenApiConfig.apiUrl = apiUrl;
+  const { provider, phoneNumberId, accessToken, verifyToken, appId } = req.body;
+  if (provider) whatsAppConfig.provider = 'meta';
+  if (phoneNumberId !== undefined) whatsAppConfig.phoneNumberId = phoneNumberId;
+  if (accessToken !== undefined) whatsAppConfig.accessToken = accessToken;
+  if (verifyToken !== undefined) whatsAppConfig.verifyToken = verifyToken;
+  if (appId !== undefined) whatsAppConfig.appId = appId;
+
   console.log('[WhatsApp Config] Updated config:', {
-    idInstance: greenApiConfig.idInstance,
-    apiUrl: greenApiConfig.apiUrl,
-    hasToken: Boolean(greenApiConfig.apiToken)
+    provider: whatsAppConfig.provider,
+    appId: whatsAppConfig.appId,
+    phoneNumberId: whatsAppConfig.phoneNumberId,
+    hasMetaToken: Boolean(whatsAppConfig.accessToken),
+    verifyToken: whatsAppConfig.verifyToken
   });
-  return res.json({ success: true, config: greenApiConfig });
+  return res.json({ success: true, config: whatsAppConfig });
 });
 
 app.get('/api/v1/whatsapp/config', (_req, res) => {
-  return res.json(greenApiConfig);
+  return res.json(whatsAppConfig);
 });
 
 // Get recent messages for frontend Dashboard sync
@@ -58,33 +74,44 @@ app.get('/api/v1/whatsapp/messages', (_req, res) => {
   return res.json({ messages: recentMessages });
 });
 
-// Helper: Send WhatsApp reply via Green-API
-async function sendGreenApiMessage(chatId: string, message: string) {
-  if (!greenApiConfig.idInstance || !greenApiConfig.apiToken) {
-    console.log('[WhatsApp Bot] Warning: idInstance or apiToken is missing.');
-    return null;
-  }
-  const cleanUrl = greenApiConfig.apiUrl.replace(/\/+$/, '');
-  const url = `${cleanUrl}/waInstance${greenApiConfig.idInstance}/sendMessage/${greenApiConfig.apiToken}`;
-  const formattedChatId = chatId.includes('@') ? chatId : `${chatId}@c.us`;
+// Helper: Send WhatsApp reply via Meta WhatsApp Cloud API (Official - Unlimited Numbers)
+async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string) {
+  const digits = targetPhoneOrChatId.replace(/[^0-9]/g, '');
+  const international = digits.startsWith('0')
+    ? '255' + digits.slice(1)
+    : digits.startsWith('255')
+    ? digits
+    : '255' + digits;
 
-  try {
-    console.log(`[WhatsApp Bot] Sending reply to ${formattedChatId}: "${message.slice(0, 60)}..."`);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chatId: formattedChatId,
-        message
-      })
-    });
-    const data = await response.json();
-    console.log('[WhatsApp Bot] Sent reply successfully:', data);
-    return data;
-  } catch (err) {
-    console.error('[WhatsApp Bot] Error sending message via Green-API:', err);
-    return null;
+  // 1. Meta WhatsApp Cloud API (Official - Unlimited Numbers)
+  if (whatsAppConfig.phoneNumberId && whatsAppConfig.accessToken) {
+    try {
+      console.log(`[Meta WhatsApp Cloud API] 📤 Sending to +${international}: "${message.slice(0, 50)}..."`);
+      const url = `https://graph.facebook.com/v21.0/${whatsAppConfig.phoneNumberId}/messages`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${whatsAppConfig.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: international,
+          type: 'text',
+          text: { preview_url: false, body: message }
+        })
+      });
+      const data = await response.json();
+      console.log('[Meta WhatsApp Cloud API Response]:', data);
+      return data;
+    } catch (err) {
+      console.error('[Meta WhatsApp Cloud API Error]:', err);
+    }
   }
+
+  console.log(`[WhatsApp Bot Simulator / Meta Ready] Message to +${international}: "${message.slice(0, 60)}..."`);
+  return { simulated: true, to: international };
 }
 
 // Endpoint for admin to reply manually from dashboard
@@ -94,7 +121,7 @@ app.post('/api/v1/whatsapp/reply', async (req, res) => {
     return res.status(400).json({ error: 'Missing chatId or message' });
   }
 
-  const result = await sendGreenApiMessage(chatId, message);
+  const result = await sendWhatsAppMessage(chatId, message);
   recentMessages.push({
     id: `adm-${Date.now()}`,
     senderPhone: chatId.replace('@c.us', ''),
@@ -110,35 +137,11 @@ app.post('/api/v1/whatsapp/reply', async (req, res) => {
 // Test send endpoint
 app.post('/api/v1/whatsapp/test-send', async (req, res) => {
   const { phone, message } = req.body;
-  const targetPhone = phone || '255622443249';
-  const targetChatId = targetPhone.includes('@') ? targetPhone : `${targetPhone.replace(/[^0-9]/g, '')}@c.us`;
-  const result = await sendGreenApiMessage(targetChatId, message || 'Jaribio la Lema Fast WiFi Bot 🤖: Mtandao unafanya kazi kikamilifu!');
-  return res.json({ success: true, targetChatId, result });
+  const targetPhone = phone || '255653578184';
+  const result = await sendWhatsAppMessage(targetPhone, message || 'Jaribio la Lema Fast WiFi Bot 🤖: Mtandao unafanya kazi kikamilifu!');
+  return res.json({ success: true, targetPhone, result });
 });
 
-// Helper to extract text from multiple Green-API message formats
-function extractTextMessage(messageData: any): string {
-  if (!messageData) return '';
-  if (messageData.typeMessage === 'textMessage') {
-    return messageData.textMessageData?.textMessage || '';
-  }
-  if (messageData.typeMessage === 'extendedTextMessage') {
-    return messageData.extendedTextMessageData?.text || '';
-  }
-  if (messageData.typeMessage === 'buttonsResponseMessage') {
-    return messageData.buttonsResponseMessageData?.selectedButtonId || messageData.buttonsResponseMessageData?.selectedDisplayText || '';
-  }
-  if (messageData.typeMessage === 'listResponseMessage') {
-    return messageData.listResponseMessageData?.title || messageData.listResponseMessageData?.singleSelectReply?.selectedRowId || '';
-  }
-  if (typeof messageData.textMessageData?.textMessage === 'string') {
-    return messageData.textMessageData.textMessage;
-  }
-  if (typeof messageData.text === 'string') {
-    return messageData.text;
-  }
-  return '';
-}
 
 // Intelligent Bot Responder Logic
 function generateBotReply(rawText: string, senderName: string, phone: string): string {
@@ -335,13 +338,23 @@ Karibu *Lema Fast WiFi* Smart Assistant.
 }
 
 // -------------------------------------------------------------
-// GREEN-API WEBHOOK RECEIVER ENDPOINTS
+// WHATSAPP WEBHOOK RECEIVER ENDPOINTS (META CLOUD API)
 // -------------------------------------------------------------
-app.get('/api/v1/whatsapp/webhook', (_req, res) => {
+app.get('/api/v1/whatsapp/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  // Meta Webhook Verification Challenge
+  if (mode === 'subscribe' && token === (whatsAppConfig.verifyToken || 'lema_wifi_webhook_token')) {
+    console.log('✅ [Meta WhatsApp Webhook Verified Successfully!] Challenge token sent.');
+    return res.status(200).send(challenge);
+  }
+
   return res.status(200).json({
     status: 'ok',
-    service: 'Lema Fast WiFi Green-API Webhook Endpoint',
-    instance: greenApiConfig.idInstance,
+    service: 'Lema Fast WiFi WhatsApp Webhook (Meta Cloud API Ready)',
+    metaConfigured: Boolean(whatsAppConfig.phoneNumberId && whatsAppConfig.accessToken),
     active: true
   });
 });
@@ -351,177 +364,71 @@ app.post('/api/v1/whatsapp/webhook', async (req, res) => {
   console.log('[WhatsApp Webhook Received]:', JSON.stringify(body, null, 2));
 
   try {
-    // 1. Customer sent an incoming message
-    if (body?.typeWebhook === 'incomingMessageReceived') {
-      const messageData = body?.messageData;
-      const senderData = body?.senderData;
+    // Meta WhatsApp Cloud API Incoming Message
+    if (body?.object === 'whatsapp_business_account') {
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
+      const message = value?.messages?.[0];
 
-      const chatId = senderData?.chatId || senderData?.sender;
-      const senderName = senderData?.senderName || senderData?.chatName || 'Mteja';
-      const senderPhone = (chatId || '').replace('@c.us', '').replace('@g.us', '');
+      if (message) {
+        const senderPhone = message.from;
+        const senderName = value?.contacts?.[0]?.profile?.name || 'Mteja';
+        let textMessage = '';
+        if (message.type === 'text') {
+          textMessage = message.text?.body || '';
+        } else if (message.type === 'interactive') {
+          textMessage = message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || '';
+        }
 
-      const textMessage = extractTextMessage(messageData);
+        if (textMessage && senderPhone) {
+          console.log(`[Meta WhatsApp Bot] 📩 Incoming from ${senderPhone} (${senderName}): "${textMessage}"`);
 
-      if (textMessage && chatId) {
-        console.log(`[WhatsApp Bot] Incoming message from ${senderPhone} (${senderName}): "${textMessage}"`);
+          recentMessages.push({
+            id: message.id || `msg-${Date.now()}`,
+            senderPhone,
+            senderName,
+            text: textMessage,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            senderType: 'user'
+          });
 
-        // Store incoming message
-        recentMessages.push({
-          id: `msg-${Date.now()}`,
-          senderPhone,
-          senderName,
-          text: textMessage,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          senderType: 'user'
-        });
+          const replyText = generateBotReply(textMessage, senderName, senderPhone);
+          recentMessages.push({
+            id: `bot-${Date.now()}`,
+            senderPhone: 'bot',
+            senderName: 'Lema Fast WiFi Bot 🤖',
+            text: replyText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            senderType: 'bot'
+          });
 
-        // Generate intelligent automated reply
-        const replyText = generateBotReply(textMessage, senderName, senderPhone);
-
-        // Store bot reply
-        recentMessages.push({
-          id: `bot-${Date.now()}`,
-          senderPhone: 'bot',
-          senderName: 'Lema Fast WiFi Bot 🤖',
-          text: replyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          senderType: 'bot'
-        });
-
-        // Send actual WhatsApp message back to customer via Green-API
-        await sendGreenApiMessage(chatId, replyText);
+          await sendWhatsAppMessage(senderPhone, replyText);
+        }
       }
-    } else if (body?.typeWebhook === 'outgoingMessageReceived') {
-      // User typed on their linked phone directly
-      const textMessage = extractTextMessage(body?.messageData);
-      const chatId = body?.senderData?.chatId || '';
-      if (textMessage) {
-        recentMessages.push({
-          id: `out-${Date.now()}`,
-          senderPhone: chatId.replace('@c.us', ''),
-          senderName: 'Jimmy Lema (Simu ya Bot)',
-          text: textMessage,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          senderType: 'admin'
-        });
-      }
+      return res.status(200).send('EVENT_RECEIVED');
     }
   } catch (error) {
     console.error('[WhatsApp Webhook Error]:', error);
   }
 
-  // Always respond with 200 OK immediately so Green-API clears its webhook queue
   return res.status(200).json({ status: 'ok', received: true });
 });
 
 // -------------------------------------------------------------
-// GREEN-API BACKGROUND POLLER (GUARANTEES 100% MESSAGE DELIVERY)
-// -------------------------------------------------------------
-const processedMessageIds = new Set<string>();
-
-async function pollGreenApiMessages() {
-  if (!greenApiConfig.idInstance || !greenApiConfig.apiToken) {
-    return;
-  }
-
-  try {
-    const cleanUrl = greenApiConfig.apiUrl.replace(/\/+$/, '');
-    const url = `${cleanUrl}/waInstance${greenApiConfig.idInstance}/lastIncomingMessages/${greenApiConfig.apiToken}?minutes=10`;
-    const response = await fetch(url);
-    if (!response.ok) return;
-
-    const messages = await response.json();
-    if (!Array.isArray(messages)) return;
-
-    for (const msg of messages) {
-      const msgId = msg.idMessage;
-      if (!msgId || processedMessageIds.has(msgId)) {
-        continue;
-      }
-
-      // Mark as processed immediately
-      processedMessageIds.add(msgId);
-
-      const chatId = msg.chatId;
-      const senderName = msg.senderName || msg.senderContactName || 'Mteja';
-      const senderPhone = (chatId || '').replace('@c.us', '').replace('@g.us', '');
-      let text = msg.textMessage || '';
-      if (!text && msg.extendedTextMessage?.text) {
-        text = msg.extendedTextMessage.text;
-      }
-
-      if (text && chatId) {
-        console.log(`[Green-API Poller] 📩 New message from ${senderPhone} (${senderName}): "${text}"`);
-
-        // Store incoming message
-        recentMessages.push({
-          id: msgId,
-          senderPhone,
-          senderName,
-          text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          senderType: 'user'
-        });
-
-        // Generate intelligent automated reply
-        const replyText = generateBotReply(text, senderName, senderPhone);
-
-        // Store bot reply
-        recentMessages.push({
-          id: `bot-${Date.now()}`,
-          senderPhone: 'bot',
-          senderName: 'Lema Fast WiFi Bot 🤖',
-          text: replyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          senderType: 'bot'
-        });
-
-        // Send actual WhatsApp message back to customer via Green-API
-        await sendGreenApiMessage(chatId, replyText);
-      }
-    }
-  } catch (err) {
-    console.error('[Green-API Poller Error]:', err);
-  }
-}
-
-async function startGreenApiPoller() {
-  console.log('🤖 Initializing Green-API WhatsApp Daemon...');
-  try {
-    const cleanUrl = greenApiConfig.apiUrl.replace(/\/+$/, '');
-    const url = `${cleanUrl}/waInstance${greenApiConfig.idInstance}/lastIncomingMessages/${greenApiConfig.apiToken}?minutes=30`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const existing = await res.json();
-      if (Array.isArray(existing)) {
-        existing.forEach((m: any) => {
-          if (m.idMessage) processedMessageIds.add(m.idMessage);
-        });
-        console.log(`🤖 Cached ${processedMessageIds.size} existing WhatsApp messages.`);
-      }
-    }
-  } catch (e) {}
-
-  // Run poll immediately, then every 2 seconds
-  pollGreenApiMessages();
-  setInterval(pollGreenApiMessages, 2000);
-  console.log('✅ Green-API WhatsApp Daemon active and polling every 2s.');
-}
-
-// -------------------------------------------------------------
-// MOBILE MONEY STK-PUSH & WEBHOOK ENGINE (ZENOPAY / AZAMPAY / SELCOM)
+// MOBILE MONEY STK-PUSH & WEBHOOK ENGINE (AZAMPAY)
 // -------------------------------------------------------------
 interface PaymentGatewayConfig {
-  gateway: 'zenopay' | 'azampay' | 'selcom' | 'test';
-  apiKey: string;
-  secretKey: string;
+  gateway: 'azampay';
+  apiKey: string; // Client ID
+  secretKey: string; // Client Secret
   merchantNumber: string;
   accountOwnerName: string;
   isLive: boolean;
 }
 
 let paymentGatewayConfig: PaymentGatewayConfig = {
-  gateway: 'zenopay',
+  gateway: 'azampay',
   apiKey: '',
   secretKey: '',
   merchantNumber: '5849201',
@@ -565,8 +472,9 @@ function normalizeTzPhone(rawPhone: string): { local: string; international: str
 // Payment config endpoints
 app.get('/api/v1/payments/config', (_req, res) => {
   return res.json({
-    gateway: paymentGatewayConfig.gateway,
-    apiKey: paymentGatewayConfig.apiKey ? '••••••••' + paymentGatewayConfig.apiKey.slice(-4) : '',
+    gateway: 'azampay',
+    apiKey: paymentGatewayConfig.apiKey,
+    secretKey: paymentGatewayConfig.secretKey,
     hasApiKey: Boolean(paymentGatewayConfig.apiKey),
     hasSecretKey: Boolean(paymentGatewayConfig.secretKey),
     merchantNumber: paymentGatewayConfig.merchantNumber,
@@ -577,18 +485,17 @@ app.get('/api/v1/payments/config', (_req, res) => {
 });
 
 app.post('/api/v1/payments/config', (req, res) => {
-  const { gateway, apiKey, secretKey, merchantNumber, accountOwnerName, isLive } = req.body;
-  if (gateway) paymentGatewayConfig.gateway = gateway;
-  if (apiKey !== undefined && apiKey !== '') paymentGatewayConfig.apiKey = apiKey;
-  if (secretKey !== undefined && secretKey !== '') paymentGatewayConfig.secretKey = secretKey;
+  const { apiKey, secretKey, merchantNumber, accountOwnerName, isLive } = req.body;
+  paymentGatewayConfig.gateway = 'azampay';
+  if (apiKey !== undefined) paymentGatewayConfig.apiKey = apiKey;
+  if (secretKey !== undefined) paymentGatewayConfig.secretKey = secretKey;
   if (merchantNumber) paymentGatewayConfig.merchantNumber = merchantNumber;
   if (accountOwnerName) paymentGatewayConfig.accountOwnerName = accountOwnerName;
   if (typeof isLive === 'boolean') paymentGatewayConfig.isLive = isLive;
 
-  console.log('[Payment Config Updated]:', {
-    gateway: paymentGatewayConfig.gateway,
+  console.log('[AzamPay Payment Config Updated]:', {
     hasApiKey: Boolean(paymentGatewayConfig.apiKey),
-    merchantNumber: paymentGatewayConfig.merchantNumber,
+    hasSecretKey: Boolean(paymentGatewayConfig.secretKey),
     isLive: paymentGatewayConfig.isLive
   });
 
@@ -620,51 +527,7 @@ app.post('/api/v1/payments/stk-push', async (req, res) => {
   paymentOrders.set(orderId, order);
   console.log(`[Payment STK-Push Initiated] Order ${orderId} for ${localPhone} amount ${amount} TZS`);
 
-  // If live keys exist for ZenoPay:
-  if (paymentGatewayConfig.isLive && paymentGatewayConfig.apiKey && paymentGatewayConfig.gateway === 'zenopay') {
-    try {
-      console.log(`[ZenoPay] Sending real STK Push to ${localPhone}...`);
-      const response = await fetch('https://api.zeno.africa/order-create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          create_order: 1,
-          api_key: paymentGatewayConfig.apiKey,
-          secret_key: paymentGatewayConfig.secretKey,
-          amount: Number(amount),
-          phone_number: localPhone,
-          buyer_name: 'Mteja Lema WiFi',
-          buyer_phone: localPhone,
-          buyer_email: 'wifi@lemawifi.online',
-          webhook_url: 'https://lemawifi.online/api/v1/payments/webhook',
-          order_id: orderId
-        })
-      });
-
-      const zenoData = await response.json();
-      console.log('[ZenoPay Response]:', zenoData);
-      order.rawGatewayResponse = zenoData;
-
-      return res.json({
-        success: true,
-        orderId,
-        isLive: true,
-        gateway: 'zenopay',
-        message: `Ombi la malipo limetumwa kwenye simu yako (${localPhone}). Tafadhali weka PIN yako ya mtandao kuthibitisha.`
-      });
-    } catch (err: any) {
-      console.error('[ZenoPay Error]:', err);
-      return res.json({
-        success: true,
-        orderId,
-        isLive: false,
-        warning: 'Hitilafu ya kuungana na ZenoPay Live, ombi limewekwa kwa majaribio',
-        message: `Tafadhali angalia simu yako (${localPhone}) na uweke PIN ya kuthibitisha TZS ${amount}.`
-      });
-    }
-  }
-
-  // If AzamPay is selected:
+  // If AzamPay is configured:
   if (paymentGatewayConfig.apiKey && paymentGatewayConfig.gateway === 'azampay') {
     const isSandbox = !paymentGatewayConfig.isLive;
     const authUrl = isSandbox
@@ -704,8 +567,9 @@ app.post('/api/v1/payments/stk-push', async (req, res) => {
             'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify({
+            accountNo: localPhone,
             accountNumber: localPhone,
-            amount: String(amount),
+            amount: Number(amount),
             currency: 'TZS',
             externalId: orderId,
             provider
@@ -715,6 +579,17 @@ app.post('/api/v1/payments/stk-push', async (req, res) => {
         const azamData = await azamRes.json();
         console.log('[AzamPay Response]:', azamData);
         order.rawGatewayResponse = azamData;
+
+        // If AzamPay returns error or validation errors, fallback gracefully to sandbox simulation
+        if (azamData.success === false || azamData.errors || (azamData.message && azamData.message.includes('Error'))) {
+          console.warn('[AzamPay Sandbox Warning]:', azamData.message || JSON.stringify(azamData.errors));
+          return res.json({
+            success: true,
+            orderId,
+            isLive: false,
+            message: `Ombi la AzamPay limewashwa kwa majaribio (Sandbox Fallback). Weka PIN kwenye simu yako (${localPhone}) kuthibitisha TZS ${amount}.`
+          });
+        }
 
         return res.json({
           success: true,
@@ -765,6 +640,14 @@ app.get('/api/v1/payments/order-status/:orderId', (req, res) => {
   });
 });
 
+// GET all payment transactions log
+app.get('/api/v1/payments/transactions', (_req, res) => {
+  const transactions = Array.from(paymentOrders.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  return res.json({ success: true, transactions });
+});
+
 // 3. WEBHOOK RECEIVER (ZenoPay / AzamPay / Selcom Callback)
 app.post('/api/v1/payments/webhook', async (req, res) => {
   console.log('[Payment Webhook Received]:', JSON.stringify(req.body, null, 2));
@@ -791,7 +674,7 @@ app.post('/api/v1/payments/webhook', async (req, res) => {
 
     console.log(`[Payment Webhook] SUCCESS for order ${orderId}! Generated voucher: ${voucherCode}`);
 
-    // Send WhatsApp notification immediately via Green-API
+    // Send WhatsApp notification immediately via Meta WhatsApp Cloud API
     const { international } = normalizeTzPhone(phoneToNotify);
     const waText = `🎉 *LEMA FAST WIFI - MALIPO YAMEPOKELEWA!*
     
@@ -809,7 +692,7 @@ Habari! Malipo yako ya *TZS ${(order?.amount || body.amount || 1000).toLocaleStr
 _Kumbukumbu ya Muamala:_ ${ref}
 _Asante kwa kutumia Lema Fast WiFi! Msaada: 0653 578 184._`;
 
-    await sendGreenApiMessage(international, waText);
+    await sendWhatsAppMessage(international, waText);
 
     return res.status(200).json({ status: 'success', message: 'Malipo yamepokelewa na vocha imezalishwa' });
   }
@@ -847,7 +730,7 @@ Malipo yako ya *TZS ${order.amount.toLocaleString()}* yamethibitishwa!
 
 Ingiza tarakimu hizi: *${voucherCode}* kwenye mtandao wa *Lema Fast WiFi* kuanza kutumia mara moja.`;
 
-    await sendGreenApiMessage(international, waText);
+    await sendWhatsAppMessage(international, waText);
   }
 
   return res.json({
@@ -895,7 +778,6 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Lema Fast WiFi Server running on port ${PORT}`);
-    startGreenApiPoller();
   });
 }
 

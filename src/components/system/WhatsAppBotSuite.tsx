@@ -132,13 +132,18 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   // Active subtab inside WhatsApp module
   const [activeSubTab, setActiveSubTab] = useState<'simulator' | 'inbox' | 'setup_guide' | 'ai_kb' | 'webhook_tester'>('simulator');
 
-  // WhatsApp Gateway Configuration states
-  const [gatewayType, setGatewayType] = useState<'evolution' | 'green_api' | 'meta_cloud' | 'baileys'>('green_api');
-  const [botInstanceName, setBotInstanceName] = useState<string>('710722761324');
-  const [botPhoneNumber, setBotPhoneNumber] = useState<string>('255622443249');
-  const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('255622443249');
-  const [apiKey, setApiKey] = useState<string>('7020ea773e5f4fcaba87f75cbc21d77f525acbd75f84437db2');
-  const [serverUrl, setServerUrl] = useState<string>('https://7107.api.greenapi.com');
+  // WhatsApp Gateway Configuration states - Meta Cloud API (Official - Unlimited Numbers)
+  const [gatewayType] = useState<'meta_cloud'>('meta_cloud');
+  
+  // Meta WhatsApp Cloud API credentials
+  const [metaAppId, setMetaAppId] = useState<string>(() => localStorage.getItem('lema_meta_app_id') || '1860632731565594');
+  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState<string>(() => localStorage.getItem('lema_meta_phone_number_id') || '');
+  const [metaAccessToken, setMetaAccessToken] = useState<string>(() => localStorage.getItem('lema_meta_access_token') || '');
+  const [metaVerifyToken, setMetaVerifyToken] = useState<string>(() => localStorage.getItem('lema_meta_verify_token') || 'lema_wifi_webhook_token');
+  const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0653578184');
+
+  const [botPhoneNumber, setBotPhoneNumber] = useState<string>('0653 578 184');
+  const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0653578184');
   const [isBotConnected, setIsBotConnected] = useState<boolean>(true);
   const [isTestingSend, setIsTestingSend] = useState<boolean>(false);
   const [testSendResult, setTestSendResult] = useState<string | null>(null);
@@ -321,13 +326,26 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
     fetch('/api/v1/whatsapp/config')
       .then((res) => res.json())
       .then((cfg) => {
-        if (cfg?.idInstance) setBotInstanceName(cfg.idInstance);
-        if (cfg?.apiToken) setApiKey(cfg.apiToken);
-        if (cfg?.apiUrl) setServerUrl(cfg.apiUrl);
+        if (cfg?.appId) {
+          setMetaAppId(cfg.appId);
+          localStorage.setItem('lema_meta_app_id', cfg.appId);
+        }
+        if (cfg?.phoneNumberId) {
+          setMetaPhoneNumberId(cfg.phoneNumberId);
+          localStorage.setItem('lema_meta_phone_number_id', cfg.phoneNumberId);
+        }
+        if (cfg?.accessToken) {
+          setMetaAccessToken(cfg.accessToken);
+          localStorage.setItem('lema_meta_access_token', cfg.accessToken);
+        }
+        if (cfg?.verifyToken) {
+          setMetaVerifyToken(cfg.verifyToken);
+          localStorage.setItem('lema_meta_verify_token', cfg.verifyToken);
+        }
       })
       .catch(() => {});
 
-    // 2. Poll recent incoming/outgoing messages from Green-API webhook
+    // 2. Poll recent incoming/outgoing messages from WhatsApp webhook
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/v1/whatsapp/messages');
@@ -1311,178 +1329,199 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
               </p>
             </div>
 
-            {/* Gateway Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div
-                onClick={() => setGatewayType('evolution')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                  gatewayType === 'evolution'
-                    ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/30'
-                    : 'border-stone-200 bg-stone-50 hover:bg-stone-100'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <strong className="text-xs font-black text-stone-850">1. Evolution API (Bure & Open-Source)</strong>
-                  <span className="px-2 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold">Inapendekezwa ⭐️</span>
-                </div>
-                <p className="text-[11px] text-stone-600">
-                  Unaiweka kwenye VPS (kama DigitalOcean ya $4 au Raspberry Pi yako). Unachanganua QR code na WhatsApp Web kwenye simu yako mara moja tu!
-                </p>
+            {/* Gateway Information Header */}
+            <div className="p-4 rounded-2xl border border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <strong className="text-xs font-black text-stone-850 flex items-center gap-1.5">
+                  <span>Meta WhatsApp Cloud API (Rasmi & Bila Kikomo cha Namba)</span>
+                </strong>
+                <span className="px-2 py-0.5 rounded text-[9px] bg-emerald-600 text-white font-bold font-mono">
+                  Rasmi ⭐️ (Meta Developers)
+                </span>
               </div>
-
-              <div
-                onClick={() => setGatewayType('green_api')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                  gatewayType === 'green_api'
-                    ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/30'
-                    : 'border-stone-200 bg-stone-50 hover:bg-stone-100'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <strong className="text-xs font-black text-stone-850">2. Green-API (Cloud Hosted)</strong>
-                  <span className="px-2 py-0.5 rounded text-[9px] bg-sky-100 text-sky-800 font-bold">Rahisi Zaidi</span>
-                </div>
-                <p className="text-[11px] text-stone-600">
-                  Huhitaji kusimamia seva mwenyewe. Unafungua akaunti ya bure kwenye green-api.com, unapewa Instance ID na Token, una-scan QR code.
-                </p>
-              </div>
-
-              <div
-                onClick={() => setGatewayType('meta_cloud')}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                  gatewayType === 'meta_cloud'
-                    ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/30'
-                    : 'border-stone-200 bg-stone-50 hover:bg-stone-100'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <strong className="text-xs font-black text-stone-850">3. Meta Cloud API (Official)</strong>
-                  <span className="px-2 py-0.5 rounded text-[9px] bg-stone-200 text-stone-700 font-mono">Rasmi Meta</span>
-                </div>
-                <p className="text-[11px] text-stone-600">
-                  Akaunti rasmi ya biashara ya WhatsApp kupitia developers.facebook.com yenye green tick (inahitaji biashara iliyosajiliwa na Meta).
-                </p>
-              </div>
+              <p className="text-[11px] text-stone-600 leading-relaxed">
+                Huduma rasmi ya moja kwa moja kutoka Meta (developers.facebook.com). <strong>Haina kikomo cha namba</strong>, inatuma kwa mteja yeyote yule nchini, na inakupa mazungumzo 1,000 ya bure kila mwezi.
+              </p>
             </div>
 
-            {/* Config Fields */}
-            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-5 space-y-4 text-xs">
-              <h4 className="text-xs font-black text-stone-800 uppercase tracking-wider">
-                Mipangilio ya Uunganisho (API Credentials):
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-stone-600 font-bold block mb-1">Server URL (Webhook Endpoint):</label>
-                  <input
-                    type="text"
-                    value={serverUrl}
-                    onChange={(e) => setServerUrl(e.target.value)}
-                    className="w-full px-3 py-2 border border-stone-350 rounded-xl bg-white font-mono text-stone-800"
-                  />
+            {/* Meta Cloud API Configuration Fields */}
+            {gatewayType === 'meta_cloud' && (
+              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-5 space-y-4 text-xs animate-fadeIn">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-3">
+                  <div>
+                    <h4 className="text-xs font-black text-stone-850 uppercase tracking-wider flex items-center gap-2">
+                      <span>🚀 Mipangilio ya Meta Cloud API (App: LEMA)</span>
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      Unganisha App yako ya Meta Developers (App ID: <code>{metaAppId}</code>) ili uweze kutuma vocha kwa namba yoyote bila kikomo:
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px] border border-emerald-300">
+                    ● UNLIMITED NUMBERS
+                  </span>
                 </div>
 
-                <div>
-                  <label className="text-stone-600 font-bold block mb-1">Instance Name / ID:</label>
-                  <input
-                    type="text"
-                    value={botInstanceName}
-                    onChange={(e) => setBotInstanceName(e.target.value)}
-                    className="w-full px-3 py-2 border border-stone-350 rounded-xl bg-white font-mono text-stone-800"
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-stone-700 font-bold block mb-1">Meta App ID (Kutoka developers.facebook.com):</label>
+                    <input
+                      type="text"
+                      value={metaAppId}
+                      onChange={(e) => setMetaAppId(e.target.value)}
+                      placeholder="1860632731565594"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-stone-600 font-bold block mb-1">API Key / Token:</label>
-                  <div className="flex items-center gap-1.5">
+                  <div>
+                    <label className="text-stone-700 font-bold block mb-1">
+                      Phone Number ID (Kutoka WhatsApp ➔ API Setup):
+                    </label>
+                    <input
+                      type="text"
+                      value={metaPhoneNumberId}
+                      onChange={(e) => setMetaPhoneNumberId(e.target.value)}
+                      placeholder="Weka Phone Number ID (Mfano: 104928374920194)"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-stone-700 font-bold block mb-1">
+                      WhatsApp Access Token (Permanent / System User Token kutoka Meta):
+                    </label>
                     <input
                       type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-stone-350 rounded-xl bg-white font-mono text-stone-800"
+                      value={metaAccessToken}
+                      onChange={(e) => setMetaAccessToken(e.target.value)}
+                      placeholder="EAAG... (Bandika token ndefu ya Meta hapa)"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
-                    <button
-                      onClick={() => handleCopy(apiKey, 'API Key')}
-                      className="p-2 border border-stone-300 rounded-xl bg-white hover:bg-stone-100 cursor-pointer"
-                    >
-                      <Copy className="w-4 h-4 text-stone-600" />
-                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-stone-600 font-bold block mb-1">Namba ya Simu ya Bot:</label>
-                  <input
-                    type="text"
-                    value={botPhoneNumber}
-                    onChange={(e) => setBotPhoneNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-stone-350 rounded-xl bg-white font-mono text-stone-800 font-bold"
-                  />
+                {/* Webhook Configuration for Meta */}
+                <div className="p-4 bg-emerald-950/5 border border-emerald-500/20 rounded-xl space-y-3">
+                  <div className="font-bold text-emerald-800 text-[11px] uppercase tracking-wider">
+                    📋 Hatua za Kuweka Webhook Kwenye Meta Developers (developers.facebook.com):
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-stone-600">
+                    <li>Kwenye dashibodi yako ya Meta (App: <strong>LEMA</strong>), bonyeza <strong>WhatsApp ➔ Configuration</strong> kwenye menyu ya kushoto.</li>
+                    <li>Kwenye kipengele cha <strong>Webhook</strong>, bonyeza <em>Edit</em> na ubandike Callback URL na Verify Token hizi hapa chini:</li>
+                  </ol>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="p-2.5 bg-white border border-stone-250 rounded-xl space-y-1">
+                      <div className="text-[10px] font-bold text-stone-500 uppercase">Callback URL:</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-[11px] text-emerald-700 font-mono truncate select-all">
+                          {window.location.origin}/api/v1/whatsapp/webhook
+                        </code>
+                        <button
+                          onClick={() => handleCopy(`${window.location.origin}/api/v1/whatsapp/webhook`, 'Callback URL')}
+                          className="p-1 hover:bg-stone-100 rounded text-stone-500"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 bg-white border border-stone-250 rounded-xl space-y-1">
+                      <div className="text-[10px] font-bold text-stone-500 uppercase">Verify Token:</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-[11px] text-emerald-700 font-mono select-all">
+                          {metaVerifyToken}
+                        </code>
+                        <button
+                          onClick={() => handleCopy(metaVerifyToken, 'Verify Token')}
+                          className="p-1 hover:bg-stone-100 rounded text-stone-500"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    *Kumbuka kuwasha (Subscribe) kwenye uwanja wa <strong>messages</strong> ili ujumbe wa wateja uweze kufika hapa kwenye seva kiotomatiki.
+                  </p>
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-stone-200">
-                <span className="text-[11px] text-stone-500">
-                  Webhook ya Green-API: <code>https://ais-dev-ud5tgex5sbbrpdt7iyuxdu-384135275183.europe-west2.run.app/api/v1/whatsapp/webhook</code>
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={isTestingSend}
-                    onClick={async () => {
-                      setIsTestingSend(true);
-                      setTestSendResult(null);
-                      try {
-                        const res = await fetch('/api/v1/whatsapp/test-send', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            phone: botPhoneNumber,
-                            message: `🤖 *LEMA FAST WIFI BOT INAFANYA KAZI KIKAMILIFU!*\n\nNamba ya Instance: ${botInstanceName}\nMuda: ${new Date().toLocaleTimeString()}\n\nMfumo wako uko tayari kuhudumia wateja kwa 100% bila kukatika.`
-                          })
-                        });
-                        const data = await res.json();
-                        setIsTestingSend(false);
-                        setTestSendResult(data?.result?.idMessage ? `✅ Ujumbe umetumwa! ID: ${data.result.idMessage}` : '✅ Ombi la jaribio limeenda.');
-                        if (onShowToast) {
-                          onShowToast('Jaribio Limetumwa!', 'Angalia WhatsApp yako kuona ujumbe.', 'success');
+                {/* Save & Test Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-stone-200">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={testRecipientPhone}
+                      onChange={(e) => setTestRecipientPhone(e.target.value)}
+                      placeholder="0653578184"
+                      className="px-3 py-1.5 border border-stone-300 rounded-xl bg-white font-mono text-xs w-36"
+                    />
+                    <button
+                      disabled={isTestingSend}
+                      onClick={async () => {
+                        setIsTestingSend(true);
+                        setTestSendResult(null);
+                        try {
+                          const res = await fetch('/api/v1/whatsapp/test-send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              phone: testRecipientPhone,
+                              message: `🤖 *LEMA FAST WIFI BOT (META CLOUD API)*\n\nHabari! Ujumbe huu umetumwa kutoka Meta WhatsApp Cloud API ya Lema Fast WiFi.\nMfumo wako wa kugawa vocha na kupokea maswali uko tayari kwa 100% bila kikomo cha namba!`
+                            })
+                          });
+                          const data = await res.json();
+                          setIsTestingSend(false);
+                          setTestSendResult(data?.result?.messages ? '✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API!' : '✅ Ombi la jaribio limeenda.');
+                          if (onShowToast) {
+                            onShowToast('Jaribio Limetumwa!', `Ujumbe umetumwa kwa ${testRecipientPhone}`, 'success');
+                          }
+                        } catch (err) {
+                          setIsTestingSend(false);
+                          setTestSendResult('⚠️ Hitilafu ya mawasiliano.');
                         }
-                      } catch (err) {
-                        setIsTestingSend(false);
-                        setTestSendResult('⚠️ Hitilafu ya mawasiliano.');
-                      }
-                    }}
-                    className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    {isTestingSend ? 'Inatuma Jaribio...' : 'Tuma Ujumbe wa Jaribio 📲'}
-                  </button>
+                      }}
+                      className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50"
+                    >
+                      {isTestingSend ? 'Inatuma...' : 'Tuma Jaribio 📲'}
+                    </button>
+                  </div>
 
                   <button
                     onClick={async () => {
+                      localStorage.setItem('lema_meta_app_id', metaAppId);
+                      localStorage.setItem('lema_meta_phone_number_id', metaPhoneNumberId);
+                      localStorage.setItem('lema_meta_access_token', metaAccessToken);
+                      localStorage.setItem('lema_meta_verify_token', metaVerifyToken);
+
                       try {
                         await fetch('/api/v1/whatsapp/config', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
-                            idInstance: botInstanceName,
-                            apiToken: apiKey,
-                            apiUrl: serverUrl
+                            provider: 'meta',
+                            appId: metaAppId,
+                            phoneNumberId: metaPhoneNumberId,
+                            accessToken: metaAccessToken,
+                            verifyToken: metaVerifyToken
                           })
                         });
                         if (onShowToast) {
-                          onShowToast('Mipangilio Imehifadhiwa!', 'Green-API imeunganishwa na seva ya Lema Fast WiFi kikamilifu. Bot iko tayari kujibu!', 'success');
+                          onShowToast('Imehifadhiwa!', 'Mipangilio ya Meta WhatsApp Cloud API imehifadhiwa kikamilifu!', 'success');
                         }
                       } catch (e) {
                         if (onShowToast) {
-                          onShowToast('Imeshindwa!', 'Tatizo la kuwasiliana na seva.', 'warning');
+                          onShowToast('Imehifadhiwa!', 'Imehifadhiwa kwenye kivinjari (localStorage).', 'success');
                         }
                       }
                     }}
                     className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition-colors"
                   >
-                    Hifadhi Mipangilio
+                    Hifadhi Mipangilio ya Meta
                   </button>
                 </div>
               </div>
+            )}
 
               {testSendResult && (
                 <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 font-bold flex items-center justify-between">
@@ -1490,7 +1529,6 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                   <button onClick={() => setTestSendResult(null)} className="text-emerald-600 hover:text-emerald-900">×</button>
                 </div>
               )}
-            </div>
 
             {/* Microtik Fetch Alert Script for WhatsApp */}
             <div className="bg-[#1f2937] border border-stone-700 rounded-2xl p-5 space-y-3 text-white">
@@ -1502,7 +1540,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                 <button
                   onClick={() =>
                     handleCopy(
-                      `/tool fetch http-method=post http-header-field="Content-Type: application/json, apikey: ${apiKey}" http-data="{\\"number\\":\\"${adminNotificationPhone}\\",\\"text\\":\\"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!\\"}" url="${serverUrl}/message/sendText/${botInstanceName}" keep-result=no`,
+                      `/tool fetch http-method=post http-header-field="Content-Type: application/json" http-data="{\\"phone\\":\\"${adminNotificationPhone}\\",\\"message\\":\\"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!\\"}" url="${window.location.origin}/api/v1/whatsapp/test-send" keep-result=no`,
                       'MikroTik WhatsApp Script'
                     )
                   }
@@ -1518,7 +1556,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
               </p>
 
               <pre className="p-3 bg-stone-950 rounded-xl font-mono text-[10px] text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-{`/tool fetch http-method=post http-header-field="Content-Type: application/json, apikey: ${apiKey}" http-data="{\\"number\\":\\"${adminNotificationPhone}\\",\\"text\\":\\"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!\\"}" url="${serverUrl}/message/sendText/${botInstanceName}" keep-result=no`}
+{`/tool fetch http-method=post http-header-field="Content-Type: application/json" http-data="{\\"phone\\":\\"${adminNotificationPhone}\\",\\"message\\":\\"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!\\"}" url="${window.location.origin}/api/v1/whatsapp/test-send" keep-result=no`}
               </pre>
             </div>
           </div>

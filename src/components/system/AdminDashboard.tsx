@@ -461,24 +461,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isClaimingAp, setIsClaimingAp] = useState<boolean>(false);
   const [apClaimStep, setApClaimStep] = useState<string>('');
 
-  // Payment Gateway Configuration states (Mobile Money STK-Push)
-  const [gatewayProvider, setGatewayProvider] = useState<'zenopay' | 'azampay' | 'selcom' | 'test'>('zenopay');
-  const [gatewayApiKey, setGatewayApiKey] = useState<string>('');
-  const [gatewaySecretKey, setGatewaySecretKey] = useState<string>('');
-  const [isGatewayLive, setIsGatewayLive] = useState<boolean>(false);
+  // Payment Gateway Configuration states (Mobile Money STK-Push - AzamPay Only)
+  const [gatewayApiKey, setGatewayApiKey] = useState<string>(() => {
+    return localStorage.getItem('lema_azampay_client_id') || '';
+  });
+  const [gatewaySecretKey, setGatewaySecretKey] = useState<string>(() => {
+    return localStorage.getItem('lema_azampay_client_secret') || '';
+  });
+  const [isGatewayLive, setIsGatewayLive] = useState<boolean>(() => {
+    return localStorage.getItem('lema_azampay_islive') === 'true';
+  });
   const [testPushPhone, setTestPushPhone] = useState<string>('0653 578 184');
   const [isTestingPush, setIsTestingPush] = useState<boolean>(false);
   const [testPushResult, setTestPushResult] = useState<string | null>(null);
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
 
+  const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState<boolean>(false);
+
+  const fetchTransactions = async () => {
+    setIsLoadingTransactions(true);
+    try {
+      const res = await fetch('/api/v1/payments/transactions');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.transactions)) {
+        setPaymentLogs(data.transactions);
+      }
+    } catch (e) {
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
   useEffect(() => {
     fetch('/api/v1/payments/config')
       .then((res) => res.json())
       .then((data) => {
-        if (data.gateway) setGatewayProvider(data.gateway);
-        if (data.isLive !== undefined) setIsGatewayLive(data.isLive);
+        if (data.apiKey) {
+          setGatewayApiKey(data.apiKey);
+          localStorage.setItem('lema_azampay_client_id', data.apiKey);
+        }
+        if (data.secretKey) {
+          setGatewaySecretKey(data.secretKey);
+          localStorage.setItem('lema_azampay_client_secret', data.secretKey);
+        }
+        if (data.isLive !== undefined) {
+          setIsGatewayLive(data.isLive);
+          localStorage.setItem('lema_azampay_islive', String(data.isLive));
+        }
       })
       .catch(() => {});
+
+    fetchTransactions();
+    const interval = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Lema AI AP Adoption Wizard States
@@ -3959,29 +3995,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Gateway Selection & Keys Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {/* Gateway Configuration Grid (AzamPay Only) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                 <div>
-                  <label className="text-stone-300 font-semibold block mb-1">Mtoa Huduma wa STK-Push (Gateway Provider):</label>
-                  <select
-                    value={gatewayProvider}
-                    onChange={(e) => setGatewayProvider(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-sans focus:outline-none focus:ring-1 focus:ring-amber-400"
-                  >
-                    <option value="zenopay">ZenoPay (zeno.africa) ⭐ - Inapendekezwa zaidi (Tanzania)</option>
-                    <option value="azampay">AzamPay Aggregator (M-Pesa, Airtel, Tigo, Halo)</option>
-                    <option value="selcom">Selcom Paytech (Masterpass & Mobile Money)</option>
-                    <option value="test">Majaribio ya Ndani (Sandbox / Simulator)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-stone-300 font-semibold block mb-1">
-                    {gatewayProvider === 'azampay' ? 'AzamPay Client ID (kutoka developer.azampay.co.tz):' : 'Gateway API Key:'}
-                  </label>
+                  <label className="text-stone-300 font-semibold block mb-1">AzamPay Client ID (API Key):</label>
                   <input
-                    type="password"
-                    placeholder={gatewayProvider === 'azampay' ? 'Weka AzamPay Client ID...' : 'Weka API Key kutoka Dashboard ya Gateway...'}
+                    type="text"
+                    placeholder="Weka AzamPay Client ID..."
                     value={gatewayApiKey}
                     onChange={(e) => setGatewayApiKey(e.target.value)}
                     className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-400"
@@ -3989,12 +4009,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-stone-300 font-semibold block mb-1">
-                    {gatewayProvider === 'azampay' ? 'AzamPay Client Secret:' : 'Gateway Secret Key:'}
-                  </label>
+                  <label className="text-stone-300 font-semibold block mb-1">AzamPay Client Secret:</label>
                   <input
                     type="password"
-                    placeholder={gatewayProvider === 'azampay' ? 'Weka AzamPay Client Secret...' : 'Weka Secret Key...'}
+                    placeholder="Weka AzamPay Client Secret..."
                     value={gatewaySecretKey}
                     onChange={(e) => setGatewaySecretKey(e.target.value)}
                     className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-400"
@@ -4013,25 +4031,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* AzamPay No-Code Quick-Start Guide Banner */}
-              {gatewayProvider === 'azampay' && (
-                <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 space-y-1.5 animate-fadeIn">
-                  <div className="font-bold flex items-center gap-1.5 text-blue-400 uppercase tracking-wider text-[11px]">
-                    <span>ℹ️ Jinsi ya Kujaribu AzamPay No-Code (Bila Kuandika Code):</span>
-                  </div>
-                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-stone-300">
-                    <li>Fungua akaunti ya bure kwenye <a href="https://developer.azampay.co.tz" target="_blank" rel="noreferrer" className="text-amber-400 underline font-semibold">developer.azampay.co.tz</a> (inachukua dakika 2 tu).</li>
-                    <li>Nenda kwenye <strong>Dashboard ➔ Applications ➔ Create New App</strong> (waza jina mfano <em>LemaFastWiFi</em>).</li>
-                    <li>Utapata mara moja <strong>Client ID</strong> na <strong>Client Secret</strong> za Sandbox (Majaribio ya bure).</li>
-                    <li>Zi-paste kwenye sehemu hizi hapo juu na bonyeza <strong>Hifadhi Mipangilio ya Malipo</strong>!</li>
-                  </ol>
+              <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-blue-200 space-y-1.5 animate-fadeIn">
+                <div className="font-bold flex items-center gap-1.5 text-blue-400 uppercase tracking-wider text-[11px]">
+                  <span>ℹ️ Jinsi ya Kujaribu AzamPay No-Code (Bila Kuandika Code):</span>
                 </div>
-              )}
+                <ol className="list-decimal list-inside space-y-1 text-[11px] text-stone-300">
+                  <li>Fungua akaunti ya bure kwenye <a href="https://developer.azampay.co.tz" target="_blank" rel="noreferrer" className="text-amber-400 underline font-semibold">developer.azampay.co.tz</a> (inachukua dakika 2 tu).</li>
+                  <li>Nenda kwenye <strong>Dashboard ➔ Applications ➔ Create New App</strong> (waza jina mfano <em>LemaFastWiFi</em>).</li>
+                  <li>Utapata mara moja <strong>Client ID</strong> na <strong>Client Secret</strong> za Sandbox (Majaribio ya bure).</li>
+                  <li>Zi-paste kwenye sehemu hizi hapo juu na bonyeza <strong>Hifadhi Mipangilio ya Malipo</strong>!</li>
+                </ol>
+              </div>
 
               {/* Webhook Callback URL Bar */}
               <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="space-y-0.5">
                   <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider font-mono">
-                    WEBHOOK CALLBACK URL (Weka hii kwenye Dashboard ya ZenoPay au AzamPay):
+                    WEBHOOK CALLBACK URL (Weka hii kwenye Dashboard ya AzamPay):
                   </div>
                   <div className="font-mono text-emerald-400 text-[11px] select-all">
                     https://lemawifi.online/api/v1/payments/webhook
@@ -4054,12 +4070,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-stone-800">
                 <button
                   onClick={async () => {
+                    localStorage.setItem('lema_azampay_client_id', gatewayApiKey);
+                    localStorage.setItem('lema_azampay_client_secret', gatewaySecretKey);
+                    localStorage.setItem('lema_azampay_islive', String(isGatewayLive));
+
                     try {
                       const res = await fetch('/api/v1/payments/config', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          gateway: gatewayProvider,
                           apiKey: gatewayApiKey,
                           secretKey: gatewaySecretKey,
                           isLive: isGatewayLive,
@@ -4069,10 +4088,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       });
                       const data = await res.json();
                       if (data.success) {
-                        showToast('Imesasishwa!', 'Mipangilio ya Gateway na Webhook imehifadhiwa kikamilifu!', 'success');
+                        showToast('Imesasishwa!', 'Mipangilio ya AzamPay na Webhook imehifadhiwa kikamilifu!', 'success');
                       }
                     } catch (e) {
-                      showToast('Hitilafu', 'Imeshindwa kuwasiliana na server', 'error');
+                      showToast('Hifadhi ya Ndani', 'Imeshughulikiwa kwenye browser (localStorage). Server haikuweza kuunganishwa.', 'success');
                     }
                   }}
                   className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2"
@@ -4126,6 +4145,103 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {testPushResult && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 animate-fadeIn">
                   🔔 <strong>Matokeo:</strong> {testPushResult}
+                </div>
+              )}
+            </div>
+
+            {/* Transaction Log Table Card */}
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-800 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <ListFilter className="w-5 h-5 text-amber-400" />
+                    <span>Rekodi za Malipo na Vocha (Transaction Log History)</span>
+                  </h3>
+                  <p className="text-xs text-stone-400 mt-1">
+                    Orodha ya maombi yote ya malipo ya simu (STK Push) na hali zake (pending, success, failed).
+                  </p>
+                </div>
+                <button
+                  onClick={fetchTransactions}
+                  className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
+                  <span>Osha / Refresh</span>
+                </button>
+              </div>
+
+              {paymentLogs.length === 0 ? (
+                <div className="text-center py-10 text-stone-500 text-xs">
+                  Hakuna miamala iliyorekodiwa bado. Jaribu kutuma STK-Push hapo juu au nunua kifurushi kupitia Captive Portal!
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-stone-300">
+                    <thead className="bg-stone-850 text-stone-400 uppercase text-[10px] tracking-wider border-b border-stone-800">
+                      <tr>
+                        <th className="py-2.5 px-3">Order ID / Ref</th>
+                        <th className="py-2.5 px-3">Namba ya Simu</th>
+                        <th className="py-2.5 px-3">Kifurushi</th>
+                        <th className="py-2.5 px-3">Kiasi</th>
+                        <th className="py-2.5 px-3">Hali (Status)</th>
+                        <th className="py-2.5 px-3">Vocha</th>
+                        <th className="py-2.5 px-3">Kitendo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-800">
+                      {paymentLogs.map((tx) => (
+                        <tr key={tx.orderId} className="hover:bg-stone-850/50 transition-colors">
+                          <td className="py-3 px-3 font-mono text-amber-400 font-bold">{tx.orderId}</td>
+                          <td className="py-3 px-3 font-mono">{tx.phone}</td>
+                          <td className="py-3 px-3">{tx.packageName}</td>
+                          <td className="py-3 px-3 font-bold text-white">TZS {Number(tx.amount).toLocaleString()}</td>
+                          <td className="py-3 px-3">
+                            {tx.status === 'completed' || tx.status === 'success' ? (
+                              <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full font-bold text-[10px] uppercase">
+                                ✓ Imefanikiwa
+                              </span>
+                            ) : tx.status === 'failed' ? (
+                              <span className="px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/30 rounded-full font-bold text-[10px] uppercase">
+                                ✕ Imefeli
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full font-bold text-[10px] uppercase animate-pulse">
+                                ⏳ Inasubiri PIN
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 font-mono font-bold text-emerald-400">
+                            {tx.voucherCode || '—'}
+                          </td>
+                          <td className="py-3 px-3">
+                            {tx.status === 'pending' && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch('/api/v1/payments/simulate-confirm', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ orderId: tx.orderId })
+                                    });
+                                    const data = await res.json();
+                                    if (data.status === 'success' || data.voucherCode) {
+                                      showToast('Imethibitishwa', `Vocha: ${data.voucherCode} imezalishwa!`, 'success');
+                                      fetchTransactions();
+                                    }
+                                  } catch (e) {
+                                    showToast('Hitilafu', 'Imeshindwa kuthibitisha muamala', 'error');
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                              >
+                                Thibitisha (Simulate)
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
