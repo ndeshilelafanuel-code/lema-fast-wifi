@@ -1472,13 +1472,22 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                           });
                           const data = await res.json();
                           setIsTestingSend(false);
-                          setTestSendResult(data?.result?.messages ? '✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API!' : '✅ Ombi la jaribio limeenda.');
-                          if (onShowToast) {
-                            onShowToast('Jaribio Limetumwa!', `Ujumbe umetumwa kwa ${testRecipientPhone}`, 'success');
+                          if (data?.result?.messages) {
+                            setTestSendResult('✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API!');
+                            if (onShowToast) onShowToast('Jaribio Limetumwa!', `Ujumbe umetumwa kwa ${testRecipientPhone}`, 'success');
+                          } else if (data?.result?.error) {
+                            const metaErrMsg = data?.result?.error?.message || JSON.stringify(data?.result?.error);
+                            setTestSendResult(`⚠️ Hitilafu kutoka Meta: ${metaErrMsg}`);
+                            if (onShowToast) onShowToast('Hitilafu ya Meta', metaErrMsg, 'error');
+                          } else if (data?.result?.simulated) {
+                            setTestSendResult('ℹ️ Taarifa: Bado hujaweka Phone Number ID na Access Token hapo juu. Tafadhali jaza kisha ubonyeze "Hifadhi Mipangilio ya Meta".');
+                            if (onShowToast) onShowToast('Mipangilio haijakamilika', 'Weka Phone Number ID na Token kwanza', 'warning');
+                          } else {
+                            setTestSendResult('✅ Ombi la jaribio limeenda kwenye mfumo.');
                           }
-                        } catch (err) {
+                        } catch (err: any) {
                           setIsTestingSend(false);
-                          setTestSendResult('⚠️ Hitilafu ya mawasiliano.');
+                          setTestSendResult('⚠️ Hitilafu ya mawasiliano na seva ya mtandao. Hakikisha seva iko hewani.');
                         }
                       }}
                       className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50"

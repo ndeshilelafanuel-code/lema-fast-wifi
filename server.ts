@@ -105,13 +105,18 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
       const data = await response.json();
       console.log('[Meta WhatsApp Cloud API Response]:', data);
       return data;
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Meta WhatsApp Cloud API Error]:', err);
+      return { error: true, message: err?.message || 'Meta Cloud API Network Error' };
     }
   }
 
   console.log(`[WhatsApp Bot Simulator / Meta Ready] Message to +${international}: "${message.slice(0, 60)}..."`);
-  return { simulated: true, to: international };
+  return {
+    simulated: true,
+    warning: 'Phone Number ID au Access Token haijawekwa kwenye Mipangilio ya Meta!',
+    to: international
+  };
 }
 
 // Endpoint for admin to reply manually from dashboard
