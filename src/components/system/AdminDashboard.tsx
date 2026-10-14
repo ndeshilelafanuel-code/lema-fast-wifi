@@ -53,7 +53,10 @@ import {
   ListFilter,
   QrCode,
   Compass,
-  Save
+  Save,
+  Menu,
+  X,
+  Gauge
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -80,6 +83,8 @@ import { WhatsAppBotSuite } from './WhatsAppBotSuite';
 import { SmartBandwidthEngine } from './SmartBandwidthEngine';
 import { GisMapModule } from './GisMapModule';
 import { TowerManagementModule } from './TowerManagementModule';
+import { SpeedTestWidget } from './SpeedTestWidget';
+import { NetworkDiagnosticsModule } from './NetworkDiagnosticsModule';
 import { LemaLogo } from '../common/LemaLogo';
 
 export interface SystemAlert {
@@ -293,7 +298,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     transactions,
     activeSessions,
     towers,
+    ads,
     addTower,
+    addAd,
+    updateAd,
+    deleteAd,
     generateVouchers,
     deleteVoucher,
     disconnectSession,
@@ -332,7 +341,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     | 'smart_bandwidth'
     | 'ssid_lan'
     | 'saas_management'
+    | 'network_diagnostics'
+    | 'speed_test'
   >('dashboard');
+
+  const [showSpeedTestModal, setShowSpeedTestModal] = useState<boolean>(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  const handleSelectTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
 
   const [selectedPkgForGen, setSelectedPkgForGen] = useState<string>(settings.packages[1]?.id || settings.packages[0]?.id);
   const [generateCount, setGenerateCount] = useState<number>(25);
@@ -348,15 +367,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [portalCardDesign, setPortalCardDesign] = useState<'clay' | 'grid' | 'halo' | 'lagoon' | 'linen' | 'lumen' | 'boutique' | 'showcase'>('clay');
   const [portalWelcomeMessage, setPortalWelcomeMessage] = useState<string>('Vyovyote mteja anavyopenda: intaneti ya kasi zaidi bila usumbufu.');
   const [portalBusinessName, setPortalBusinessName] = useState<string>(settings.hotspotName || 'Lema Fast WiFi');
-  const [captiveSubTab, setCaptiveSubTab] = useState<'brand' | 'style' | 'legal' | 'save_preview'>('brand');
+  const [captiveSubTab, setCaptiveSubTab] = useState<'brand' | 'style' | 'features' | 'legal' | 'save_preview'>('brand');
   const [useCustomPortal, setUseCustomPortal] = useState<boolean>(true);
   const [uploadedLogo, setUploadedLogo] = useState<string | null>(null);
   const [uploadedBg, setUploadedBg] = useState<string | null>(null);
   const [showQuickActionMenu, setShowQuickActionMenu] = useState<boolean>(false);
   const [confirmClearSessions, setConfirmClearSessions] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<{ title: string; desc: string; type?: 'success' | 'info' | 'warning' } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ title: string; desc: string; type?: 'success' | 'info' | 'warning' | 'error' } | null>(null);
 
-  const showToast = (title: string, desc: string, type: 'success' | 'info' | 'warning' = 'success') => {
+  const showToast = (title: string, desc: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
     setToastMessage({ title, desc, type });
     setTimeout(() => {
       setToastMessage((prev) => (prev?.title === title ? null : prev));
@@ -391,9 +410,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newPppoePass, setNewPppoePass] = useState('');
   const [newPppoeProfile, setNewPppoeProfile] = useState('Home_5Mbps');
 
-  const [adverts, setAdverts] = useState<any[]>([]);
   const [newAdTitle, setNewAdTitle] = useState('');
   const [newAdSponsor, setNewAdSponsor] = useState('');
+  const [newAdPhone, setNewAdPhone] = useState('0653 578 184');
+  const [newAdDesc, setNewAdDesc] = useState('');
+  const [newAdPrice, setNewAdPrice] = useState<number>(25000);
+  const [newAdTag, setNewAdTag] = useState('🔥 Ofa Maalum');
 
   // Interactive Routers & Access Points States (Real hardware only)
   const [routers, setRouters] = useState<any[]>(() => {
@@ -690,25 +712,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const offlineApsCount = accessPoints.filter(a => a.status !== 'connected').length;
   const totalPackagesList = settings.packages || [];
 
-  return (
-    <div className="flex min-h-screen bg-[#f5f2eb] text-[#3a3431] font-sans">
-      {/* PROFESSIONAL SIDEBAR (Premium Espresso Theme) */}
-      <aside className="w-64 bg-[#231f1c] text-stone-200 border-r border-[#e6e2d3] flex flex-col shrink-0 select-none">
-        {/* Sidebar Header / Brand */}
-        <div className="p-4 border-b border-[#352f2c] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <LemaLogo variant="horizontal" size="sm" theme="dark" showSlogan={false} />
-          </div>
-          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-sky-500 text-white uppercase tracking-wider">ISP</span>
+  const renderSidebarNav = (isMobile: boolean = false) => (
+    <>
+      {/* Sidebar Header / Brand */}
+      <div className="p-4 border-b border-[#352f2c] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <LemaLogo variant="horizontal" size="sm" theme="dark" showSlogan={false} />
         </div>
+        <div className="flex items-center gap-2">
+          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-sky-500 text-white uppercase tracking-wider">ISP</span>
+          {isMobile && (
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-1.5 text-stone-400 hover:text-white rounded-lg bg-stone-800/80 hover:bg-stone-700 cursor-pointer ml-1"
+              aria-label="Funga menyu"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* Sidebar Menu Items */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-none text-xs">
+      {/* Sidebar Menu Items */}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-none text-xs">
           {/* Main / Dashboards */}
           <div className="space-y-1.5">
             <span className="px-3 text-[10px] font-bold text-stone-500 uppercase tracking-widest block">Main Portal</span>
             <button
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => handleSelectTab('dashboard')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-all cursor-pointer ${
                 activeTab === 'dashboard'
                   ? 'bg-[#cca43b] text-white shadow-md shadow-[#cca43b]/10'
@@ -719,7 +750,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Dashboard Overview</span>
             </button>
             <button
-              onClick={() => setActiveTab('lema_ai')}
+              onClick={() => handleSelectTab('lema_ai')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold transition-all cursor-pointer ${
                 activeTab === 'lema_ai'
                   ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30'
@@ -733,7 +764,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-indigo-500 text-white uppercase tracking-wider">7 Apps</span>
             </button>
             <button
-              onClick={() => setActiveTab('wakala')}
+              onClick={() => handleSelectTab('wakala')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold transition-all cursor-pointer ${
                 activeTab === 'wakala'
                   ? 'bg-[#cca43b] text-white shadow-md shadow-[#cca43b]/10'
@@ -747,7 +778,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-rose-500 text-white animate-pulse">New</span>
             </button>
             <button
-              onClick={() => setActiveTab('saas_management')}
+              onClick={() => handleSelectTab('saas_management')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold transition-all cursor-pointer ${
                 activeTab === 'saas_management'
                   ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-600/30'
@@ -761,7 +792,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500 text-white uppercase tracking-wider">SAAS</span>
             </button>
             <button
-              onClick={() => setActiveTab('whatsapp_bot')}
+              onClick={() => handleSelectTab('whatsapp_bot')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold transition-all cursor-pointer ${
                 activeTab === 'whatsapp_bot'
                   ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-600/30 font-black'
@@ -777,7 +808,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
             </button>
             <button
-              onClick={() => setActiveTab('chat')}
+              onClick={() => handleSelectTab('chat')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold transition-all cursor-pointer ${
                 activeTab === 'chat'
                   ? 'bg-[#cca43b] text-white shadow-md shadow-[#cca43b]/10'
@@ -796,7 +827,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-1.5">
             <span className="px-3 text-[10px] font-bold text-stone-500 uppercase tracking-widest block">Network</span>
             <button
-              onClick={() => setActiveTab('customers')}
+              onClick={() => handleSelectTab('customers')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'customers'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -807,7 +838,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Customers</span>
             </button>
             <button
-              onClick={() => setActiveTab('settings')}
+              onClick={() => handleSelectTab('settings')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'settings'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -818,7 +849,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Packages & Profiles</span>
             </button>
             <button
-              onClick={() => setActiveTab('vouchers')}
+              onClick={() => handleSelectTab('vouchers')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'vouchers'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -829,7 +860,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Vouchers</span>
             </button>
             <button
-              onClick={() => setActiveTab('binding')}
+              onClick={() => handleSelectTab('binding')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'binding'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -840,7 +871,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Bypass Binding</span>
             </button>
             <button
-              onClick={() => setActiveTab('anti_tethering')}
+              onClick={() => handleSelectTab('anti_tethering')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'anti_tethering'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -856,7 +887,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
             </button>
             <button
-              onClick={() => setActiveTab('smart_bandwidth')}
+              onClick={() => handleSelectTab('smart_bandwidth')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'smart_bandwidth'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -872,7 +903,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
             </button>
             <button
-              onClick={() => setActiveTab('ssid_lan')}
+              onClick={() => handleSelectTab('ssid_lan')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'ssid_lan'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -883,7 +914,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>SSID / LAN Status</span>
             </button>
             <button
-              onClick={() => setActiveTab('pppoe')}
+              onClick={() => handleSelectTab('pppoe')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'pppoe'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -894,7 +925,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>PPPoE Secrets</span>
             </button>
             <button
-              onClick={() => setActiveTab('hotspot_portal')}
+              onClick={() => handleSelectTab('hotspot_portal')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'hotspot_portal'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -905,7 +936,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Hotspot Portal Config</span>
             </button>
             <button
-              onClick={() => setActiveTab('adverts')}
+              onClick={() => handleSelectTab('adverts')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'adverts'
                   ? 'bg-[#cca43b] text-white shadow-md font-bold'
@@ -916,7 +947,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Wi-Fi Adverts</span>
             </button>
             <button
-              onClick={() => setActiveTab('sessions')}
+              onClick={() => handleSelectTab('sessions')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'sessions'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -930,7 +961,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </button>
             <button
-              onClick={() => setActiveTab('users_devices')}
+              onClick={() => handleSelectTab('users_devices')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'users_devices'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -946,7 +977,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-1.5">
             <span className="px-3 text-[10px] font-bold text-stone-500 uppercase tracking-widest block">Infrastructure</span>
             <button
-              onClick={() => setActiveTab('routers')}
+              onClick={() => handleSelectTab('routers')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'routers'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -957,7 +988,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Routers</span>
             </button>
             <button
-              onClick={() => setActiveTab('aps')}
+              onClick={() => handleSelectTab('aps')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'aps'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -968,7 +999,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Access Points</span>
             </button>
             <button
-              onClick={() => setActiveTab('sites')}
+              onClick={() => handleSelectTab('sites')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'sites'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -979,7 +1010,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Sites / Locations</span>
             </button>
             <button
-              onClick={() => setActiveTab('towers')}
+              onClick={() => handleSelectTab('towers')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'towers'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -995,7 +1026,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
             </button>
             <button
-              onClick={() => setActiveTab('gis_map')}
+              onClick={() => handleSelectTab('gis_map')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'gis_map'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -1009,7 +1040,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </button>
             <button
-              onClick={() => setActiveTab('equipment')}
+              onClick={() => handleSelectTab('equipment')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'equipment' || activeTab === 'inventory'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -1022,13 +1053,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <span className="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 font-mono font-bold">SCAN</span>
             </button>
+            <button
+              onClick={() => handleSelectTab('network_diagnostics')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
+                activeTab === 'network_diagnostics'
+                  ? 'bg-[#cca43b] text-white shadow-md font-bold'
+                  : 'text-stone-300 hover:bg-[#352f2c] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span>Utambuzi wa Mtandao (Ping)</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-500/20 text-emerald-300 font-mono font-bold uppercase">
+                DIAG
+              </span>
+            </button>
+            <button
+              onClick={() => handleSelectTab('speed_test')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
+                activeTab === 'speed_test'
+                  ? 'bg-[#cca43b] text-white shadow-md font-bold'
+                  : 'text-stone-300 hover:bg-[#352f2c] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Gauge className="w-4 h-4 text-amber-400" />
+                <span>Pima Kasi (Speed Test)</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[8px] bg-amber-500/20 text-amber-300 font-mono font-bold uppercase">
+                SPEED
+              </span>
+            </button>
           </div>
 
           {/* Finance Modules */}
           <div className="space-y-1.5">
             <span className="px-3 text-[10px] font-bold text-stone-500 uppercase tracking-widest block">Finance</span>
             <button
-              onClick={() => setActiveTab('payout')}
+              onClick={() => handleSelectTab('payout')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'payout'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -1039,7 +1102,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Payout Accounts</span>
             </button>
             <button
-              onClick={() => setActiveTab('invoices')}
+              onClick={() => handleSelectTab('invoices')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'invoices'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -1050,7 +1113,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Invoices</span>
             </button>
             <button
-              onClick={() => setActiveTab('transactions')}
+              onClick={() => handleSelectTab('transactions')}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer ${
                 activeTab === 'transactions'
                   ? 'bg-stone-800 text-white border-l-2 border-amber-400 font-bold'
@@ -1071,17 +1134,84 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           {onLogout && (
             <button
-              onClick={onLogout}
+              onClick={() => {
+                if (isMobile) setIsMobileMenuOpen(false);
+                onLogout();
+              }}
               className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 font-bold rounded-lg transition-colors cursor-pointer text-center"
             >
               Toka (Logout)
             </button>
           )}
         </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-[#f5f2eb] text-[#3a3431] font-sans flex-col lg:flex-row">
+      {/* MOBILE DRAWER OVERLAY (< lg screens) */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <aside className="relative w-72 max-w-[85vw] bg-[#231f1c] text-stone-200 border-r border-[#352f2c] flex flex-col z-10 shadow-2xl h-full animate-in slide-in-from-left duration-200">
+            {renderSidebarNav(true)}
+          </aside>
+        </div>
+      )}
+
+      {/* DESKTOP PERMANENT DOCKED SIDEBAR */}
+      <aside className="hidden lg:flex w-64 bg-[#231f1c] text-stone-200 border-r border-[#e6e2d3] flex-col shrink-0 select-none sticky top-0 h-screen">
+        {renderSidebarNav(false)}
       </aside>
 
-      {/* MAIN VIEW AREA (Right of sidebar) */}
-      <main className="flex-1 min-w-0 overflow-y-auto bg-[#fbf9f4] p-6 sm:p-8 space-y-8 text-[#3a3431]">
+      {/* MAIN VIEW AREA (Right of sidebar on desktop, full width on mobile) */}
+      <main className="flex-1 min-w-0 overflow-y-auto bg-[#fbf9f4] p-3.5 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 text-[#3a3431]">
+        {/* Mobile Navigation Header Bar (Visible on mobile/tablet < lg) */}
+        <div className="lg:hidden bg-[#231f1c] text-stone-200 px-3.5 py-2.5 -mx-3.5 -mt-3.5 sm:-mx-6 sm:-mt-6 mb-4 border-b border-[#352f2c] flex items-center justify-between sticky top-0 z-30 shadow-md">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-[#352f2c] text-amber-400 hover:text-white border border-amber-500/20 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer shadow-xs"
+              aria-label="Fungua Menyu"
+            >
+              <Menu className="w-4 h-4 text-amber-400" />
+              <span>Menyu</span>
+            </button>
+            <div className="flex items-center gap-1.5 pl-1.5 border-l border-stone-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-black uppercase text-amber-400 truncate max-w-[130px]">
+                {activeTab.replace('_', ' ')}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => handleSelectTab('whatsapp_bot')}
+              className="p-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs cursor-pointer"
+              title="WhatsApp Bot"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setShowDailyReportModal(true)}
+              className="p-1.5 bg-white/10 text-stone-200 border border-stone-700 rounded-lg text-xs cursor-pointer"
+              title="Ripoti ya Siku"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+            <button
+              onClick={onOpenCustomerPortal}
+              className="px-2.5 py-1 bg-[#cca43b] text-white rounded-lg text-[10px] font-black cursor-pointer shadow-xs"
+            >
+              Portal
+            </button>
+          </div>
+        </div>
+
         {/* Top Floating Actions Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e6e2d3] pb-5">
           <div className="space-y-1.5">
@@ -1167,6 +1297,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
 
             <button
+              onClick={() => setShowSpeedTestModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-100/70 hover:bg-amber-200/80 border border-amber-300 rounded-lg transition-colors cursor-pointer shadow-xs"
+              title="Pima kasi ya intaneti kwa sasa"
+            >
+              <Gauge className="w-3.5 h-3.5 text-amber-600" />
+              <span>Pima Kasi</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('network_diagnostics')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-sky-800 bg-sky-100/70 hover:bg-sky-200/80 border border-sky-300 rounded-lg transition-colors cursor-pointer shadow-xs"
+              title="Ukaguzi wa ping na mtandao"
+            >
+              <Activity className="w-3.5 h-3.5 text-sky-600" />
+              <span>Utambuzi (Ping)</span>
+            </button>
+
+            <button
               onClick={onOpenCustomerPortal}
               className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-black text-white bg-[#cca43b] hover:bg-[#b89332] rounded-lg shadow-sm transition-all cursor-pointer animate-pulse"
             >
@@ -1175,6 +1323,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           </div>
         </div>
+
+        {/* MODULE: NETWORK DIAGNOSTICS & PING */}
+        {activeTab === 'network_diagnostics' && (
+          <NetworkDiagnosticsModule onShowToast={showToast} />
+        )}
+
+        {/* MODULE: SPEED TEST */}
+        {activeTab === 'speed_test' && (
+          <div className="max-w-xl mx-auto py-4">
+            <SpeedTestWidget
+              isModal={false}
+              businessName={settings.hotspotName || 'LEMA FAST WiFi'}
+              theme="dark"
+            />
+          </div>
+        )}
 
         {/* MODULE: TOWER MANAGEMENT */}
         {activeTab === 'towers' && (
@@ -2278,10 +2442,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 {/* Sub-Tab Bar matching the screenshot */}
-                <div className="flex items-center gap-1 border-b border-[#e6e2d3] pb-0.5 text-xs font-bold">
+                <div className="flex items-center gap-1 border-b border-[#e6e2d3] pb-0.5 text-xs font-bold overflow-x-auto">
                   {[
                     { id: 'brand', label: 'Brand' },
                     { id: 'style', label: 'Style' },
+                    { id: 'features', label: 'Omada Features' },
                     { id: 'legal', label: 'Legal' },
                     { id: 'save_preview', label: 'Save Preview' }
                   ].map((tab) => (
@@ -2541,6 +2706,169 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           {d.name}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* OMADA & CLOUD HOTSPOT BEST PRACTICES (Mambo 4 Muhimu Yaliyoboreshwa) */}
+              {captiveSubTab === 'features' && (
+                <div className="space-y-5">
+                  <div className="bg-white border border-[#e6e2d3] rounded-3xl p-6 space-y-4 shadow-xs">
+                    <div className="border-b border-[#e6e2d3] pb-3 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-black text-[#231f1c] uppercase tracking-wider flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-[#cca43b]" />
+                          <span>Vipengele 4 vya Kisasa vya Captive Portal</span>
+                        </h3>
+                        <p className="text-[10px] text-stone-500 mt-0.5">
+                          Teknolojia za TP-Link Omada EAP 772 & Ruijie Cloud za kuzuia usumbufu na kuongeza mapato ya WiFi yako.
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                        Active in Live Portal
+                      </span>
+                    </div>
+
+                    <div className="space-y-4 text-xs">
+                      {/* Feature 1: MAC Binding / Auto-Login */}
+                      <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center font-bold text-xs">1</span>
+                            <strong className="text-stone-900 font-bold">Auto-Login (Kukumbuka Kifaa kwa MAC Binding)</strong>
+                          </div>
+                          <p className="text-[11px] text-stone-600 leading-relaxed pl-8">
+                            Mteja akinunua kifurushi au kuweka vocha mara moja, anwani yake ya MAC inafungamanishwa. Akitembea na kurudi kwenye eneo la AP, anaunganishwa papo hapo bila kuulizwa nenosiri wala kuingiza vocha upya.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateSettings({ enableAutoMacLogin: !(settings.enableAutoMacLogin ?? true) });
+                            showToast('Imesasishwa', 'Mipangilio ya MAC Binding imesasishwa kwa mafanikio.', 'success');
+                          }}
+                          className={`w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 relative ${
+                            (settings.enableAutoMacLogin ?? true) ? 'bg-emerald-600' : 'bg-stone-300'
+                          }`}
+                        >
+                          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                            (settings.enableAutoMacLogin ?? true) ? 'left-6' : 'left-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      {/* Feature 2: In-Portal QR Camera Scanner */}
+                      <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-600 flex items-center justify-center font-bold text-xs">2</span>
+                            <strong className="text-stone-900 font-bold">Kamera ya QR Code kwenye Vocha (In-Browser Scanner)</strong>
+                          </div>
+                          <p className="text-[11px] text-stone-600 leading-relaxed pl-8">
+                            Inaweka kitufe cha kamera ndani ya lango la mteja. Mteja anaelekeza simu yake kwenye risiti ya vocha aliyonunua dukani, na mfumo unasoma tarakimu mara moja bila makosa ya uandishi.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateSettings({ enableQrCameraScanner: !(settings.enableQrCameraScanner ?? true) });
+                            showToast('Imesasishwa', 'Kamera ya QR Scanner imesasishwa.', 'success');
+                          }}
+                          className={`w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 relative ${
+                            (settings.enableQrCameraScanner ?? true) ? 'bg-emerald-600' : 'bg-stone-300'
+                          }`}
+                        >
+                          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                            (settings.enableQrCameraScanner ?? true) ? 'left-6' : 'left-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      {/* Feature 3: Smart Anti-Abuse Free Trial */}
+                      <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl space-y-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-600 flex items-center justify-center font-bold text-xs">3</span>
+                              <strong className="text-stone-900 font-bold">Majaribio ya Bure yenye Kuzuia Udanganyifu (Anti-Abuse Cooldown)</strong>
+                            </div>
+                            <p className="text-[11px] text-stone-600 leading-relaxed pl-8">
+                              Inampa mteja kipindi kifupi cha kupima spidi kabla ya kulipa, lakini inazuia kifaa hicho kisirudie bure ndani ya muda wa ulinzi uliouchagua.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateSettings({ enableAntiAbuseTrial: !(settings.enableAntiAbuseTrial ?? true) });
+                              showToast('Imesasishwa', 'Mfumo wa Majaribio ya Bure umesasishwa.', 'success');
+                            }}
+                            className={`w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 relative ${
+                              (settings.enableAntiAbuseTrial ?? true) ? 'bg-emerald-600' : 'bg-stone-300'
+                            }`}
+                          >
+                            <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                              (settings.enableAntiAbuseTrial ?? true) ? 'left-6' : 'left-1'
+                            }`} />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-8 pt-2 border-t border-stone-200/60">
+                          <div>
+                            <label className="text-[10px] font-bold text-stone-500 block mb-1">Muda wa Jaribio la Bure:</label>
+                            <select
+                              value={settings.trialDurationMinutes || 15}
+                              onChange={(e) => updateSettings({ trialDurationMinutes: parseInt(e.target.value, 10) })}
+                              className="w-full px-3 py-1.5 border border-stone-300 rounded-xl bg-white text-stone-800 text-xs font-bold"
+                            >
+                              <option value={5}>Dakika 5 (Mtihani wa Haraka)</option>
+                              <option value={10}>Dakika 10</option>
+                              <option value={15}>Dakika 15 (Inashauriwa zaidi)</option>
+                              <option value={30}>Dakika 30</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-stone-500 block mb-1">Muda wa Kuzuia Simu Kurudia (Cooldown):</label>
+                            <select
+                              value={settings.trialCooldownHours || 24}
+                              onChange={(e) => updateSettings({ trialCooldownHours: parseInt(e.target.value, 10) })}
+                              className="w-full px-3 py-1.5 border border-stone-300 rounded-xl bg-white text-stone-800 text-xs font-bold"
+                            >
+                              <option value={12}>Masaa 12</option>
+                              <option value={24}>Masaa 24 (Siku 1 - Standard)</option>
+                              <option value={48}>Masaa 48 (Siku 2)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Feature 4: WhatsApp Voucher Delivery & Diagnostic Telemetry */}
+                      <div className="p-4 bg-stone-50 border border-stone-200 rounded-2xl flex items-start justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-600 flex items-center justify-center font-bold text-xs">4</span>
+                            <strong className="text-stone-900 font-bold">Kutuma Vocha WhatsApp & Msaada wenye Utambulisho wa Kifaa</strong>
+                          </div>
+                          <p className="text-[11px] text-stone-600 leading-relaxed pl-8">
+                            Mteja akilipa kwa M-Pesa / Mixx by Yas anapokea nakala ya risiti kwenye WhatsApp yake. Pia kitufe cha msaada kinajaza kiotomatiki MAC address na IP yake kwenye WhatsApp ya Admin ili kutatua tatizo kwa sekunde 10.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateSettings({ enableWhatsAppVoucherDelivery: !(settings.enableWhatsAppVoucherDelivery ?? true) });
+                            showToast('Imesasishwa', 'Utumaji wa WhatsApp umesasishwa.', 'success');
+                          }}
+                          className={`w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 relative ${
+                            (settings.enableWhatsAppVoucherDelivery ?? true) ? 'bg-emerald-600' : 'bg-stone-300'
+                          }`}
+                        >
+                          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                            (settings.enableWhatsAppVoucherDelivery ?? true) ? 'left-6' : 'left-1'
+                          }`} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3038,94 +3366,266 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         )}
 
-        {/* 8. MODULE: ADVERTS */}
+        {/* 8. MODULE: ADVERTS (WiFi Ads & Monetization Suite) */}
         {activeTab === 'adverts' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Megaphone className="w-5 h-5 text-amber-400" />
-                <span>Kampeni ya Matangazo Kwenye Portal (WiFi Ads)</span>
-              </h3>
-              <p className="text-xs text-stone-400">
-                Pata hela za ziada! Weka matangazo ya wafanyabiashara wa mtaani kwako (kama mabango ya maduka au biashara za chakula) ambayo yataonekana kabla ya mteja kuunganishwa kwenye mtandao.
-              </p>
+            {/* Header & Revenue Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">Mapato ya Matangazo (Ad Revenue)</span>
+                <span className="text-xl font-black font-mono text-emerald-400 block">
+                  Tsh {ads.filter((a) => a.status === 'active').reduce((acc, a) => acc + (a.priceMonthly || 0), 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-stone-500">Kwa mwezi (Wafadhili {ads.filter((a) => a.status === 'active').length})</span>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">Watazamaji Wote (Impressions)</span>
+                <span className="text-xl font-black font-mono text-amber-400 block">
+                  {ads.reduce((acc, a) => acc + (a.impressions || 0), 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-stone-500">Wateja waliotazama kwenye simu</span>
+              </div>
+
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">Mibofyo ya WhatsApp (Leads)</span>
+                <span className="text-xl font-black font-mono text-sky-400 block">
+                  {ads.reduce((acc, a) => acc + (a.clicks || 0), 0).toLocaleString()}
+                </span>
+                <span className="text-[10px] text-stone-500">Wateja waliowasiliana na biashara</span>
+              </div>
+
+              <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 space-y-1 flex flex-col justify-between">
                 <div>
-                  <label className="text-stone-400 block mb-1">Jina la Kampeni (Campaign Title):</label>
-                  <input
-                    type="text"
-                    placeholder="Mchele Safi kutoka Kyela"
-                    value={newAdTitle}
-                    onChange={(e) => setNewAdTitle(e.target.value)}
-                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white"
-                  />
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">Hali ya Slideshow</span>
+                  <span className="text-xs font-bold text-white block mt-0.5">Captive Portal Carousel</span>
                 </div>
-                <div>
-                  <label className="text-stone-400 block mb-1">Mfadhili (Sponsor/Business Name):</label>
-                  <input
-                    type="text"
-                    placeholder="Duka la Chakula Kyela"
-                    value={newAdSponsor}
-                    onChange={(e) => setNewAdSponsor(e.target.value)}
-                    className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newAdTitle) return;
-                      const na = {
-                        id: `ad-${Date.now()}`,
-                        title: newAdTitle,
-                        sponsor: newAdSponsor || 'Sponsor',
-                        impressions: 0,
-                        views: 0,
-                        status: 'active',
-                        banner: 'https://images.unsplash.com/photo-1550525811-e5869dd03032?auto=format&fit=crop&q=80&w=400'
-                      };
-                      setAdverts([...adverts, na]);
-                      setNewAdTitle('');
-                      setNewAdSponsor('');
-                    }}
-                    className="w-full py-2 font-bold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer h-[38px]"
-                  >
-                    Weka Tangazo
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={onOpenCustomerPortal}
+                  className="w-full py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-[11px] rounded-xl border border-amber-500/40 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Tazama Kwenye Portal ➔</span>
+                </button>
               </div>
             </div>
 
-            {/* Ad campaigns list */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              {adverts.map((ad) => (
-                <div key={ad.id} className="p-4 bg-stone-900 border border-stone-800 rounded-2xl flex gap-4">
-                  <img
-                    src={ad.banner}
-                    alt={ad.title}
-                    className="w-20 h-20 rounded-xl object-cover border border-stone-800 shrink-0"
-                  />
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <strong className="text-white text-xs font-bold block truncate">{ad.title}</strong>
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold uppercase text-[9px] shrink-0">Live</span>
-                    </div>
-                    <p className="text-[11px] text-stone-400 font-sans">Business: <strong className="text-white font-sans">{ad.sponsor}</strong></p>
+            {/* Form Box: Add New Ad Campaign */}
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                    <Megaphone className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">Sajili Tangazo Jipya la Mfanyabiashara wa Mtaani</h3>
+                    <p className="text-xs text-stone-400">Lipisha maduka, saluni, na migahawa kuweka matangazo yao kwenye ukurasa wa WiFi.</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                  Monetization Engine
+                </span>
+              </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1">
-                      <div className="p-1.5 bg-stone-950 border border-stone-850 rounded text-center">
-                        <span className="text-stone-400 block text-[9px] font-sans">Impressions</span>
-                        <strong className="text-white text-xs">{ad.impressions}</strong>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newAdTitle.trim()) {
+                    showToast('Tahadhari', 'Tafadhali weka jina la tangazo.', 'warning');
+                    return;
+                  }
+                  addAd({
+                    title: newAdTitle.trim(),
+                    sponsor: newAdSponsor.trim() || 'Biashara ya Mtaani',
+                    desc: newAdDesc.trim() || 'Huduma bora mtaani kwako! Wasiliana nasi leo kwa punguzo la bei.',
+                    phone: newAdPhone.trim() || '0653 578 184',
+                    tag: newAdTag || '🔥 Ofa Maalum',
+                    action: 'Piga / WhatsApp',
+                    priceMonthly: newAdPrice || 20000,
+                    startDate: new Date().toISOString().split('T')[0],
+                    status: 'active',
+                    bgGradient: 'from-fuchsia-950/80 via-purple-900/60 to-stone-900 border-fuchsia-500/40 text-fuchsia-200',
+                    badgeColor: 'bg-fuchsia-500 text-white',
+                    videoDurationSec: 10
+                  });
+                  setNewAdTitle('');
+                  setNewAdSponsor('');
+                  setNewAdDesc('');
+                  showToast('Hongera!', `Tangazo la "${newAdTitle}" limechapishwa na linaonekana kwenye simu za wateja!`, 'success');
+                }}
+                className="space-y-4 text-xs"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-stone-400 block mb-1 font-bold">Kichwa cha Tangazo (Headline):</label>
+                    <input
+                      type="text"
+                      placeholder="Mfano: MIKATE MIKATE FRESH BAKERY"
+                      value={newAdTitle}
+                      onChange={(e) => setNewAdTitle(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-bold"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-stone-400 block mb-1 font-bold">Jina la Duka / Mfadhili (Business Name):</label>
+                    <input
+                      type="text"
+                      placeholder="Mfano: Fresh Bakery Mtaani"
+                      value={newAdSponsor}
+                      onChange={(e) => setNewAdSponsor(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-stone-400 block mb-1 font-bold">Namba ya Simu / WhatsApp ya Duka:</label>
+                    <input
+                      type="text"
+                      placeholder="Mfano: 0754 xxx xxx"
+                      value={newAdPhone}
+                      onChange={(e) => setNewAdPhone(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-mono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-stone-400 block mb-1 font-bold">Kiasi Anacholipia kwa Mwezi (Tsh):</label>
+                    <input
+                      type="number"
+                      step={1000}
+                      value={newAdPrice}
+                      onChange={(e) => setNewAdPrice(parseInt(e.target.value, 10) || 0)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-emerald-400 font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-stone-400 block mb-1 font-bold">Kategoria / Tag ya Bango:</label>
+                    <select
+                      value={newAdTag}
+                      onChange={(e) => setNewAdTag(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white"
+                    >
+                      <option value="🔥 Ofa Maalum Mtaani">🔥 Ofa Maalum Mtaani</option>
+                      <option value="⚡ Vifaa Halisi vya Simu">⚡ Vifaa Halisi vya Simu</option>
+                      <option value="💇 Saluni & Urembo">💇 Saluni & Urembo</option>
+                      <option value="🍔 Chakula & Vinywaji">🍔 Chakula & Vinywaji</option>
+                      <option value="🔧 Fundi & Ujenzi">🔧 Fundi & Ujenzi</option>
+                      <option value="📢 Tangazo la Kibiashara">📢 Tangazo la Kibiashara</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-stone-400 block mb-1 font-bold">Maelezo Mafupi (Offer / Promo Details):</label>
+                    <input
+                      type="text"
+                      placeholder="Mfano: Punguzo la 15% wiki hii, mchele na unga safi..."
+                      value={newAdDesc}
+                      onChange={(e) => setNewAdDesc(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    className="py-2.5 px-6 font-bold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-sm text-xs"
+                  >
+                    + Chapisha Tangazo Kwenye Portal
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Live Campaigns Grid */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-stone-400">
+                  Matangazo Yanayoendelea Kwenye Captive Portal ({ads.length})
+                </h4>
+                <span className="text-[10px] text-stone-500 font-mono">
+                  Inazunguka kila sekunde 5.5
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                {ads.map((ad) => (
+                  <div
+                    key={ad.id}
+                    className="p-4 bg-stone-900 border border-stone-800 rounded-2xl flex flex-col justify-between space-y-3 relative overflow-hidden"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          {ad.tag}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateAd(ad.id, { status: ad.status === 'active' ? 'paused' : 'active' });
+                              showToast('Hali Imebadilishwa', `Tangazo la ${ad.title} sasa ni ${ad.status === 'active' ? 'Paused' : 'Active'}.`, 'info');
+                            }}
+                            className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase cursor-pointer transition-colors ${
+                              ad.status === 'active'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-stone-800 text-stone-400 border border-stone-700'
+                            }`}
+                          >
+                            {ad.status === 'active' ? '● Live' : '○ Paused'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteAd(ad.id);
+                              showToast('Imefutwa', 'Tangazo limeondolewa kwenye mfumo.', 'info');
+                            }}
+                            className="text-stone-500 hover:text-rose-400 p-0.5 cursor-pointer"
+                            title="Futa Tangazo"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
-                      <div className="p-1.5 bg-stone-950 border border-stone-850 rounded text-center">
-                        <span className="text-stone-400 block text-[9px] font-sans">Clicks/Views</span>
-                        <strong className="text-amber-400 text-xs">{ad.views}</strong>
+
+                      <h5 className="text-sm font-black text-white tracking-tight leading-snug">
+                        {ad.title}
+                      </h5>
+                      <p className="text-[11px] text-stone-400 line-clamp-2 leading-relaxed">
+                        {ad.desc}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-stone-800">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-stone-500">Mfadhili:</span>
+                        <strong className="text-stone-300 truncate max-w-[150px]">{ad.sponsor}</strong>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-stone-500">Malipo:</span>
+                        <strong className="text-emerald-400 font-mono">Tsh {ad.priceMonthly.toLocaleString()} / mwezi</strong>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[10px] font-mono pt-1">
+                        <div className="p-2 bg-stone-950 border border-stone-850 rounded-xl text-center">
+                          <span className="text-stone-400 block text-[9px] font-sans">Watazamaji</span>
+                          <strong className="text-white text-xs">{ad.impressions || 0}</strong>
+                        </div>
+                        <div className="p-2 bg-stone-950 border border-stone-850 rounded-xl text-center">
+                          <span className="text-stone-400 block text-[9px] font-sans">WhatsApp Clicks</span>
+                          <strong className="text-amber-400 text-xs">{ad.clicks || 0}</strong>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -5443,7 +5943,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* FLOATING QUICK ACTIONS MENU */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40">
         {/* Expanded menu options */}
         {showQuickActionMenu && (
           <div className="absolute bottom-16 right-0 w-64 bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl p-3 space-y-2 animate-in slide-in-from-bottom-5 duration-200 text-stone-100">
@@ -5539,13 +6039,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>📊</span>
               <span>Download Sales Report</span>
             </button>
+
+            {/* Option 6: Speed Test */}
+            <button
+              onClick={() => {
+                setShowSpeedTestModal(true);
+                setShowQuickActionMenu(false);
+              }}
+              className="w-full text-left p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-xl transition-colors text-xs font-bold flex items-center gap-2 cursor-pointer border border-amber-500/20"
+            >
+              <span>⚡</span>
+              <span>Pima Kasi ya Mtandao (Speed Test)</span>
+            </button>
+
+            {/* Option 7: Network Diagnostics */}
+            <button
+              onClick={() => {
+                setActiveTab('network_diagnostics');
+                setShowQuickActionMenu(false);
+              }}
+              className="w-full text-left p-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 rounded-xl transition-colors text-xs font-bold flex items-center gap-2 cursor-pointer border border-sky-500/20"
+            >
+              <span>🔍</span>
+              <span>Utambuzi & Ping Tool</span>
+            </button>
           </div>
         )}
 
         {/* Floating FAB Trigger Button */}
         <button
           onClick={() => setShowQuickActionMenu(!showQuickActionMenu)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer ${
+          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-300 hover:scale-105 cursor-pointer ${
             showQuickActionMenu 
               ? 'bg-stone-800 hover:bg-stone-750 rotate-45 border border-stone-700' 
               : 'bg-[#cca43b] hover:bg-amber-500 shadow-amber-500/20'
@@ -5553,9 +6077,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           title="Quick Actions Menu"
         >
           {showQuickActionMenu ? (
-            <span className="text-xl font-bold">✕</span>
+            <span className="text-lg sm:text-xl font-bold">✕</span>
           ) : (
-            <span className="text-2xl font-black animate-pulse">⚡</span>
+            <span className="text-xl sm:text-2xl font-black animate-pulse">⚡</span>
           )}
         </button>
       </div>
@@ -5581,6 +6105,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ✕
           </button>
         </div>
+      )}
+
+      {/* Interactive Speed Test Modal */}
+      {showSpeedTestModal && (
+        <SpeedTestWidget
+          isModal={true}
+          onClose={() => setShowSpeedTestModal(false)}
+          businessName={settings.hotspotName || 'LEMA FAST WiFi'}
+          theme="dark"
+        />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Language, AppView } from '../types';
 import { useHotspot } from '../context/HotspotContext';
 import { LemaLogo } from './common/LemaLogo';
@@ -29,6 +29,7 @@ import heroWifiSceneImg from '../assets/images/hero_wifi_scene_1791617825078.jpg
 import telecomTowerImg from '../assets/images/telecom_tower_antenna_1791617835995.jpg';
 import mobileMoneyPayImg from '../assets/images/mobile_money_pay_1791617847899.jpg';
 import networkOperationsDeskImg from '../assets/images/network_operations_desk_1791617859620.jpg';
+import { SpeedTestWidget } from './system/SpeedTestWidget';
 
 interface LandingPageProps {
   lang: Language;
@@ -37,6 +38,7 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) => {
   const { settings, towers, activeSessions } = useHotspot();
+  const [showSpeedTestModal, setShowSpeedTestModal] = useState<boolean>(false);
 
   const scrollToPricing = () => {
     const el = document.getElementById('landing-pricing');
@@ -101,6 +103,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
                 >
                   <LayoutDashboard className="w-4 h-4 text-amber-400" />
                   <span>Fungua Admin Dashboard</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowSpeedTestModal(true)}
+                  className="px-6 py-4 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-white font-bold text-sm border border-amber-500/30 transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <Gauge className="w-4 h-4 text-amber-400" />
+                  <span>Pima Kasi ya Mtandao</span>
                 </button>
               </div>
 
@@ -700,6 +711,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
         </div>
       </section>
 
+      {/* Speed Test Modal */}
+      {showSpeedTestModal && (
+        <SpeedTestWidget
+          isModal={true}
+          onClose={() => setShowSpeedTestModal(false)}
+          businessName={settings.hotspotName || 'LEMA FAST WiFi'}
+          theme="dark"
+        />
+      )}
     </div>
   );
 };

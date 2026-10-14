@@ -31,35 +31,45 @@ const recentMessages: StoredMessage[] = [];
 // WhatsApp Cloud API (Meta Official - Unlimited Numbers)
 interface WhatsAppConfig {
   provider: 'meta';
-  // Meta WhatsApp Cloud API credentials
   phoneNumberId: string;
   accessToken: string;
   verifyToken: string;
   appId: string;
+  lastError?: {
+    type: string;
+    code?: number;
+    message: string;
+    timestamp: string;
+    isNotRegistered?: boolean;
+  } | null;
 }
 
 let whatsAppConfig: WhatsAppConfig = {
   provider: 'meta',
-  phoneNumberId: '',
-  accessToken: '',
-  verifyToken: 'lema_wifi_webhook_token',
-  appId: '1860632731565594'
+  phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782',
+  accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'lema_wifi_webhook_token',
+  appId: process.env.WHATSAPP_APP_ID || '1860632731565594',
+  lastError: null
 };
 
 // WhatsApp Config endpoint
 app.post('/api/v1/whatsapp/config', (req, res) => {
   const { provider, phoneNumberId, accessToken, verifyToken, appId } = req.body;
   if (provider) whatsAppConfig.provider = 'meta';
-  if (phoneNumberId !== undefined) whatsAppConfig.phoneNumberId = phoneNumberId;
-  if (accessToken !== undefined) whatsAppConfig.accessToken = accessToken;
-  if (verifyToken !== undefined) whatsAppConfig.verifyToken = verifyToken;
-  if (appId !== undefined) whatsAppConfig.appId = appId;
+  if (phoneNumberId !== undefined) whatsAppConfig.phoneNumberId = String(phoneNumberId).trim();
+  if (accessToken !== undefined) {
+    whatsAppConfig.accessToken = String(accessToken).trim();
+    whatsAppConfig.lastError = null;
+  }
+  if (verifyToken !== undefined) whatsAppConfig.verifyToken = String(verifyToken).trim();
+  if (appId !== undefined) whatsAppConfig.appId = String(appId).trim();
 
   console.log('[WhatsApp Config] Updated config:', {
     provider: whatsAppConfig.provider,
     appId: whatsAppConfig.appId,
     phoneNumberId: whatsAppConfig.phoneNumberId,
-    hasMetaToken: Boolean(whatsAppConfig.accessToken),
+    hasMetaToken: Boolean(whatsAppConfig.accessToken && whatsAppConfig.accessToken.length > 20),
     verifyToken: whatsAppConfig.verifyToken
   });
   return res.json({ success: true, config: whatsAppConfig });
@@ -69,12 +79,76 @@ app.get('/api/v1/whatsapp/config', (_req, res) => {
   return res.json(whatsAppConfig);
 });
 
-// Get recent messages for frontend Dashboard sync
-app.get('/api/v1/whatsapp/messages', (_req, res) => {
-  return res.json({ messages: recentMessages });
+// Clear error endpoint
+app.post('/api/v1/whatsapp/clear-error', (_req, res) => {
+  whatsAppConfig.lastError = null;
+  return res.json({ success: true });
 });
 
-// Helper: Send WhatsApp reply via Meta WhatsApp Cloud API (Official - Unlimited Numbers)
+// Register Phone with Meta Cloud API (Solves Error 133010 Account not registered)
+async function registerMetaPhoneNumber(phoneId: string, token: string, pin: string = '123456') {
+  try {
+    console.log(`[Meta WhatsApp] 🔄 Registering phone ID ${phoneId} with Meta API (PIN: ${pin})...`);
+    const url = `https://graph.facebook.com/v21.0/${phoneId}/register`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        pin: pin || '123456'
+      })
+    });
+    const data: any = await response.json();
+    if (data?.success) {
+      console.log(`[Meta WhatsApp] ✅ Phone ${phoneId} registered successfully with Meta!`);
+      return { success: true, data };
+    }
+    console.log(`[Meta WhatsApp] Registration response:`, data);
+    return { success: false, error: data?.error };
+  } catch (err: any) {
+    console.log(`[Meta WhatsApp] Registration network issue:`, err?.message);
+    return { success: false, error: { message: err?.message || 'Network issue during registration' } };
+  }
+}
+
+// Dedicated Register Phone endpoint for Admin UI
+app.post('/api/v1/whatsapp/register-phone', async (req, res) => {
+  const { pin } = req.body || {};
+  const token = (whatsAppConfig.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782').trim();
+
+  if (!token || token.length < 25) {
+    return res.status(400).json({
+      success: false,
+      message: 'Access Token ya Meta inahitajika kabla ya kusajili namba!'
+    });
+  }
+
+  const result = await registerMetaPhoneNumber(phoneId, token, pin || '123456');
+  if (result.success) {
+    whatsAppConfig.lastError = null;
+    return res.json({
+      success: true,
+      message: 'Namba ya simu imesajiliwa kikamilifu kwenye Meta WhatsApp Cloud API!'
+    });
+  }
+
+  return res.status(400).json({
+    success: false,
+    error: result.error,
+    message: result.error?.message || 'Kusajili namba kumeshindikana. Tafadhali thibitisha Token na PIN.'
+  });
+});
+
+// Get recent messages for frontend Dashboard sync
+app.get('/api/v1/whatsapp/messages', (_req, res) => {
+  return res.json({ messages: recentMessages, lastError: whatsAppConfig.lastError });
+});
+
+// Helper: Send WhatsApp reply via Meta WhatsApp Cloud API safely
 async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string) {
   const digits = targetPhoneOrChatId.replace(/[^0-9]/g, '');
   const international = digits.startsWith('0')
@@ -83,15 +157,21 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
     ? digits
     : '255' + digits;
 
+  const token = (whatsAppConfig.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782').trim();
+
+  // Validate if token is real Meta token (must not be empty, placeholder or too short)
+  const isPlaceholderOrInvalid = !token || token.toLowerCase().includes('token string') || token.length < 25;
+
   // 1. Meta WhatsApp Cloud API (Official - Unlimited Numbers)
-  if (whatsAppConfig.phoneNumberId && whatsAppConfig.accessToken) {
+  if (phoneId && !isPlaceholderOrInvalid) {
     try {
       console.log(`[Meta WhatsApp Cloud API] 📤 Sending to +${international}: "${message.slice(0, 50)}..."`);
-      const url = `https://graph.facebook.com/v21.0/${whatsAppConfig.phoneNumberId}/messages`;
+      const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${whatsAppConfig.accessToken}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -102,19 +182,91 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
           text: { preview_url: false, body: message }
         })
       });
-      const data = await response.json();
-      console.log('[Meta WhatsApp Cloud API Response]:', data);
+      const data: any = await response.json();
+
+      if (data?.error) {
+        const errorType = data.error.type || 'MetaAPIError';
+        const errorCode = data.error.code;
+        const errorMessage = data.error.message || 'Hitilafu ya Meta Cloud API';
+
+        // Auto-handle 133010 Account not registered: Register phone and retry send
+        if (errorCode === 133010 || errorMessage.includes('133010') || errorMessage.toLowerCase().includes('account not registered')) {
+          console.log('[Meta Cloud API] 🔄 Account not registered (133010). Attempting automatic phone registration...');
+          const regRes = await registerMetaPhoneNumber(phoneId, token);
+          if (regRes.success) {
+            console.log('[Meta Cloud API] ✅ Auto-registration successful! Retrying message delivery...');
+            const retryRes = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: international,
+                type: 'text',
+                text: { preview_url: false, body: message }
+              })
+            });
+            const retryData: any = await retryRes.json();
+            if (!retryData?.error) {
+              console.log(`[Meta WhatsApp Cloud API Success] Ujumbe umetumwa kwa +${international} baada ya usajili.`);
+              whatsAppConfig.lastError = null;
+              return retryData;
+            }
+          }
+        }
+
+        const isNotRegistered = errorCode === 133010 || errorMessage.includes('133010');
+        const isOAuth = errorType === 'OAuthException';
+
+        whatsAppConfig.lastError = {
+          type: errorType,
+          code: errorCode,
+          message: errorMessage,
+          isNotRegistered,
+          timestamp: new Date().toLocaleTimeString()
+        };
+
+        let userTip = errorMessage;
+        if (isNotRegistered) {
+          userTip = 'Namba haijasajiliwa Meta (Code 133010: Account not registered). Mfumo unakuruhusu kubonyeza "Sajili Namba Meta" chini au hakikisha namba ya mpokeaji imeongezwa kwenye orodha ya "To" kwenye Meta Developers.';
+        } else if (isOAuth) {
+          userTip = 'Token ya Meta imekwisha muda au si sahihi. Bonyeza "Generate token" au "Copy" kutoka ukurasa wa Meta Developers ➔ WhatsApp ➔ API Setup.';
+        }
+
+        return {
+          error: true,
+          errorType,
+          code: errorCode,
+          subcode: data.error.error_subcode,
+          message: errorMessage,
+          isAccountNotRegistered: isNotRegistered,
+          isOAuthException: isOAuth,
+          userTip
+        };
+      }
+
+      console.log(`[Meta WhatsApp Cloud API Success] Ujumbe umetumwa kwa +${international}`);
+      whatsAppConfig.lastError = null;
       return data;
     } catch (err: any) {
-      console.error('[Meta WhatsApp Cloud API Error]:', err);
-      return { error: true, message: err?.message || 'Meta Cloud API Network Error' };
+      console.log('[Meta WhatsApp Cloud API Handled Catch]:', err?.message || 'Network error');
+      return { 
+        error: true, 
+        message: err?.message || 'Meta Cloud API Network Error',
+        userTip: 'Tatizo la mawasiliano ya mtandao na seva ya Meta.' 
+      };
     }
   }
 
   console.log(`[WhatsApp Bot Simulator / Meta Ready] Message to +${international}: "${message.slice(0, 60)}..."`);
   return {
     simulated: true,
-    warning: 'Phone Number ID au Access Token haijawekwa kwenye Mipangilio ya Meta!',
+    warning: isPlaceholderOrInvalid
+      ? 'Access Token ya Meta haijawekwa au ni ya mfano tu ("Access Token String"). Tafadhali weka Token halisi inayoanza na EAA... kutoka Meta Developers ukurasa wa WhatsApp ➔ API Setup.'
+      : 'Phone Number ID au Access Token haijawekwa kwenye Mipangilio ya Meta!',
     to: international
   };
 }
@@ -352,7 +504,7 @@ app.get('/api/v1/whatsapp/webhook', (req, res) => {
 
   // Meta Webhook Verification Challenge
   const expectedTokens = [whatsAppConfig.verifyToken, 'lema_wifi_webhook_token', 'lema_fast_wifi'].filter(Boolean);
-  if (mode === 'subscribe' && expectedTokens.includes(token)) {
+  if (mode === 'subscribe' && typeof token === 'string' && expectedTokens.includes(token)) {
     console.log('✅ [Meta WhatsApp Webhook Verified Successfully!] Challenge token sent back to Meta.');
     return res.status(200).send(challenge);
   }

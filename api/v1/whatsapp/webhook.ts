@@ -68,32 +68,39 @@ export default async function handler(req: any, res: any) {
               replyText = `Habari ${senderName}! 👋\nKaribu *Lema Fast WiFi* Smart Assistant.\n\n📶 *VIFURUSHI VYA INTANETI:*\n1️⃣ Saa 2 (TZS 500) ➔ Jibu: *1*\n2️⃣ Siku 1 (TZS 1,000) ➔ Jibu: *2*\n3️⃣ Wiki 1 (TZS 5,000) ➔ Jibu: *3*\n4️⃣ Mwezi 1 (TZS 25,000) ➔ Jibu: *4*\n\nAndika namba kupata vocha mara moja au andika *ADMIN* kuwasiliana na Jimmy Lema (0653 578 184).`;
             }
 
-            // Send via Meta API if credentials exist
-            const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-            const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+            const phoneNumberId = (process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782').trim();
+            const accessToken = (process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 
-            if (phoneNumberId && accessToken) {
-              const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
-              await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  messaging_product: 'whatsapp',
-                  to: senderPhone,
-                  type: 'text',
-                  text: { body: replyText }
-                })
-              });
+            if (phoneNumberId && accessToken && accessToken.length > 25 && !accessToken.toLowerCase().includes('token string')) {
+              try {
+                const url = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
+                const metaRes = await fetch(url, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    to: senderPhone,
+                    type: 'text',
+                    text: { body: replyText }
+                  })
+                });
+                const metaJson: any = await metaRes.json();
+                if (metaJson?.error) {
+                  console.log('[Vercel Webhook Handled Status]:', metaJson.error.message || 'Meta API error');
+                }
+              } catch (metaErr: any) {
+                console.log('[Vercel Webhook Network Notice]:', metaErr?.message || 'Meta network issue');
+              }
             }
           }
         }
         return res.status(200).send('EVENT_RECEIVED');
       }
-    } catch (err) {
-      console.error('[Vercel Webhook Error]:', err);
+    } catch (err: any) {
+      console.log('[Vercel Webhook Handled Catch]:', err?.message || 'Webhook catch');
     }
     return res.status(200).json({ status: 'ok', received: true });
   }

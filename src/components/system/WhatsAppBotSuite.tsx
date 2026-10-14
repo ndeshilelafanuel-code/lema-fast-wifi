@@ -26,7 +26,11 @@ import {
   XCircle,
   FileText,
   Key,
-  Globe
+  Globe,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { useHotspot } from '../../context/HotspotContext';
 import { HotspotPackage, Voucher } from '../../types';
@@ -64,7 +68,7 @@ export interface WhatsAppConversation {
 }
 
 interface WhatsAppBotSuiteProps {
-  onShowToast?: (title: string, desc: string, type?: 'success' | 'info' | 'warning') => void;
+  onShowToast?: (title: string, desc: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   onSendAdminAlert?: (title: string, message: string, severity?: 'warning' | 'error' | 'info') => void;
 }
 
@@ -137,7 +141,7 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   
   // Meta WhatsApp Cloud API credentials
   const [metaAppId, setMetaAppId] = useState<string>(() => localStorage.getItem('lema_meta_app_id') || '1860632731565594');
-  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState<string>(() => localStorage.getItem('lema_meta_phone_number_id') || '');
+  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState<string>(() => localStorage.getItem('lema_meta_phone_number_id') || '1424208230767782');
   const [metaAccessToken, setMetaAccessToken] = useState<string>(() => localStorage.getItem('lema_meta_access_token') || '');
   const [metaVerifyToken, setMetaVerifyToken] = useState<string>(() => localStorage.getItem('lema_meta_verify_token') || 'lema_wifi_webhook_token');
   const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0653578184');
@@ -146,7 +150,12 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0653578184');
   const [isBotConnected, setIsBotConnected] = useState<boolean>(true);
   const [isTestingSend, setIsTestingSend] = useState<boolean>(false);
-  const [testSendResult, setTestSendResult] = useState<string | null>(null);
+  const [testSendResult, setTestSendResult] = useState<{ message: string; isError: boolean; isOAuth?: boolean; isNotRegistered?: boolean } | null>(null);
+  const [showToken, setShowToken] = useState<boolean>(false);
+  const [metaLastError, setMetaLastError] = useState<{ type: string; code?: number; message: string; timestamp: string; isNotRegistered?: boolean } | null>(null);
+  const [isRegisteringPhone, setIsRegisteringPhone] = useState<boolean>(false);
+  const [registerPin, setRegisterPin] = useState<string>('123456');
+  const [registerSuccessMessage, setRegisterSuccessMessage] = useState<string | null>(null);
   const [autoSellPackages, setAutoSellPackages] = useState<boolean>(true);
   const [autoResolveErrors, setAutoResolveErrors] = useState<boolean>(true);
   const [sendDashboardAlertOnEscalate, setSendDashboardAlertOnEscalate] = useState<boolean>(true);
@@ -316,6 +325,31 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleRegisterPhone = async (pinToUse?: string) => {
+    setIsRegisteringPhone(true);
+    setRegisterSuccessMessage(null);
+    try {
+      const res = await fetch('/api/v1/whatsapp/register-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinToUse || registerPin || '123456' })
+      });
+      const data = await res.json();
+      setIsRegisteringPhone(false);
+      if (data.success) {
+        setMetaLastError(null);
+        setRegisterSuccessMessage('✅ Namba imesajiliwa kikamilifu kwenye Meta WhatsApp Cloud API! Sasa ujumbe unaweza kutoka.');
+        if (onShowToast) onShowToast('Usajili Umefaulu! 🎉', 'Namba ya simu imesajiliwa Meta Cloud API', 'success');
+      } else {
+        const errMsg = data?.error?.message || data?.message || 'Hitilafu ya kusajili namba Meta';
+        if (onShowToast) onShowToast('Hitilafu ya Usajili', errMsg, 'error');
+      }
+    } catch (err: any) {
+      setIsRegisteringPhone(false);
+      if (onShowToast) onShowToast('Hitilafu ya Mtandao', 'Haikuweza kuungana na seva', 'error');
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [simMessages]);
@@ -342,6 +376,9 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
           setMetaVerifyToken(cfg.verifyToken);
           localStorage.setItem('lema_meta_verify_token', cfg.verifyToken);
         }
+        if (cfg?.lastError) {
+          setMetaLastError(cfg.lastError);
+        }
       })
       .catch(() => {});
 
@@ -350,6 +387,9 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
       try {
         const res = await fetch('/api/v1/whatsapp/messages');
         const data = await res.json();
+        if (data?.lastError !== undefined) {
+          setMetaLastError(data.lastError);
+        }
         if (data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
           // Group incoming messages by customer phone
           const serverMsgs: any[] = data.messages;
@@ -1361,6 +1401,92 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                   </span>
                 </div>
 
+                {/* Registration Success Message */}
+                {registerSuccessMessage && (
+                  <div className="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-2xl text-emerald-900 text-xs flex items-center justify-between animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{registerSuccessMessage}</span>
+                    </div>
+                    <button
+                      onClick={() => setRegisterSuccessMessage(null)}
+                      className="text-emerald-700 hover:text-emerald-900 font-bold ml-2 px-1.5 py-0.5 rounded bg-emerald-200/60"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Error Alert Banner if 133010 Not Registered or token expired */}
+                {metaLastError && (
+                  <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-2xl space-y-2 text-stone-800 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                        <span className="font-black text-xs text-amber-900 uppercase tracking-tight">
+                          {metaLastError.isNotRegistered || metaLastError.code === 133010 || metaLastError.message?.includes('133010')
+                            ? '⚠️ Hitilafu ya Usajili wa Namba Meta (#133010 Account Not Registered)'
+                            : metaLastError.type === 'OAuthException'
+                            ? '⚠️ Hitilafu ya Token ya Meta (OAuthException / Expired Token)'
+                            : `⚠️ Hitilafu ya Meta: ${metaLastError.type}`}
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setMetaLastError(null);
+                          await fetch('/api/v1/whatsapp/clear-error', { method: 'POST' }).catch(() => {});
+                        }}
+                        className="text-xs text-amber-700 hover:text-amber-900 font-bold px-2 py-0.5 rounded bg-amber-200/60"
+                      >
+                        Ondoa Arifa ✕
+                      </button>
+                    </div>
+
+                    {(metaLastError.isNotRegistered || metaLastError.code === 133010 || metaLastError.message?.includes('133010')) ? (
+                      <div className="space-y-2.5 pt-1">
+                        <p className="text-xs text-amber-900 leading-relaxed">
+                          Namba ya simu ya Meta <strong>haijasajiliwa rasmi (Code 133010: Account not registered)</strong>.
+                          Kwenye Meta WhatsApp Cloud API, namba mpya inatakiwa kusajiliwa mara moja kwa kuweka PIN ya tarakimu 6 (chaguomsingi ni <code>123456</code>).
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={registerPin}
+                            onChange={(e) => setRegisterPin(e.target.value)}
+                            placeholder="123456"
+                            className="w-24 px-2 py-1.5 border border-amber-300 rounded-lg text-xs font-mono text-center font-bold bg-white"
+                          />
+                          <button
+                            disabled={isRegisteringPhone}
+                            onClick={() => handleRegisterPhone()}
+                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                          >
+                            {isRegisteringPhone ? 'Inasajili...' : 'Sajili Namba Meta Sasa (Register Phone) 📲'}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-amber-800">
+                          💡 <em>Pia hakikisha kwenye ukurasa wa Meta Developers (<strong>WhatsApp ➔ API Setup</strong>), namba yako ya simu ya mpokeaji (<code>+255...</code>) imeongezwa kwenye uwanja wa <strong>"To" (Recipient phone number)</strong>.</em>
+                        </p>
+                      </div>
+                    ) : metaLastError.type === 'OAuthException' ? (
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Token ya Meta uliyoiweka <strong>imekwisha muda wake (Masaa 24 yamepita)</strong> au haikunakiliwa kwa ukamilifu.
+                        <br />
+                        <strong>Jinsi ya Kurekebisha Haraka (Sekunde 30):</strong>
+                        <br />
+                        1. Fungua ukurasa wako wa Meta: <strong>developers.facebook.com ➔ WhatsApp ➔ API Setup</strong>.
+                        <br />
+                        2. Bonyeza kitufe cha <strong>"Generate token"</strong> au <strong>"Copy"</strong> chini ya <em>Temporary access token</em> (huanza na herufi <code>EAA...</code>).
+                        <br />
+                        3. Bandika hapa chini kwenye kisanduku cha <strong>WhatsApp Access Token</strong> kisha bonyeza <strong>"Hifadhi Mipangilio ya Meta"</strong>.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-800 leading-relaxed">{metaLastError.message}</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-stone-700 font-bold block mb-1">Meta App ID (Kutoka developers.facebook.com):</label>
@@ -1381,23 +1507,80 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       type="text"
                       value={metaPhoneNumberId}
                       onChange={(e) => setMetaPhoneNumberId(e.target.value)}
-                      placeholder="Weka Phone Number ID (Mfano: 104928374920194)"
+                      placeholder="1424208230767782"
                       className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="text-stone-700 font-bold block mb-1">
-                      WhatsApp Access Token (Permanent / System User Token kutoka Meta):
-                    </label>
-                    <input
-                      type="password"
-                      value={metaAccessToken}
-                      onChange={(e) => setMetaAccessToken(e.target.value)}
-                      placeholder="EAAG... (Bandika token ndefu ya Meta hapa)"
-                      className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-stone-700 font-bold block">
+                        WhatsApp Access Token (Inaanza na EAAG... kutoka Meta Developers):
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="text-[11px] text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span>{showToken ? 'Ficha Token' : 'Onyesha Token'}</span>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showToken ? 'text' : 'password'}
+                        value={metaAccessToken}
+                        onChange={(e) => {
+                          setMetaAccessToken(e.target.value);
+                          if (metaLastError) setMetaLastError(null);
+                        }}
+                        placeholder="EAA... (Nakili token ndefu kutoka Meta ukurasa wa API Setup)"
+                        className="w-full px-3 py-2 pr-20 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
+                      />
+                      {metaAccessToken && (
+                        <button
+                          type="button"
+                          onClick={() => setMetaAccessToken('')}
+                          className="absolute right-2 top-2 text-[10px] px-2 py-0.5 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded font-bold"
+                        >
+                          Futa
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Token Format Status Feedback */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                      {!metaAccessToken ? (
+                        <span className="text-stone-400 italic">Bado hujaweka token.</span>
+                      ) : metaAccessToken.toLowerCase().includes('token string') || metaAccessToken.length < 25 ? (
+                        <span className="text-amber-700 font-bold flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Hii si token kamili (inaonekana ni maandishi ya mfano). Token halisi ya Meta huwa ndefu sana na huanza na "EAA...".
+                        </span>
+                      ) : metaAccessToken.startsWith('EAA') ? (
+                        <span className="text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          Muundo sahihi wa Meta Access Token (Herufi {metaAccessToken.length})
+                        </span>
+                      ) : (
+                        <span className="text-stone-600 font-medium">
+                          Token imewekwa (Herufi {metaAccessToken.length})
+                        </span>
+                      )}
+                    </div>
                   </div>
+                </div>
+
+                {/* Permanent Token Tip Box */}
+                <div className="p-3 bg-stone-100 border border-stone-200 rounded-xl space-y-1.5 text-[11px] text-stone-700">
+                  <div className="font-bold flex items-center gap-1.5 text-stone-850">
+                    <Info className="w-4 h-4 text-emerald-600" />
+                    <span>Jinsi ya Kupata Token ya Kudumu Isiyoisha Muda Kamwe (Permanent System User Token):</span>
+                  </div>
+                  <p className="text-stone-600 leading-relaxed">
+                    Temporary Token ya Meta huisha kila baada ya masaa 24 (huleta <em>OAuthException</em>). Ukipenda isiishe kamwe:
+                    Fungua <strong>Meta Business Settings ➔ System Users ➔ Add ➔ Generate Token</strong>, weka muda kuwa <em>Never expire</em> na uchague ruhusa za <code>whatsapp_business_messaging</code>.
+                  </p>
                 </div>
 
                 {/* Webhook Configuration for Meta */}
@@ -1473,21 +1656,53 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                           const data = await res.json();
                           setIsTestingSend(false);
                           if (data?.result?.messages) {
-                            setTestSendResult('✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API!');
+                            setTestSendResult({
+                              message: '✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API!',
+                              isError: false
+                            });
                             if (onShowToast) onShowToast('Jaribio Limetumwa!', `Ujumbe umetumwa kwa ${testRecipientPhone}`, 'success');
+                          } else if (data?.result?.isAccountNotRegistered || data?.result?.code === 133010 || data?.result?.message?.includes('133010')) {
+                            const tip = data?.result?.userTip || 'Namba ya Meta inatakiwa kusajiliwa mara moja kwa kuweka PIN (123456). Tumia kitufe cha "Sajili Namba Meta Sasa" hapo juu.';
+                            setTestSendResult({
+                              message: `⚠️ Namba Haijasajiliwa Meta (#133010): ${tip}`,
+                              isError: true,
+                              isNotRegistered: true
+                            });
+                            if (onShowToast) onShowToast('Namba Haijasajiliwa Meta', 'Bonyeza Sajili Namba Meta', 'warning');
+                          } else if (data?.result?.isOAuthException || data?.result?.errorType === 'OAuthException' || data?.result?.error?.type === 'OAuthException') {
+                            const userTip = data?.result?.userTip || 'Token ya Meta imekwisha muda wake (Session expired). Tafadhali bonyeza "Generate token" kwenye Meta ukurasa wa API Setup na ubandike hapa.';
+                            setTestSendResult({
+                              message: `⚠️ Hitilafu ya Token (OAuthException): ${userTip}`,
+                              isError: true,
+                              isOAuth: true
+                            });
+                            if (onShowToast) onShowToast('Token ya Meta Imekwisha Muda', 'Tafadhali nakili token mpya kutoka Meta', 'error');
                           } else if (data?.result?.error) {
-                            const metaErrMsg = data?.result?.error?.message || JSON.stringify(data?.result?.error);
-                            setTestSendResult(`⚠️ Hitilafu kutoka Meta: ${metaErrMsg}`);
+                            const metaErrMsg = data?.result?.message || data?.result?.error?.message || JSON.stringify(data?.result?.error);
+                            setTestSendResult({
+                              message: `⚠️ Hitilafu kutoka Meta: ${metaErrMsg}`,
+                              isError: true
+                            });
                             if (onShowToast) onShowToast('Hitilafu ya Meta', metaErrMsg, 'error');
                           } else if (data?.result?.simulated) {
-                            setTestSendResult('ℹ️ Taarifa: Bado hujaweka Phone Number ID na Access Token hapo juu. Tafadhali jaza kisha ubonyeze "Hifadhi Mipangilio ya Meta".');
-                            if (onShowToast) onShowToast('Mipangilio haijakamilika', 'Weka Phone Number ID na Token kwanza', 'warning');
+                            const warn = data?.result?.warning || 'Bado hujaweka Phone Number ID na Access Token hapo juu.';
+                            setTestSendResult({
+                              message: `ℹ️ Taarifa: ${warn}`,
+                              isError: true
+                            });
+                            if (onShowToast) onShowToast('Mipangilio haijakamilika', warn, 'warning');
                           } else {
-                            setTestSendResult('✅ Ombi la jaribio limeenda kwenye mfumo.');
+                            setTestSendResult({
+                              message: '✅ Ombi la jaribio limeenda kwenye mfumo.',
+                              isError: false
+                            });
                           }
                         } catch (err: any) {
                           setIsTestingSend(false);
-                          setTestSendResult('⚠️ Hitilafu ya mawasiliano na seva ya mtandao. Hakikisha seva iko hewani.');
+                          setTestSendResult({
+                            message: '⚠️ Hitilafu ya mawasiliano na seva ya mtandao.',
+                            isError: true
+                          });
                         }
                       }}
                       className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50"
@@ -1515,6 +1730,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                             verifyToken: metaVerifyToken
                           })
                         });
+                        setMetaLastError(null);
                         if (onShowToast) {
                           onShowToast('Imehifadhiwa!', 'Mipangilio ya Meta WhatsApp Cloud API imehifadhiwa kikamilifu!', 'success');
                         }
@@ -1532,12 +1748,30 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
               </div>
             )}
 
-              {testSendResult && (
-                <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-800 font-bold flex items-center justify-between">
-                  <span>{testSendResult}</span>
-                  <button onClick={() => setTestSendResult(null)} className="text-emerald-600 hover:text-emerald-900">×</button>
+            {testSendResult && (
+              <div
+                className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 animate-fadeIn ${
+                  testSendResult.isError
+                    ? 'bg-amber-50 border-2 border-amber-400 text-amber-900'
+                    : 'bg-emerald-50 border border-emerald-300 text-emerald-800'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  {testSendResult.isError ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  )}
+                  <span className="leading-relaxed">{testSendResult.message}</span>
                 </div>
-              )}
+                <button
+                  onClick={() => setTestSendResult(null)}
+                  className="text-stone-500 hover:text-stone-800 px-1 font-bold text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* Microtik Fetch Alert Script for WhatsApp */}
             <div className="bg-[#1f2937] border border-stone-700 rounded-2xl p-5 space-y-3 text-white">

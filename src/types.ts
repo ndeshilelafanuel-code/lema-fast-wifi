@@ -80,6 +80,24 @@ export interface NetworkTower {
   lastPingMs?: number;
 }
 
+export interface HotspotAdvertisement {
+  id: string;
+  tag: string;
+  title: string;
+  desc: string;
+  action: string;
+  phone: string;
+  sponsor: string;
+  priceMonthly: number;
+  startDate: string;
+  status: 'active' | 'paused' | 'expired';
+  impressions: number;
+  clicks: number;
+  bgGradient?: string;
+  badgeColor?: string;
+  videoDurationSec?: number;
+}
+
 export interface HotspotSettings {
   hotspotName: string;
   tagline: string;
@@ -111,6 +129,14 @@ export interface HotspotSettings {
   lowBalanceSmsTemplate?: string;
   enablePurchaseReceiptSms?: boolean;
   purchaseReceiptSmsTemplate?: string;
+
+  // Modern Captive Portal Best Practices (Omada / Ruijie / Mikrotik)
+  enableAutoMacLogin?: boolean;
+  enableQrCameraScanner?: boolean;
+  enableAntiAbuseTrial?: boolean;
+  trialDurationMinutes?: number;
+  trialCooldownHours?: number;
+  enableWhatsAppVoucherDelivery?: boolean;
 }
 
 export interface EquipmentItem {

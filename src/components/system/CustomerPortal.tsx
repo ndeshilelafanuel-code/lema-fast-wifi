@@ -16,10 +16,25 @@ import {
   LogOut,
   Sparkles,
   MessageSquare,
-  Bot,
-  Zap
+  Zap,
+  Gauge,
+  Bell,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  Gift,
+  Megaphone,
+  RotateCw,
+  Tag,
+  Phone,
+  ShieldCheck,
+  Camera,
+  QrCode,
+  Share2
 } from 'lucide-react';
 import { BandwidthVisualizationWidget } from './BandwidthVisualizationWidget';
+import { SpeedTestWidget } from './SpeedTestWidget';
+import { VoucherQrScannerModal } from './VoucherQrScannerModal';
 
 interface CustomerPortalProps {
   lang: Language;
@@ -32,17 +47,63 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     redeemVoucher,
     currentClientSession,
     disconnectSession,
+    reconnectByReference,
+    ads,
+    recordAdImpression,
+    recordAdClick,
   } = useHotspot();
 
-  const [activeTab, setActiveTab] = useState<'mobile-stk' | 'voucher' | 'trial'>('mobile-stk');
+  const [activeTab, setActiveTab] = useState<'mobile-stk' | 'voucher' | 'reconnect' | 'trial'>('mobile-stk');
   const [selectedPackageId, setSelectedPackageId] = useState<string>(settings.packages[1]?.id || settings.packages[0]?.id);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
+  const [smsReferenceNo, setSmsReferenceNo] = useState<string>('');
+  const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [showUssdPrompt, setShowUssdPrompt] = useState<boolean>(false);
   const [simulatedPin, setSimulatedPin] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState<'mpesa' | 'tigopesa' | 'airtel' | 'halopesa'>('mpesa');
+
+  // Ad Banner Carousel Data from Global Hotspot Context
+  const activeAds = ads.filter((a) => a.status === 'active');
+  const adBanners = activeAds.length > 0 ? activeAds : ads;
+  const [currentAdIndex, setCurrentAdIndex] = useState<number>(0);
+
+  // Watch Ad to Unlock Free WiFi States
+  const [isWatchingAdModal, setIsWatchingAdModal] = useState<boolean>(false);
+  const [adWatchCountdown, setAdWatchCountdown] = useState<number>(10);
+
+  // Auto-rotate advertisement banner every 5 seconds & record impressions
+  React.useEffect(() => {
+    if (adBanners.length === 0) return;
+    const currentAd = adBanners[currentAdIndex % adBanners.length];
+    if (currentAd) {
+      recordAdImpression(currentAd.id);
+    }
+    const timer = setInterval(() => {
+      setCurrentAdIndex((prev) => (prev + 1) % adBanners.length);
+    }, 5500);
+    return () => clearInterval(timer);
+  }, [adBanners.length, currentAdIndex]);
+
+  const handleReconnect = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!smsReferenceNo.trim()) return;
+    setIsReconnecting(true);
+    setStatusMessage(null);
+
+    setTimeout(() => {
+      setIsReconnecting(false);
+      const res = reconnectByReference(smsReferenceNo);
+      if (res.success) {
+        setStatusMessage({ type: 'success', text: res.message });
+        setSmsReferenceNo('');
+      } else {
+        setStatusMessage({ type: 'error', text: res.message });
+      }
+    }, 700);
+  };
 
   // Live real-time Billing & Session Expiry tracking states
   const [timeLeftSec, setTimeLeftSec] = useState<number>(0);
@@ -51,6 +112,176 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const [isSpeakingVoice, setIsSpeakingVoice] = useState<boolean>(false);
   const [showAiPortalHelp, setShowAiPortalHelp] = useState<boolean>(false);
   const [showBandwidthVisualizer, setShowBandwidthVisualizer] = useState<boolean>(false);
+  
+  // Speed Test & Expiry Alert States
+  const [showSpeedTestModal, setShowSpeedTestModal] = useState<boolean>(false);
+  const [simulateLowTime, setSimulateLowTime] = useState<boolean>(false);
+  const [showTopUpDrawer, setShowTopUpDrawer] = useState<boolean>(false);
+  const [renewalPackageId, setRenewalPackageId] = useState<string>(settings.packages[0]?.id || 'pkg_1hr');
+  const [smsReminderSent, setSmsReminderSent] = useState<boolean>(false);
+
+  // 4 Modern Captive Portal Features States
+  // 1. MAC Binding / Remembered Device Auto-Login
+  const [rememberDeviceChecked, setRememberDeviceChecked] = useState<boolean>(true);
+  const [rememberedDevice, setRememberedDevice] = useState<{
+    mac: string;
+    voucherCode: string;
+    packageName: string;
+    expiresAt: string;
+    phone?: string;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem('wifi_remembered_device');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (new Date(parsed.expiresAt).getTime() > Date.now()) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  // Client Device Identity Simulation (Client IP & MAC)
+  const [clientMac] = useState<string>(() => {
+    const saved = localStorage.getItem('wifi_client_mac');
+    if (saved) return saved;
+    const generated = `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
+    localStorage.setItem('wifi_client_mac', generated);
+    return generated;
+  });
+  const [clientIp] = useState<string>('192.168.88.104');
+
+  // 2. In-Portal QR Camera Scanner
+  const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
+
+  // 3. Smart Anti-Abuse Free Trial State & Cooldown Tracking
+  const [trialCooldownRemainingSec, setTrialCooldownRemainingSec] = useState<number>(0);
+
+  // 4. WhatsApp Voucher Delivery & Diagnostic Support
+  const [sendWhatsAppVoucher, setSendWhatsAppVoucher] = useState<boolean>(true);
+  const [lastPurchasedVoucher, setLastPurchasedVoucher] = useState<{
+    code: string;
+    pkgName: string;
+    price: number;
+    phone: string;
+  } | null>(null);
+
+  // Calculate Anti-Abuse Trial Cooldown
+  const checkTrialCooldown = () => {
+    try {
+      const lastUsed = localStorage.getItem('wifi_trial_last_used');
+      if (lastUsed) {
+        const lastUsedMs = parseInt(lastUsed, 10);
+        const cooldownMs = (settings.trialCooldownHours || 24) * 3600 * 1000;
+        const elapsed = Date.now() - lastUsedMs;
+        if (elapsed < cooldownMs) {
+          const remainingSec = Math.floor((cooldownMs - elapsed) / 1000);
+          setTrialCooldownRemainingSec(remainingSec);
+          return remainingSec;
+        }
+      }
+    } catch {}
+    setTrialCooldownRemainingSec(0);
+    return 0;
+  };
+
+  React.useEffect(() => {
+    checkTrialCooldown();
+    const interval = setInterval(() => {
+      checkTrialCooldown();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [settings.trialCooldownHours]);
+
+  const handleForgetDevice = () => {
+    localStorage.removeItem('wifi_remembered_device');
+    setRememberedDevice(null);
+    setStatusMessage({
+      type: 'success',
+      text: 'Kifaa hiki kimefutwa kwenye kumbukumbu ya mfumo (MAC Unbound).'
+    });
+  };
+
+  const handleAutoConnect = () => {
+    if (!rememberedDevice) return;
+    const res = redeemVoucher(rememberedDevice.voucherCode, rememberedDevice.phone);
+    if (res.success) {
+      setStatusMessage({
+        type: 'success',
+        text: `⚡ Umeunganishwa kiotomatiki kwa MAC Binding (${rememberedDevice.mac})!`
+      });
+    } else {
+      handleForgetDevice();
+      setStatusMessage({
+        type: 'error',
+        text: 'Vocha iliyohifadhiwa imekwisha muda wake. Tafadhali nunua kifurushi kipya.'
+      });
+    }
+  };
+
+  const handleQrScannedCode = (scannedCode: string) => {
+    setVoucherCode(scannedCode);
+    setShowQrScanner(false);
+    const res = redeemVoucher(scannedCode, phoneNumber);
+    if (res.success) {
+      // Save device for Auto-Login if checked
+      if (rememberDeviceChecked) {
+        const savedData = {
+          mac: clientMac,
+          voucherCode: scannedCode,
+          packageName: 'Vocha ya QR',
+          expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+          phone: phoneNumber || undefined
+        };
+        localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
+        setRememberedDevice(savedData);
+      }
+      setStatusMessage({
+        type: 'success',
+        text: `📷 Vocha ya QR "${scannedCode}" imesomwa na mtandao umewashwa papo hapo!`
+      });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message });
+    }
+  };
+
+  const getDiagnosticWhatsAppUrl = () => {
+    const supportPhone = (settings.supportPhone || '255653578184').replace(/[^0-9]/g, '');
+    const text =
+      `Habari ${settings.hotspotName || 'LEMA FAST WiFi'}!\n` +
+      `Nahitaji msaada wa kujiunga na mtandao wa mtaani:\n` +
+      `📱 Kifaa/MAC: ${clientMac}\n` +
+      `🌐 IP Yangu: ${clientIp}\n` +
+      `📶 AP Eneo: ${settings.hotspotName || 'Sokoni Ghorofani'}\n` +
+      `📞 Simu Yangu: ${phoneNumber || 'Bila Namba'}\n` +
+      `Tafadhali nisaidie kuwasha huduma yangu haraka.`;
+    return `https://wa.me/${supportPhone}?text=${encodeURIComponent(text)}`;
+  };
+
+  const handleQuickTopUp = (pkgId: string) => {
+    const pkg = settings.packages.find((p) => p.id === pkgId) || settings.packages[0];
+    const addedSecs = (pkg.durationHours || 1) * 3600;
+    setTimeLeftSec((prev) => prev + addedSecs);
+    setSimulateLowTime(false);
+    setShowTopUpDrawer(false);
+    setStatusMessage({
+      type: 'success',
+      text: lang === 'sw'
+        ? `Hongera! Kifurushi chako kimeongezwa kwa ufanisi (${pkg.name}). Mtandao wako unaendelea bila kukatika wala kubadili nenosiri!`
+        : `Success! Top-up complete (${pkg.name}). Session extended seamlessly without interruption!`
+    });
+  };
+
+  const handleSendSmsReminder = () => {
+    setSmsReminderSent(true);
+    setStatusMessage({
+      type: 'success',
+      text: lang === 'sw'
+        ? `Ujumbe wa SMS & WhatsApp umetumwa: "Kifurushi chako cha LEMA FAST WiFi kitaisha baada ya dakika 8. Bofya lemawifi.online kuongeza muda."`
+        : `SMS & WhatsApp alert dispatched: "Your LEMA FAST WiFi bundle expires in 8 minutes. Top up now."`
+    });
+  };
 
   const toggleVoiceGuide = () => {
     if (isSpeakingVoice) {
@@ -206,6 +437,30 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
       setIsProcessing(false);
       if (result.success) {
         setStatusMessage({ type: 'success', text: result.message });
+        const vCode = result.voucher?.code || '9482';
+
+        // Auto-save MAC Binding if checked
+        if (rememberDeviceChecked) {
+          const savedData = {
+            mac: clientMac,
+            voucherCode: vCode,
+            packageName: selectedPkg.name,
+            expiresAt: new Date(Date.now() + (selectedPkg.durationHours || 24) * 3600000).toISOString(),
+            phone: phoneNumber
+          };
+          localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
+          setRememberedDevice(savedData);
+        }
+
+        // Trigger WhatsApp Voucher Link
+        if (sendWhatsAppVoucher) {
+          setLastPurchasedVoucher({
+            code: vCode,
+            pkgName: selectedPkg.name,
+            price: selectedPkg.price,
+            phone: phoneNumber
+          });
+        }
       } else {
         setStatusMessage({ type: 'error', text: result.message });
       }
@@ -219,22 +474,94 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const handleRedeemVoucher = (e: React.FormEvent) => {
     e.preventDefault();
     if (!voucherCode.trim()) return;
-    const result = redeemVoucher(voucherCode, phoneNumber);
+    const trimmed = voucherCode.trim();
+    const result = redeemVoucher(trimmed, phoneNumber);
     if (result.success) {
       setStatusMessage({ type: 'success', text: result.message });
+      
+      // Auto-save MAC Binding if checked
+      if (rememberDeviceChecked) {
+        const savedData = {
+          mac: clientMac,
+          voucherCode: trimmed,
+          packageName: 'Vocha ya Karatasi',
+          expiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+          phone: phoneNumber || undefined
+        };
+        localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
+        setRememberedDevice(savedData);
+      }
       setVoucherCode('');
     } else {
       setStatusMessage({ type: 'error', text: result.message });
     }
   };
 
-  // Free trial
+  // Smart Anti-Abuse Free trial with Cooldown & Device Fingerprint
   const handleFreeTrial = () => {
+    const remainingCooldown = checkTrialCooldown();
+    if (remainingCooldown > 0) {
+      const hrs = Math.floor(remainingCooldown / 3600);
+      const mins = Math.floor((remainingCooldown % 3600) / 60);
+      setStatusMessage({
+        type: 'error',
+        text: `🔒 Majaribio ya bure yameshatumika kwenye kifaa hiki. Jaribio lijalo linapatikana baada ya Masaa ${hrs} na Dk ${mins} (Anti-Abuse Protection). Chagua kifurushi hapa chini kuendelea!`
+      });
+      setActiveTab('mobile-stk');
+      return;
+    }
+
+    // Record trial usage in device localStorage
+    localStorage.setItem('wifi_trial_last_used', Date.now().toString());
+    setTrialCooldownRemainingSec((settings.trialCooldownHours || 24) * 3600);
+
     const result = redeemVoucher('7492', phoneNumber);
     if (result.success) {
-      setStatusMessage({ type: 'success', text: 'Majaribio ya dakika 15 yameanza!' });
+      // Bind MAC for trial as well
+      if (rememberDeviceChecked) {
+        const savedData = {
+          mac: clientMac,
+          voucherCode: '7492',
+          packageName: 'Majaribio ya Bure (Dakika 15)',
+          expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
+          phone: phoneNumber || undefined
+        };
+        localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
+        setRememberedDevice(savedData);
+      }
+      setStatusMessage({
+        type: 'success',
+        text: '🎁 Majaribio ya dakika 15 yameanza rasmi! Furahia intaneti ya kasi ya LEMA FAST WiFi.'
+      });
     }
   };
+
+  // Watch Ad to Unlock Free WiFi Access
+  const handleStartWatchAd = () => {
+    const remainingCooldown = checkTrialCooldown();
+    if (remainingCooldown > 0) {
+      const hrs = Math.floor(remainingCooldown / 3600);
+      const mins = Math.floor((remainingCooldown % 3600) / 60);
+      setStatusMessage({
+        type: 'error',
+        text: `🔒 Majaribio ya bure yameshatumika kwenye kifaa hiki. Jaribio lijalo linapatikana baada ya Masaa ${hrs} na Dk ${mins}.`
+      });
+      setActiveTab('mobile-stk');
+      return;
+    }
+    setIsWatchingAdModal(true);
+    setAdWatchCountdown(10);
+  };
+
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isWatchingAdModal && adWatchCountdown > 0) {
+      timer = setTimeout(() => {
+        setAdWatchCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [isWatchingAdModal, adWatchCountdown]);
 
   return (
     <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
@@ -346,6 +673,97 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               <span>WhatsApp Bot (Msaada 24/7)</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
             </a>
+
+            <button
+              type="button"
+              onClick={() => setShowSpeedTestModal(true)}
+              className="px-3 py-1.5 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span>Pima Kasi (Speed Test)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 1. SEHEMU YA MATANGAZO NA SLIDESHOW (Kama Kiho & Chino Wifi) */}
+        <div className="pt-3 pb-1">
+          <div className={`relative rounded-2xl overflow-hidden border p-3.5 shadow-xs transition-all duration-300 bg-gradient-to-r ${adBanners[currentAdIndex].bgGradient}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 flex-1 pr-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${adBanners[currentAdIndex].badgeColor}`}>
+                    {adBanners[currentAdIndex].tag}
+                  </span>
+                  <span className="text-[10px] text-stone-300 font-mono">
+                    Tangazo {currentAdIndex + 1}/{adBanners.length}
+                  </span>
+                </div>
+                <h4 className="text-xs font-black tracking-tight text-white line-clamp-1">
+                  {adBanners[currentAdIndex].title}
+                </h4>
+                <p className="text-[11px] text-stone-200 leading-snug line-clamp-2 font-normal">
+                  {adBanners[currentAdIndex].desc}
+                </p>
+              </div>
+
+              {/* Action Link / Call */}
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <a
+                  href={`https://wa.me/${adBanners[currentAdIndex].phone.replace(/[^0-9]/g, '')}?text=Habari!+Nimeona+tangazo+lako+kwenye+LEMA+FAST+WiFi`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => recordAdClick(adBanners[currentAdIndex].id)}
+                  className="px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[10px] font-black border border-white/20 transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                >
+                  <Phone className="w-3 h-3 text-emerald-400" />
+                  <span>{adBanners[currentAdIndex].action}</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Carousel Navigation Dots & Controls */}
+            <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-white/10 text-[10px]">
+              <a
+                href={`https://wa.me/${(settings.supportPhone || '255653578184').replace(/[^0-9]/g, '')}?text=Habari!+Ninahitaji+kutangaza+biashara+yangu+kwenye+LEMA+FAST+WiFi`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-amber-300 hover:text-amber-200 font-bold underline flex items-center gap-1"
+              >
+                <Megaphone className="w-3 h-3 text-amber-400" />
+                <span>Tangaza Biashara Yako Hapa</span>
+              </a>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentAdIndex((prev) => (prev - 1 + adBanners.length) % adBanners.length)}
+                  className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+                  title="Tangazo Lililopita"
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+                <div className="flex gap-1">
+                  {adBanners.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setCurrentAdIndex(i)}
+                      className={`h-1.5 rounded-full transition-all ${
+                        currentAdIndex === i ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/30'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentAdIndex((prev) => (prev + 1) % adBanners.length)}
+                  className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+                  title="Tangazo Lijalo"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -362,13 +780,77 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               </p>
             </div>
 
+            {/* EXPIRY ALERT & ONE-CLICK TOP-UP BANNER */}
+            {((timeLeftSec > 0 && timeLeftSec <= 900) || simulateLowTime) && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 to-amber-950/90 border-2 border-rose-500/80 shadow-xl text-white space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-rose-500 text-white animate-pulse">
+                      <Bell className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wide text-rose-300">
+                        Tahadhari: Kifurushi Kinakaribia Kuisha!
+                      </h4>
+                      <p className="text-[10px] text-stone-300 font-mono">
+                        Muda uliosalia: <strong className="text-amber-300 font-bold">{formatTime(simulateLowTime ? 480 : timeLeftSec)}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSimulateLowTime(false)}
+                    className="text-[10px] text-stone-400 hover:text-white cursor-pointer px-2 py-0.5 rounded bg-black/40"
+                  >
+                    Funga
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-stone-200 leading-tight">
+                  Usikatikiwe mtandao ukiwa katikati ya shughuli zako! Ongeza muda papo hapo kwa mbofyo 1 bila kubadili nenosiri:
+                </p>
+
+                {/* 1-Click Renewal Bundles */}
+                <div className="grid grid-cols-3 gap-2">
+                  {settings.packages.slice(0, 3).map((pkg) => (
+                    <button
+                      key={pkg.id}
+                      onClick={() => handleQuickTopUp(pkg.id)}
+                      className="p-2.5 rounded-xl bg-stone-900 hover:bg-amber-500 hover:text-stone-950 border border-stone-700/80 text-center transition-all cursor-pointer group"
+                    >
+                      <span className="block text-[10px] font-bold text-stone-400 group-hover:text-stone-900">
+                        {pkg.name}
+                      </span>
+                      <span className="block text-xs font-black text-amber-400 group-hover:text-stone-950">
+                        Tsh {pkg.price.toLocaleString()}
+                      </span>
+                      <span className="block text-[9px] text-emerald-400 group-hover:text-stone-900 font-bold">
+                        +Ongeza Sasa
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* SMS / WhatsApp Reminder Dispatch button */}
+                <div className="pt-1 flex items-center justify-between text-[11px]">
+                  <span className="text-stone-400 text-[10px]">Unataka kikumbusho kwa ujumbe?</span>
+                  <button
+                    onClick={handleSendSmsReminder}
+                    disabled={smsReminderSent}
+                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer disabled:opacity-50"
+                  >
+                    {smsReminderSent ? '✓ Kikumbusho Kimetumwa' : '📲 Nitumie Kikumbusho cha SMS'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* REAL-TIME TIMESTAMPS & BALANCE METERS */}
             <div className="grid grid-cols-2 gap-3 text-center">
               {/* Card 1: Time Left */}
               <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
                 <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Muda Uliobaki</span>
                 <span className="text-sm font-black font-mono text-amber-400 block animate-pulse">
-                  {formatTime(timeLeftSec)}
+                  {formatTime(simulateLowTime ? 480 : timeLeftSec)}
                 </span>
               </div>
 
@@ -379,6 +861,27 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                   {Math.max(0, Math.round(simulatedDataLimitMb - simulatedDataUsedMb))} MB
                 </span>
               </div>
+            </div>
+
+            {/* Simulation toggle & Speed Test launch in session */}
+            <div className="flex items-center justify-between text-[11px] px-1 bg-stone-900/60 p-2 rounded-xl border border-stone-800">
+              <button
+                type="button"
+                onClick={() => setSimulateLowTime(!simulateLowTime)}
+                className="text-[10px] font-bold text-stone-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span>⏰</span>
+                <span>{simulateLowTime ? 'Rudisha Muda Kamili' : 'Jaribu Arifa ya Kuisha (Test Alert)'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSpeedTestModal(true)}
+                className="text-[10px] font-black text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/30"
+              >
+                <Gauge className="w-3 h-3" />
+                <span>Pima Kasi Hapa</span>
+              </button>
             </div>
 
             {/* Simulated Live Data Usage Progress Bar */}
@@ -459,46 +962,187 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               </div>
             )}
 
-            {/* Mode Switcher Tabs */}
-            <div className="flex items-center gap-1 p-1 bg-stone-100 border border-stone-200 rounded-xl text-xs font-semibold">
+            {/* 1. AUTO-LOGIN / REMEMBERED DEVICE (MAC BINDING) CARD */}
+            {rememberedDevice && !currentClientSession && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-stone-100 border-2 border-amber-500/40 shadow-xs space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center font-bold shrink-0">
+                      <Smartphone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <strong className="text-xs font-black text-stone-900 uppercase">
+                          Kifaa Chako Kinafahamika!
+                        </strong>
+                        <span className="text-[9px] bg-emerald-600 text-white font-bold px-1.5 py-0.2 rounded-full">
+                          MAC Auto-Bound
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-stone-600 font-mono">
+                        MAC: {rememberedDevice.mac} · Vocha: <strong className="text-amber-700">{rememberedDevice.voucherCode}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleForgetDevice}
+                    className="text-[10px] text-stone-400 hover:text-rose-600 underline cursor-pointer"
+                    title="Sahau Kifaa Hiki"
+                  >
+                    Sahau
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-500/20">
+                  <span className="text-[10px] text-stone-600 font-medium truncate">
+                    Kifurushi: <strong>{rememberedDevice.packageName}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAutoConnect}
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-stone-950" />
+                    <span>Unganisha Kiotomatiki (1-Tap)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 4. WHATSAPP VOUCHER DELIVERY & SHARE PROMPT (If recently purchased) */}
+            {lastPurchasedVoucher && (
+              <div className="p-3.5 rounded-2xl bg-emerald-950/90 border border-emerald-500/60 text-white space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-400/30 shrink-0">
+                      <Share2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <strong className="text-xs font-black text-emerald-300 block">
+                        Risiti & Vocha Yako Iko Tayari!
+                      </strong>
+                      <span className="text-[10px] text-stone-300 font-mono">
+                        Nambari: <strong className="text-amber-300 font-black">{lastPurchasedVoucher.code}</strong> · {lastPurchasedVoucher.pkgName}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLastPurchasedVoucher(null)}
+                    className="text-[10px] text-stone-400 hover:text-white cursor-pointer px-1.5 py-0.5 rounded bg-black/30"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <a
+                  href={`https://wa.me/${(lastPurchasedVoucher.phone || settings.supportPhone || '255653578184').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                    `*RISITI YA LEMA FAST WIFI*\n` +
+                    `Vocha Yako: *${lastPurchasedVoucher.code}*\n` +
+                    `Kifurushi: ${lastPurchasedVoucher.pkgName}\n` +
+                    `Kiasi: Tsh ${lastPurchasedVoucher.price.toLocaleString()}\n` +
+                    `Tarehe: ${new Date().toLocaleDateString('sw-TZ')}\n` +
+                    `Ukurasa wa kuunganisha: lemawifi.online\n` +
+                    `Msaada: ${settings.supportPhone || '0653 578 184'}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>📲 TUMA / HIFADHI RISITI KWENYE WHATSAPP YANGU</span>
+                </a>
+              </div>
+            )}
+
+            {/* Mode Switcher Tabs (4 Options: Lipa Simu, Vocha, Rudisha Mtandao, Trial) */}
+            <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 border border-stone-200 rounded-2xl text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setActiveTab('mobile-stk')}
-                className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
                   activeTab === 'mobile-stk'
-                    ? 'bg-[#cca43b] text-white shadow-xs font-bold'
-                    : 'text-stone-500 hover:text-stone-800'
+                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
+                    : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                Lipa kwa Simu
+                Lipa Simu
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('voucher')}
-                className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
                   activeTab === 'voucher'
-                    ? 'bg-[#cca43b] text-white shadow-xs font-bold'
-                    : 'text-stone-500 hover:text-stone-800'
+                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
+                    : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                Weka Vocha
+                Vocha
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('reconnect')}
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
+                  activeTab === 'reconnect'
+                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                Rudisha SMS
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('trial')}
-                className={`flex-1 py-2 rounded-lg transition-all cursor-pointer ${
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
                   activeTab === 'trial'
-                    ? 'bg-[#cca43b] text-white shadow-xs font-bold'
-                    : 'text-stone-500 hover:text-stone-800'
+                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
+                    : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                Bure (Trial)
+                Bure
               </button>
             </div>
 
             {/* TAB 1: Mobile Money STK-Push */}
             {activeTab === 'mobile-stk' && (
               <form onSubmit={handleStartPayment} className="space-y-4">
+                {/* 4. PROMINENT 1-TAP FREE TRIAL CARD (Kama Chino Wifi) */}
+                <div
+                  onClick={handleFreeTrial}
+                  className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 border border-emerald-500/60 shadow-xs text-white flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-400 transition-all group active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0 text-emerald-300">
+                      <Gift className="w-4 h-4 text-emerald-400 animate-bounce" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <strong className="text-xs font-black tracking-tight text-white uppercase">
+                          JARIBU BURE DK 5 KILA SIKU
+                        </strong>
+                        <span className="text-[9px] font-black uppercase bg-emerald-400 text-stone-950 px-1.5 py-0.2 rounded-sm shadow-xs">
+                          BURE
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-emerald-200 mt-0.5">
+                        Jaribu mtandao wako · 20 Mbps · Hakuna gharama
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFreeTrial();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-stone-950 font-black text-[11px] shadow-sm uppercase shrink-0 flex items-center gap-1 transition-transform group-hover:scale-105 cursor-pointer"
+                  >
+                    <span>ANZA</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+
                 {/* Lema AI Live Signal Quality Badge */}
                 <div className="p-2.5 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-[11px] flex items-center justify-between text-indigo-950 shadow-xs">
                   <div className="flex items-center gap-2">
@@ -507,57 +1151,105 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                       <span>Lema AI:</span>
                     </span>
-                    <span className="text-emerald-700 font-extrabold truncate">Spidi Bora (15 Mbps)</span>
+                    <span className="text-emerald-700 font-extrabold truncate">Spidi Imara (20 Mbps)</span>
                   </div>
                   <span className="text-[10px] font-mono text-indigo-600 bg-white px-2 py-0.5 rounded-md border border-indigo-200 shrink-0">
                     Ping 11ms · 4K Ready
                   </span>
                 </div>
 
-                {/* Select Package */}
+                {/* 3. VIBRANT PACKAGE CARDS (Kama Kiho & Covanet) */}
                 <div>
-                  <label className="text-xs font-bold text-stone-500 block mb-1.5">
-                    Chagua Kifurushi:
-                  </label>
-                  <div className="space-y-1.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-black text-stone-700 uppercase tracking-wide">
+                      Chagua Kifurushi Chako:
+                    </label>
+                    <span className="text-[10px] text-stone-400 font-mono">
+                      {settings.packages.length} Vifurushi Vipo
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
                     {settings.packages.map((pkg, idx) => {
                       const isSelected = pkg.id === selectedPackageId;
+
+                      // Dynamic color accents per tier
+                      const tierThemes = [
+                        { iconBg: 'bg-emerald-100 text-emerald-700 border-emerald-200', badge: 'Haraka' },
+                        { iconBg: 'bg-amber-100 text-amber-800 border-amber-200', badge: 'Bora / Popular' },
+                        { iconBg: 'bg-blue-100 text-blue-700 border-blue-200', badge: 'Siku 3' },
+                        { iconBg: 'bg-purple-100 text-purple-700 border-purple-200', badge: 'Wiki 1' },
+                        { iconBg: 'bg-rose-100 text-rose-700 border-rose-200', badge: 'Mwezi 1' }
+                      ];
+                      const currentTheme = tierThemes[idx % tierThemes.length];
+
                       return (
                         <div
                           key={pkg.id}
                           onClick={() => setSelectedPackageId(pkg.id)}
-                          className={`p-3 rounded-xl border text-left flex items-center justify-between transition-colors cursor-pointer ${
+                          className={`p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-amber-500/5 border-[#cca43b] text-stone-900 ring-1 ring-[#cca43b]'
+                              ? 'bg-[#cca43b]/10 border-[#cca43b] text-stone-900 ring-2 ring-[#cca43b]/40 shadow-xs'
                               : 'bg-white border-[#e6e2d3] hover:border-stone-400 text-stone-700'
                           }`}
                         >
-                          <div>
-                            <p className="text-xs font-bold text-stone-800 flex items-center gap-1.5 flex-wrap">
-                              <span>{pkg.name}</span>
-                              {idx === 1 && (
-                                <span className="text-[9px] bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-1.5 py-0.5 rounded font-bold uppercase flex items-center gap-1 shadow-xs">
-                                  <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
-                                  <span>AI Choice</span>
-                                </span>
-                              )}
-                              {pkg.isPopular && idx !== 1 && (
-                                <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.2 rounded font-bold uppercase">
-                                  Bora
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-[10px] text-stone-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                              <span>Muda: {pkg.durationHours}h · Spidi: {pkg.speedDownload}</span>
-                              <span className="text-[9px] bg-amber-500/15 text-amber-400 font-mono font-bold px-1 rounded flex items-center gap-0.5 border border-amber-500/30">
-                                <Zap className="w-2.5 h-2.5 text-amber-400" />
-                                <span>Burst 15M</span>
-                              </span>
-                            </p>
+                          <div className="flex items-center gap-3">
+                            {/* Left Rounded Tier Icon */}
+                            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${currentTheme.iconBg}`}>
+                              <Clock className="w-5 h-5" />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h5 className="text-xs font-black text-stone-900 uppercase tracking-tight">
+                                  {pkg.name}
+                                </h5>
+                                {pkg.isPopular && (
+                                  <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded-sm font-black uppercase">
+                                    Bora
+                                  </span>
+                                )}
+                                {idx === 1 && !pkg.isPopular && (
+                                  <span className="text-[9px] bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-1.5 py-0.2 rounded-sm font-black uppercase">
+                                    AI Choice
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-[10px] text-stone-500 flex items-center gap-2 flex-wrap mt-0.5">
+                                <span className="font-medium">⏱️ {pkg.durationHours} Masaa</span>
+                                <span className="text-stone-300">·</span>
+                                <span className="font-semibold text-emerald-700">🚀 {pkg.speedDownload || '20M'} Spidi Bila Kikomo</span>
+                              </p>
+                            </div>
                           </div>
-                          <span className="text-xs font-mono font-bold text-[#cca43b]">
-                            Tsh {pkg.price.toLocaleString()}
-                          </span>
+
+                          {/* Right Side: Price & "NUNUA" Button */}
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="text-right">
+                              <span className="text-sm font-black font-mono text-stone-900 block leading-tight">
+                                {pkg.price.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] font-bold text-stone-400 block uppercase">
+                                TZS
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPackageId(pkg.id);
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#cca43b] text-white shadow-sm'
+                                  : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-200'
+                              }`}
+                            >
+                              {isSelected ? '✓ NUNUA' : 'NUNUA'}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -764,6 +1456,33 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                   </div>
                 </div>
 
+                {/* 1 & 4. Best Practices Checkboxes: WhatsApp Delivery & MAC Binding */}
+                <div className="p-3 bg-stone-100 border border-stone-200 rounded-xl space-y-2 text-[11px]">
+                  <label className="flex items-start gap-2 text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sendWhatsAppVoucher}
+                      onChange={(e) => setSendWhatsAppVoucher(e.target.checked)}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>
+                      <strong className="text-stone-900">Tuma Risiti & Vocha WhatsApp:</strong> Utapokea ujumbe wa nakala ya vocha ili usipoteze hata ukizima simu.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2 text-stone-700 cursor-pointer pt-1 border-t border-stone-200">
+                    <input
+                      type="checkbox"
+                      checked={rememberDeviceChecked}
+                      onChange={(e) => setRememberDeviceChecked(e.target.checked)}
+                      className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>
+                      <strong className="text-stone-900">Kumbuka Kifaa Hiki (MAC Binding):</strong> Simu yako itaunganishwa kiotomatiki wakati wowote bila kuandika vocha tena.
+                    </span>
+                  </label>
+                </div>
+
                 <button
                   type="submit"
                   className={`w-full py-3 px-4 text-xs font-black text-white rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer ${
@@ -814,9 +1533,30 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               </form>
             )}
 
-            {/* TAB 2: Enter Scratch Voucher */}
+            {/* TAB 2: Enter Scratch Voucher + QR Camera Scanner */}
             {activeTab === 'voucher' && (
               <form onSubmit={handleRedeemVoucher} className="space-y-4">
+                {/* 2. IN-PORTAL QR CODE CAMERA SCANNER BUTTON */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowQrScanner(true)}
+                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-[0.98]"
+                  >
+                    <Camera className="w-4 h-4 text-stone-950" />
+                    <span>📷 SCAN VOCHA KWA KAMERA (QR CODE)</span>
+                  </button>
+                  <p className="text-[10px] text-stone-500 text-center mt-1">
+                    Huna haja ya kuandika kwa mkono! Elekeza kamera kwenye karatasi ya vocha.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="h-px bg-stone-200 flex-1" />
+                  <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider">Au Andika Namba</span>
+                  <div className="h-px bg-stone-200 flex-1" />
+                </div>
+
                 <div>
                   <label className="text-xs font-bold text-stone-500 block mb-1">
                     Weka Nambari ya Vocha Uliyonunua:
@@ -826,58 +1566,285 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
                     placeholder="Mfano: 7492 au 8319"
-                    className="w-full px-3 py-2.5 text-center text-lg font-mono font-bold tracking-widest border border-[#e6e2d3] rounded-xl bg-white text-[#cca43b] focus:outline-none focus:ring-1 focus:ring-[#cca43b]"
+                    className="w-full px-3 py-2.5 text-center text-lg font-mono font-bold tracking-widest border border-[#e6e2d3] rounded-xl bg-white text-[#cca43b] focus:outline-none focus:ring-2 focus:ring-[#cca43b]"
                     required
                   />
                   <span className="text-[10px] text-stone-400 mt-1 block text-center font-medium">
-                    Vocha zinapatikana maduka yote ya karibu.
+                    Vocha za karatasi zinapatikana maduka na vibanda vyote vya mtaani.
                   </span>
                 </div>
+
+                {/* 1. MAC Binding Checkbox */}
+                <label className="flex items-start gap-2 p-2.5 rounded-xl bg-stone-100 border border-stone-200 text-[11px] text-stone-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberDeviceChecked}
+                    onChange={(e) => setRememberDeviceChecked(e.target.checked)}
+                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>
+                    <strong className="text-stone-900">Kumbuka Kifaa Hiki (MAC Binding):</strong> Unganisha kiotomatiki kesho bila kuandika vocha upya.
+                  </span>
+                </label>
 
                 <button
                   type="submit"
                   className="w-full py-3 px-4 text-xs font-black text-white bg-[#cca43b] hover:bg-[#b89332] rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Ticket className="w-3.5 h-3.5" />
-                  <span>UNGANISHA VOCHA</span>
+                  <span>UNGANISHA VOCHA SASA</span>
                 </button>
               </form>
             )}
 
-            {/* TAB 3: Free Trial */}
-            {activeTab === 'trial' && (
-              <div className="py-4 text-center space-y-4">
-                <p className="text-xs text-stone-600 leading-relaxed font-medium">
-                  Pata dakika 15 za bure kupima spidi ya intaneti yetu kabla ya kufanya malipo yoyote!
-                </p>
+            {/* TAB: RECONNECT VIA SMS REFERENCE */}
+            {activeTab === 'reconnect' && (
+              <form onSubmit={handleReconnect} className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 font-black text-amber-950">
+                    <RotateCw className="w-4 h-4 text-amber-600" />
+                    <span>Rudisha Mtandao (Restore via SMS Ref)</span>
+                  </div>
+                  <p className="text-[11px] text-stone-600 leading-relaxed font-normal">
+                    Ulipia kwa <strong>M-Pesa, Mixx by Yas, au Airtel</strong> lakini intaneti ikakatika au unatumia simu mpya? Weka ile namba ya kumbukumbu (Transaction / Reference ID) kutoka kwenye SMS ya mtandao wako wa simu ili kurudisha bando lako papo hapo bila kulipa tena.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-600 block mb-1">
+                    Weka Namba ya Kumbukumbu ya SMS (SMS Ref No.):
+                  </label>
+                  <input
+                    type="text"
+                    value={smsReferenceNo}
+                    onChange={(e) => setSmsReferenceNo(e.target.value)}
+                    placeholder="Mfano: MP261023... au STK123456TZ"
+                    className="w-full px-3.5 py-3 text-center text-sm font-mono font-bold tracking-wider border border-[#e6e2d3] rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#cca43b]"
+                    required
+                  />
+                  <span className="text-[10px] text-stone-400 mt-1 block text-center">
+                    Mfano wa namba ya kumbukumbu: <em>STK749281TZ</em> au <em>MP261011</em>
+                  </span>
+                </div>
+
                 <button
-                  type="button"
-                  onClick={handleFreeTrial}
-                  className="w-full py-2.5 px-4 text-xs font-black text-white bg-[#cca43b] hover:bg-[#b89332] rounded-xl shadow-sm transition-colors cursor-pointer"
+                  type="submit"
+                  disabled={isReconnecting}
+                  className="w-full py-3 px-4 text-xs font-black text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  ANZA DAKIKA 15 ZA BURE
+                  <RotateCw className={`w-3.5 h-3.5 ${isReconnecting ? 'animate-spin' : ''}`} />
+                  <span>{isReconnecting ? 'Inathibitisha Muamala...' : 'RECONNECT (RUDISHA MTANDAO) ⚡'}</span>
                 </button>
+              </form>
+            )}
+
+            {/* 3. TAB: SMART ANTI-ABUSE FREE TRIAL & COOLDOWN */}
+            {activeTab === 'trial' && (
+              <div className="py-2 space-y-4">
+                {trialCooldownRemainingSec > 0 ? (
+                  <div className="p-4 rounded-2xl bg-stone-100 border border-stone-300 text-stone-800 space-y-3">
+                    <div className="flex items-center gap-2.5 text-stone-900 font-black text-xs uppercase tracking-wide">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span>Majaribio Yameshatumika (Anti-Abuse)</span>
+                        <span className="block text-[10px] text-stone-500 font-normal">Kifaa hiki kinaruhusiwa mara 1 kila masaa 24</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      Kifaa chako (MAC: <span className="font-mono font-bold text-stone-800">{clientMac}</span>) tayari kimeshatumia kipindi cha bure. Jaribio lijalo linapatikana baada ya:
+                    </p>
+                    <div className="p-2.5 rounded-xl bg-stone-900 text-amber-400 text-center font-mono font-bold text-sm tracking-wider shadow-inner">
+                      ⏳ {formatTime(trialCooldownRemainingSec)}
+                    </div>
+                    <div className="pt-2 border-t border-stone-200">
+                      <span className="text-[11px] font-bold text-stone-700 block mb-2">Nunua kifurushi uendelee sasa:</span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('mobile-stk')}
+                        className="w-full py-2.5 px-4 text-xs font-black text-white bg-[#cca43b] hover:bg-[#b89332] rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <span>NUNUA KIFURUSHI CHA TSH 500 AU 1,000 ➔</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 border border-emerald-500/60 text-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Gift className="w-5 h-5 text-emerald-400 animate-bounce" />
+                          <strong className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                            Dakika 15 za Majaribio ya Bure
+                          </strong>
+                        </div>
+                        <span className="text-[9px] font-black uppercase bg-emerald-400 text-stone-950 px-2 py-0.5 rounded-full">
+                          BURE 100%
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-100 leading-relaxed">
+                        Pima kasi ya intaneti ya <strong>LEMA FAST WiFi</strong> kwenye simu yako kabla ya kununua kifurushi.
+                      </p>
+                      <div className="space-y-1.5 text-[11px] text-emerald-200 pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Spidi ya kasi hadi 15 Mbps bila kikomo</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Inafaa WhatsApp, TikTok, YouTube & Instagram</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Hakuna malipo wala namba ya kadi inayohitajika</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleFreeTrial}
+                        className="w-full py-3 px-4 text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                      >
+                        <Zap className="w-4 h-4 fill-white" />
+                        <span>ANZA DAKIKA 15 BURE SASA</span>
+                      </button>
+
+                      {/* Sponsored Ad Free Unlock Button */}
+                      <button
+                        type="button"
+                        onClick={handleStartWatchAd}
+                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-900 via-indigo-900 to-stone-900 hover:from-purple-800 hover:to-indigo-800 border border-purple-500/40 text-purple-200 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                      >
+                        <Megaphone className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                        <span>Au Tazama Tangazo (Sekunde 10) Kupata Bure 🎬</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* Support Footer */}
+        {/* 4. Support Footer with Diagnostic Telemetry */}
         <div className="pt-4 border-t border-stone-200/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-stone-500">
           <div>
             Msaada wa Wateja: <strong className="text-stone-800">{settings.supportPhone || '0653 578 184'}</strong>
           </div>
           <a
-            href={`https://wa.me/255622443249?text=Habari!+Nahitaji+msaada+wa+haraka+kwenye+WiFi`}
+            href={getDiagnosticWhatsAppUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold rounded-lg transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold rounded-xl transition-colors cursor-pointer shadow-xs active:scale-95"
+            title="Tuma Ombi la Msaada WhatsApp pamoja na Taarifa za Kifaa"
           >
             <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Chat na Bot ya WhatsApp</span>
+            <span>Msaada wa WhatsApp (w/ Device Info)</span>
           </a>
         </div>
       </div>
+
+      {/* 2. In-Portal QR Camera Scanner Modal */}
+      <VoucherQrScannerModal
+        isOpen={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
+        onScanSuccess={handleQrScannedCode}
+      />
+
+      {/* Sponsored Ad Watch Modal */}
+      {isWatchingAdModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/85 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-stone-900 border border-stone-700 rounded-3xl overflow-hidden shadow-2xl p-5 space-y-4 text-white text-center">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-2.5">
+              <span className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Megaphone className="w-3.5 h-3.5 text-amber-400" />
+                <span>Tangazo la Mfadhili wa WiFi</span>
+              </span>
+              <span className="text-xs font-mono font-black text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-lg border border-amber-500/30">
+                {adWatchCountdown > 0 ? `${adWatchCountdown}s` : '✓ Tayari'}
+              </span>
+            </div>
+
+            {/* Featured Ad card inside modal */}
+            <div className={`p-4 rounded-2xl border text-left space-y-2.5 bg-gradient-to-r ${adBanners[currentAdIndex]?.bgGradient || 'from-fuchsia-950 via-purple-900 to-stone-900 border-fuchsia-500/40 text-fuchsia-200'}`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${adBanners[currentAdIndex]?.badgeColor || 'bg-fuchsia-500 text-white'}`}>
+                  {adBanners[currentAdIndex]?.tag || '🔥 Mfadhili Mtaani'}
+                </span>
+                <span className="text-[10px] text-stone-300 font-mono">
+                  {adBanners[currentAdIndex]?.sponsor || 'Sponsor'}
+                </span>
+              </div>
+              <h4 className="text-sm font-black text-white">
+                {adBanners[currentAdIndex]?.title || 'GLAMOUR TOUCH SALON & SPA'}
+              </h4>
+              <p className="text-xs text-stone-200 leading-relaxed font-normal">
+                {adBanners[currentAdIndex]?.desc || 'Huduma bora mtaani kwako! Tembelea leo au wasiliana kupitia WhatsApp.'}
+              </p>
+              <div className="pt-2">
+                <a
+                  href={`https://wa.me/${(adBanners[currentAdIndex]?.phone || '255653578184').replace(/[^0-9]/g, '')}?text=Habari!+Nimeona+tangazo+lako+la+${encodeURIComponent(adBanners[currentAdIndex]?.title || 'WiFi')}+kwenye+LEMA+FAST+WiFi`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => recordAdClick(adBanners[currentAdIndex]?.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-xs rounded-xl shadow-xs active:scale-95 transition-all"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Wasiliana na Mfadhili (WhatsApp)</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Countdown progress bar */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-stone-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-amber-400 h-full transition-all duration-1000 ease-linear"
+                  style={{ width: `${Math.min(100, Math.max(0, ((10 - adWatchCountdown) / 10) * 100))}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-stone-400">
+                {adWatchCountdown > 0
+                  ? `Subiri sekunde ${adWatchCountdown} kupokea intaneti ya bure...`
+                  : 'Hongera! Tangazo limekamilika. Bonyeza kitufe hapa chini kuwasha mtandao!'}
+              </p>
+            </div>
+
+            {adWatchCountdown === 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsWatchingAdModal(false);
+                  handleFreeTrial();
+                }}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-xs rounded-xl shadow-lg transition-all animate-bounce cursor-pointer uppercase tracking-wider"
+              >
+                FUNGUA INTANETI YA BURE SASA ➔
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsWatchingAdModal(false)}
+                className="text-[10px] text-stone-500 hover:text-stone-300 underline cursor-pointer"
+              >
+                Ghairi (Funga Tangazo)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Speed Test Modal */}
+      {showSpeedTestModal && (
+        <SpeedTestWidget
+          isModal={true}
+          onClose={() => setShowSpeedTestModal(false)}
+          businessName={settings.hotspotName || 'LEMA FAST WiFi'}
+        />
+      )}
     </div>
   );
 };
