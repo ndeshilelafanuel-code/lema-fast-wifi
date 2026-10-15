@@ -297,12 +297,17 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                     </span>
                   </div>
 
-                  {/* Brand Branding in Portal */}
-                  <div className="text-center py-2.5 flex flex-col items-center">
-                    <LemaLogo variant="full" size="sm" theme="light" showSlogan={true} className="mb-1" />
-                    <p className="text-[10px] text-stone-500 font-medium">
-                      {lang === 'sw' ? 'Omada & Ruijie Smart Captive Portal' : 'High Speed Fiber WiFi Hotspot'}
-                    </p>
+                  {/* Brand Branding in Portal: Top-Left Logo with Slogan in front */}
+                  <div className="pb-2 border-b border-stone-200/60 flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <LemaLogo variant="horizontal" size="xs" theme="light" showSlogan={false} className="shrink-0" />
+                      <span className="text-[8px] font-black uppercase tracking-wider text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-200/70 truncate">
+                        Connecting You Faster
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-stone-500 font-medium shrink-0">
+                      Fiber & Starlink
+                    </span>
                   </div>
 
                   {/* 1. AUTO-LOGIN BANNER (MAC BINDING) */}

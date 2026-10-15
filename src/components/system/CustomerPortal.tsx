@@ -742,44 +742,56 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
           </div>
         )}
 
-        {/* Header Branding */}
-        <div className="text-center pb-4 border-b border-stone-200/50 flex flex-col items-center">
-          <LemaLogo variant="full" size="md" theme="light" showSlogan={true} className="mb-2" />
-          <p className="text-[11px] text-stone-500 font-medium tracking-wide">{settings.tagline || 'Intaneti ya Kasi ya Fiber & Starlink'}</p>
+        {/* Header Branding: Logo on Top Left + Words and Action Buttons Arranged in Front */}
+        <div className="pb-2.5 border-b border-stone-200/60 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2.5">
+            {/* Top-Left: Logo & Brand with Slogan and Tagline in Front */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <LemaLogo variant="horizontal" size="sm" theme="light" showSlogan={false} className="shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[9px] font-black uppercase tracking-wider text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200/70 inline-block">
+                  Connecting You Faster
+                </span>
+                <p className="text-[10px] text-stone-500 font-medium truncate mt-0.5">
+                  {settings.tagline || 'Intaneti ya Kasi ya Fiber & Starlink'}
+                </p>
+              </div>
+            </div>
+          </div>
 
-          {/* Voice AI Audio Guide & WhatsApp Bot Pill Buttons */}
-          <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
+          {/* Quick Action Buttons Arranged Nicely in Front Before Advertisement */}
+          <div className="flex items-center justify-between gap-1.5">
             <button
               type="button"
               onClick={toggleVoiceGuide}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+              className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs ${
                 isSpeakingVoice
-                  ? 'bg-amber-400 text-stone-950 ring-2 ring-amber-300 animate-pulse font-black'
+                  ? 'bg-amber-400 text-stone-950 font-black animate-pulse'
                   : 'bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 hover:border-amber-400'
               }`}
             >
               <span className="text-xs">{isSpeakingVoice ? '🔊' : '🎙️'}</span>
-              <span>{isSpeakingVoice ? 'Inaongea... (Kusitisha)' : 'Mwongozo wa Sauti'}</span>
+              <span className="truncate">{isSpeakingVoice ? 'Inaongea...' : 'Mwongozo wa Sauti'}</span>
             </button>
 
             <a
               href={`https://wa.me/${(settings.supportPhone || '255653578184').replace(/[^0-9]/g, '')}?text=Habari!+Nahitaji+msaada+wa+vocha+au+bando+kwenye+WiFi`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              className="flex-1 py-1.5 px-2 rounded-xl text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer truncate"
             >
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-200" />
-              <span>WhatsApp Bot (Msaada 24/7)</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping" />
+              <MessageSquare className="w-3 h-3 text-emerald-200 shrink-0" />
+              <span className="truncate">WhatsApp 24/7</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping shrink-0" />
             </a>
 
             <button
               type="button"
               onClick={() => setShowSpeedTestModal(true)}
-              className="px-3 py-1.5 rounded-full text-[11px] font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              className="flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 flex items-center justify-center gap-1 transition-all shadow-2xs cursor-pointer truncate"
             >
-              <Gauge className="w-3.5 h-3.5" />
-              <span>Pima Kasi (Speed Test)</span>
+              <Gauge className="w-3 h-3 shrink-0" />
+              <span className="truncate">Pima Kasi</span>
             </button>
           </div>
         </div>
