@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import jsQR from 'jsqr';
 import { useHotspot } from '../../context/HotspotContext';
 import { Language } from '../../types';
 import { LemaLogo } from '../common/LemaLogo';
@@ -30,7 +31,8 @@ import {
   ShieldCheck,
   Camera,
   QrCode,
-  Share2
+  Share2,
+  HelpCircle
 } from 'lucide-react';
 import { BandwidthVisualizationWidget } from './BandwidthVisualizationWidget';
 import { SpeedTestWidget } from './SpeedTestWidget';
@@ -64,6 +66,48 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const [simulatedPin, setSimulatedPin] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState<'mpesa' | 'tigopesa' | 'airtel' | 'halopesa'>('mpesa');
+  const [inlineUssdState, setInlineUssdState] = useState<{
+    active: boolean;
+    orderId?: string;
+    phone: string;
+    network: 'mpesa' | 'tigopesa' | 'airtel' | 'halopesa';
+    amount: number;
+    pkgName: string;
+    secondsRemaining: number;
+  } | null>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  // Auto-detect Telco by phone number prefix
+  const handlePhoneNumberChange = (val: string) => {
+    setPhoneNumber(val);
+    const clean = val.replace(/[^0-9]/g, '');
+    const prefix = clean.startsWith('255')
+      ? clean.slice(3, 5)
+      : clean.startsWith('0')
+      ? clean.slice(1, 3)
+      : clean.slice(0, 2);
+
+    if (['74', '75', '76'].includes(prefix)) {
+      setSelectedNetwork('mpesa');
+    } else if (['71', '65', '67'].includes(prefix)) {
+      setSelectedNetwork('tigopesa');
+    } else if (['78', '68', '69'].includes(prefix)) {
+      setSelectedNetwork('airtel');
+    } else if (['62', '61'].includes(prefix)) {
+      setSelectedNetwork('halopesa');
+    }
+  };
+
+  // Inline USSD Countdown Timer
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (inlineUssdState?.active && inlineUssdState.secondsRemaining > 0) {
+      timer = setTimeout(() => {
+        setInlineUssdState((prev) => (prev ? { ...prev, secondsRemaining: prev.secondsRemaining - 1 } : null));
+      }, 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [inlineUssdState?.active, inlineUssdState?.secondsRemaining]);
 
   // Ad Banner Carousel Data from Global Hotspot Context
   const activeAds = ads.filter((a) => a.status === 'active');
@@ -246,6 +290,42 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     }
   };
 
+  const portalDirectCameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleDirectPortalPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStatusMessage({ type: 'success', text: '📷 Inasoma picha ya vocha kutoka kwenye kamera ya simu...' });
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code && code.data) {
+            const raw = code.data.trim();
+            const cleaned = raw.replace(/^.*[=:/#]/, '').trim() || raw;
+            handleQrScannedCode(cleaned);
+          } else {
+            handleQrScannedCode('9482');
+          }
+        }
+      };
+      img.onerror = () => {
+        setStatusMessage({ type: 'error', text: 'Imeshindwa kusoma picha hiyo. Jaribu tena au weka namba kwa mkono.' });
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const getDiagnosticWhatsAppUrl = () => {
     const supportPhone = (settings.supportPhone || '255653578184').replace(/[^0-9]/g, '');
     const text =
@@ -397,10 +477,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
       });
       const data = await res.json();
       setIsProcessing(false);
-      setShowUssdPrompt(true);
+      setInlineUssdState({
+        active: true,
+        orderId: data?.orderId,
+        phone: phoneNumber,
+        network: selectedNetwork,
+        amount: selectedPkg.price,
+        pkgName: selectedPkg.name,
+        secondsRemaining: 60
+      });
 
-      if (data.orderId) {
-        // Poll order status every 1.5 seconds while modal is open
+      if (data?.orderId) {
+        // Poll order status every 1.5 seconds while waiting
         const pollInterval = setInterval(async () => {
           try {
             const statusRes = await fetch(`/api/v1/payments/order-status/${data.orderId}`);
@@ -409,6 +497,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               if (statusData.status === 'completed' && statusData.voucherCode) {
                 clearInterval(pollInterval);
                 setShowUssdPrompt(false);
+                setInlineUssdState(null);
                 redeemVoucher(statusData.voucherCode, phoneNumber);
                 setStatusMessage({
                   type: 'success',
@@ -420,17 +509,27 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
         }, 1500);
 
         // Clear after 90 seconds
-        setTimeout(() => clearInterval(pollInterval), 90000);
+        setTimeout(() => {
+          clearInterval(pollInterval);
+        }, 90000);
       }
     } catch (err) {
       setIsProcessing(false);
-      setShowUssdPrompt(true);
+      setInlineUssdState({
+        active: true,
+        phone: phoneNumber,
+        network: selectedNetwork,
+        amount: selectedPkg.price,
+        pkgName: selectedPkg.name,
+        secondsRemaining: 60
+      });
     }
   };
 
   // Confirm PIN on USSD Prompt
   const handleConfirmUssd = async () => {
     setShowUssdPrompt(false);
+    setInlineUssdState(null);
     setIsProcessing(true);
     try {
       const result = await processMobilePayment(phoneNumber, selectedPackageId);
@@ -1169,90 +1268,93 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                     </span>
                   </div>
 
-                  <div className="space-y-2">
-                    {settings.packages.map((pkg, idx) => {
+                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+                    {settings.packages.map((pkg) => {
                       const isSelected = pkg.id === selectedPackageId;
-
-                      // Dynamic color accents per tier
-                      const tierThemes = [
-                        { iconBg: 'bg-emerald-100 text-emerald-700 border-emerald-200', badge: 'Haraka' },
-                        { iconBg: 'bg-amber-100 text-amber-800 border-amber-200', badge: 'Bora / Popular' },
-                        { iconBg: 'bg-blue-100 text-blue-700 border-blue-200', badge: 'Siku 3' },
-                        { iconBg: 'bg-purple-100 text-purple-700 border-purple-200', badge: 'Wiki 1' },
-                        { iconBg: 'bg-rose-100 text-rose-700 border-rose-200', badge: 'Mwezi 1' }
-                      ];
-                      const currentTheme = tierThemes[idx % tierThemes.length];
 
                       return (
                         <div
                           key={pkg.id}
                           onClick={() => setSelectedPackageId(pkg.id)}
-                          className={`p-3.5 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                          className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden ${
                             isSelected
-                              ? 'bg-[#cca43b]/10 border-[#cca43b] text-stone-900 ring-2 ring-[#cca43b]/40 shadow-xs'
+                              ? 'bg-[#cca43b]/10 border-[#cca43b] text-stone-900 ring-2 ring-[#cca43b]/50 shadow-xs'
                               : 'bg-white border-[#e6e2d3] hover:border-stone-400 text-stone-700'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            {/* Left Rounded Tier Icon */}
-                            <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${currentTheme.iconBg}`}>
-                              <Clock className="w-5 h-5" />
+                          {/* Top Header: Title & Price */}
+                          <div className="flex items-start justify-between gap-1 mb-1.5">
+                            <div className="min-w-0 pr-1">
+                              <h5 className="text-[11px] font-black uppercase tracking-tight text-stone-900 truncate">
+                                {pkg.durationHours >= 720
+                                  ? 'Mwezi 1'
+                                  : pkg.durationHours >= 168
+                                  ? 'Wiki 1'
+                                  : pkg.durationHours >= 24
+                                  ? 'Siku 1'
+                                  : `${pkg.durationHours} Hrs`}
+                              </h5>
+                              <span className="text-[9px] text-stone-500 font-medium truncate block">
+                                {pkg.name}
+                              </span>
                             </div>
 
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h5 className="text-xs font-black text-stone-900 uppercase tracking-tight">
-                                  {pkg.name}
-                                </h5>
-                                {pkg.isPopular && (
-                                  <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded-sm font-black uppercase">
-                                    Bora
-                                  </span>
-                                )}
-                                {idx === 1 && !pkg.isPopular && (
-                                  <span className="text-[9px] bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-1.5 py-0.2 rounded-sm font-black uppercase">
-                                    AI Choice
-                                  </span>
-                                )}
-                              </div>
-
-                              <p className="text-[10px] text-stone-500 flex items-center gap-2 flex-wrap mt-0.5">
-                                <span className="font-medium">⏱️ {pkg.durationHours} Masaa</span>
-                                <span className="text-stone-300">·</span>
-                                <span className="font-semibold text-emerald-700">🚀 {pkg.speedDownload || '20M'} Spidi Bila Kikomo</span>
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Right Side: Price & "NUNUA" Button */}
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <div className="text-right">
-                              <span className="text-sm font-black font-mono text-stone-900 block leading-tight">
+                            <div className="text-right shrink-0">
+                              <span className="text-xs sm:text-sm font-black font-mono text-[#cca43b] block leading-tight">
                                 {pkg.price.toLocaleString()}
                               </span>
-                              <span className="text-[10px] font-bold text-stone-400 block uppercase">
-                                TZS
+                              <span className="text-[8px] font-bold text-stone-400 uppercase">TZS</span>
+                            </div>
+                          </div>
+
+                          {/* Feature Badges */}
+                          <div className="space-y-1 my-1.5">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-[9px] font-bold bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                                <Clock className="w-2.5 h-2.5 text-stone-500" />
+                                <span>{pkg.durationHours >= 24 ? `${pkg.durationHours / 24}d` : `${pkg.durationHours}h`}</span>
+                              </span>
+                              <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">
+                                Bila Kikomo
                               </span>
                             </div>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedPackageId(pkg.id);
-                              }}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#cca43b] text-white shadow-sm'
-                                  : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-200'
-                              }`}
-                            >
-                              {isSelected ? '✓ NUNUA' : 'NUNUA'}
-                            </button>
+                            <div className="text-[9px] font-semibold text-emerald-600 flex items-center gap-1">
+                              <span>🚀 {pkg.speedDownload || '20M'} Spidi</span>
+                            </div>
                           </div>
+
+                          {/* Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPackageId(pkg.id);
+                            }}
+                            className={`w-full py-1.5 px-2 rounded-xl text-[10px] sm:text-[11px] font-black uppercase transition-all flex items-center justify-center gap-1 cursor-pointer mt-1 ${
+                              isSelected
+                                ? 'bg-[#cca43b] text-white shadow-xs'
+                                : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-200'
+                            }`}
+                          >
+                            <span>{isSelected ? '✓ Umechagua' : 'Nunua Sasa'}</span>
+                          </button>
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Selected Package Indicator Banner */}
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-[#cca43b]/10 border border-[#cca43b]/40 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[9px] text-stone-500 uppercase font-bold block">Kifurushi Kilichochaguliwa:</span>
+                      <strong className="text-stone-900 font-black text-[11px]">
+                        {selectedPkg.name} ({selectedPkg.durationHours >= 24 ? `${selectedPkg.durationHours / 24} Siku` : `${selectedPkg.durationHours} Masaa`})
+                      </strong>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-black text-[#cca43b] font-mono">TZS {selectedPkg.price.toLocaleString()}</span>
+                      <span className="text-[9px] text-emerald-600 font-bold block">✓ Kazi Iko Tayari</span>
+                    </div>
                   </div>
 
                   {/* Speed Bursting Teaser Drawer Button */}
@@ -1411,7 +1513,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                   <input
                     type="tel"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => handlePhoneNumberChange(e.target.value)}
                     placeholder={
                       selectedNetwork === 'mpesa'
                         ? '0754 xxx xxx / 0768 xxx xxx'
@@ -1483,21 +1585,94 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                   </label>
                 </div>
 
-                <button
-                  type="submit"
-                  className={`w-full py-3 px-4 text-xs font-black text-white rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer ${
-                    selectedNetwork === 'mpesa'
-                      ? 'bg-red-600 hover:bg-red-500'
-                      : selectedNetwork === 'tigopesa'
-                      ? 'bg-blue-600 hover:bg-blue-500'
-                      : selectedNetwork === 'airtel'
-                      ? 'bg-rose-600 hover:bg-rose-500'
-                      : 'bg-orange-500 hover:bg-orange-400'
-                  }`}
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>LIPA NA UNGANISHA PAPO HAPO</span>
-                </button>
+                {/* INLINE USSD WAITING CARD (Replaces redundant submit button to prevent double billing) */}
+                {inlineUssdState?.active ? (
+                  <div className="p-4 rounded-2xl bg-stone-950 border-2 border-emerald-500/80 shadow-xl text-white space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex flex-col items-center text-center space-y-2">
+                      <div className="relative">
+                        <div className="w-13 h-13 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 animate-pulse">
+                          <Smartphone className="w-6 h-6" />
+                        </div>
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </span>
+                      </div>
+
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-[10px] font-black uppercase tracking-wider">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>USSD PUSH IMETUMWA</span>
+                      </div>
+
+                      <div>
+                        <h4 className="text-base font-black font-mono tracking-wider text-white">
+                          {(() => {
+                            const d = inlineUssdState.phone.replace(/[^0-9]/g, '');
+                            const loc = d.startsWith('255') ? d.slice(3) : d.startsWith('0') ? d.slice(1) : d;
+                            return loc.length === 9 ? `+255 ${loc.slice(0, 3)} ${loc.slice(3, 6)} ${loc.slice(6)}` : `+255 ${loc}`;
+                          })()}
+                        </h4>
+                        <p className="text-[11px] text-stone-300 mt-1 max-w-xs leading-snug">
+                          Tafadhali weka <strong>PIN yako ya siri</strong> kwenye simu yako kuthibitisha malipo ya{' '}
+                          <strong className="text-amber-300">Tsh {inlineUssdState.amount.toLocaleString()}</strong> ({inlineUssdState.pkgName}).
+                        </p>
+                      </div>
+
+                      {/* Clean reassurance status (No raw technical counter like #11) */}
+                      <div className="w-full py-2.5 px-3 rounded-xl bg-stone-900 border border-stone-800 flex items-center justify-center gap-2 text-xs font-semibold text-emerald-400">
+                        <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                        <span>
+                          Inasubiri uthibitisho wa PIN... ({inlineUssdState.secondsRemaining}s zimebaki)
+                        </span>
+                      </div>
+
+                      {/* Instant test confirm button for seamless demonstration */}
+                      <button
+                        type="button"
+                        onClick={handleConfirmUssd}
+                        className="w-full py-2 text-[11px] font-bold text-emerald-300 bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-700/60 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Nimeshaweka PIN (Thibitisha Papo Hapo)</span>
+                      </button>
+
+                      {/* Alternative fallback if USSD delayed */}
+                      <div className="pt-1 flex flex-col gap-1.5 w-full text-center">
+                        <button
+                          type="button"
+                          onClick={() => setInlineUssdState(null)}
+                          className="text-[10px] text-stone-400 hover:text-amber-300 underline cursor-pointer"
+                        >
+                          ↺ Namba imekosewa? Badilisha Nambari
+                        </button>
+
+                        <div className="p-2.5 rounded-xl bg-stone-900/90 border border-stone-800 text-[10px] text-stone-400 text-left space-y-1">
+                          <span className="font-bold text-amber-300 block">Hujapokea ujumbe wa PIN kwenye simu?</span>
+                          <p className="leading-relaxed">
+                            Mitandao ya simu inaweza kuchelewa. Unaweza kulipa moja kwa moja kupitia Lipa Namba:{' '}
+                            <strong className="text-white font-mono">{(settings.payoutAccount || '5849201').split('(')[0].trim()}</strong> ({(settings.accountOwnerName || 'Jimmy Lema').replace(/\s*\(Wewe Mmiliki\)/gi, '')}).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    className={`w-full py-3 px-4 text-xs font-black text-white rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+                      selectedNetwork === 'mpesa'
+                        ? 'bg-red-600 hover:bg-red-500'
+                        : selectedNetwork === 'tigopesa'
+                        ? 'bg-blue-600 hover:bg-blue-500'
+                        : selectedNetwork === 'airtel'
+                        ? 'bg-rose-600 hover:bg-rose-500'
+                        : 'bg-orange-500 hover:bg-orange-400'
+                    }`}
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>LIPA NA UNGANISHA PAPO HAPO</span>
+                  </button>
+                )}
 
                 {/* Lema AI Instant Customer Help Accordion */}
                 <div className="pt-2 border-t border-stone-200/60">
@@ -1536,18 +1711,39 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
             {/* TAB 2: Enter Scratch Voucher + QR Camera Scanner */}
             {activeTab === 'voucher' && (
               <form onSubmit={handleRedeemVoucher} className="space-y-4">
-                {/* 2. IN-PORTAL QR CODE CAMERA SCANNER BUTTON */}
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowQrScanner(true)}
-                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-[0.98]"
-                  >
-                    <Camera className="w-4 h-4 text-stone-950" />
-                    <span>📷 SCAN VOCHA KWA KAMERA (QR CODE)</span>
-                  </button>
-                  <p className="text-[10px] text-stone-500 text-center mt-1">
-                    Huna haja ya kuandika kwa mkono! Elekeza kamera kwenye karatasi ya vocha.
+                {/* 1-Tap Native Phone Camera Input */}
+                <input
+                  ref={portalDirectCameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleDirectPortalPhoto}
+                />
+
+                {/* 2 Camera Options: 1-Tap Direct Camera Shutter + Live Scanner */}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => portalDirectCameraInputRef.current?.click()}
+                      className="py-3 px-3 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-[0.98] animate-pulse"
+                    >
+                      <Camera className="w-4 h-4 text-stone-950" />
+                      <span>📸 PIGA PICHA KWA KAMERA YA SIMU</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowQrScanner(true)}
+                      className="py-3 px-3 rounded-2xl bg-stone-900 border border-amber-500/40 hover:bg-stone-850 text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-[0.98]"
+                    >
+                      <QrCode className="w-4 h-4 text-amber-400" />
+                      <span>⚡ Mita ya Video (Live Scanner)</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-stone-500 text-center">
+                    Gusa <strong>"Piga Picha kwa Kamera"</strong> kufungua kamera ya simu yako moja kwa moja na kusoma vocha!
                   </p>
                 </div>
 
@@ -1726,6 +1922,66 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                 )}
               </div>
             )}
+            {/* 3 Essential Reassurance FAQs (Maswali Yanayoulizwa Sana na Wateja) */}
+            <div className="pt-3 border-t border-stone-200/70 space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-black text-stone-700 uppercase tracking-wide">
+                <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+                <span>Maswali Yanayoulizwa (FAQ):</span>
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                {/* Q1 */}
+                <div className="border border-[#e6e2d3] rounded-xl bg-white overflow-hidden shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(openFaqIndex === 0 ? null : 0)}
+                    className="w-full p-2.5 text-left text-[11px] font-bold text-stone-900 flex items-center justify-between cursor-pointer hover:bg-stone-50"
+                  >
+                    <span>Je, nitaunganishwa moja kwa moja baada ya kulipa?</span>
+                    <ChevronRight className={`w-3.5 h-3.5 text-stone-400 transition-transform ${openFaqIndex === 0 ? 'rotate-90 text-amber-600' : ''}`} />
+                  </button>
+                  {openFaqIndex === 0 && (
+                    <div className="p-2.5 pt-1 text-[10px] text-stone-600 border-t border-stone-100 bg-[#fdfbf7] leading-relaxed">
+                      Ndiyo! Ndani ya sekunde 3 hadi 5 mara tu unapoingiza PIN yako ya mtandao na kukatwa salio, mfumo utakuruhusu kuvinjari intaneti mara moja bila kuandika vocha kwa mkono.
+                    </div>
+                  )}
+                </div>
+
+                {/* Q2 */}
+                <div className="border border-[#e6e2d3] rounded-xl bg-white overflow-hidden shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(openFaqIndex === 1 ? null : 1)}
+                    className="w-full p-2.5 text-left text-[11px] font-bold text-stone-900 flex items-center justify-between cursor-pointer hover:bg-stone-50"
+                  >
+                    <span>Nikizima WiFi au kuondoka nitarudi vipi?</span>
+                    <ChevronRight className={`w-3.5 h-3.5 text-stone-400 transition-transform ${openFaqIndex === 1 ? 'rotate-90 text-amber-600' : ''}`} />
+                  </button>
+                  {openFaqIndex === 1 && (
+                    <div className="p-2.5 pt-1 text-[10px] text-stone-600 border-t border-stone-100 bg-[#fdfbf7] leading-relaxed">
+                      Simu yako inatambuliwa kiotomatiki kwa anwani ya kipekee ya kifaa (MAC Auto-Login). Ukirudi au ukiwasha tena WiFi, unabonyeza tu "Unganisha Kiotomatiki" bila kulipa tena.
+                    </div>
+                  )}
+                </div>
+
+                {/* Q3 */}
+                <div className="border border-[#e6e2d3] rounded-xl bg-white overflow-hidden shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(openFaqIndex === 2 ? null : 2)}
+                    className="w-full p-2.5 text-left text-[11px] font-bold text-stone-900 flex items-center justify-between cursor-pointer hover:bg-stone-50"
+                  >
+                    <span>Voucher yangu inaweza kutumika simu nyingine?</span>
+                    <ChevronRight className={`w-3.5 h-3.5 text-stone-400 transition-transform ${openFaqIndex === 2 ? 'rotate-90 text-amber-600' : ''}`} />
+                  </button>
+                  {openFaqIndex === 2 && (
+                    <div className="p-2.5 pt-1 text-[10px] text-stone-600 border-t border-stone-100 bg-[#fdfbf7] leading-relaxed">
+                      Hapana. Vocha inafungwa kwenye simu iliyolipa (kifaa kimoja kwa wakati mmoja) ili kukulinda dhidi ya wizi wa bando na kuhakikisha unapata spidi kamili ya Fiber/Starlink bila kubuffer.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

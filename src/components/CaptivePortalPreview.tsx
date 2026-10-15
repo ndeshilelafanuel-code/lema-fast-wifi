@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import jsQR from 'jsqr';
 import { Language } from '../types';
 import { LemaLogo } from './common/LemaLogo';
+import { VoucherQrScannerModal } from './system/VoucherQrScannerModal';
 import {
   Smartphone,
   Wifi,
@@ -19,7 +21,9 @@ import {
   Clock,
   Megaphone,
   Phone,
-  Play
+  Play,
+  HelpCircle,
+  ChevronRight
 } from 'lucide-react';
 
 interface CaptivePortalPreviewProps {
@@ -39,11 +43,25 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
   const [rememberDeviceChecked, setRememberDeviceChecked] = useState<boolean>(true);
   const [simulateTrialCooldown, setSimulateTrialCooldown] = useState<boolean>(false);
   const [isScanningQr, setIsScanningQr] = useState<boolean>(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
 
   // 5. Ad Monetization States
   const [isWatchingAd, setIsWatchingAd] = useState<boolean>(false);
   const [adCountdown, setAdCountdown] = useState<number>(10);
   const [adWatchedComplete, setAdWatchedComplete] = useState<boolean>(false);
+
+  // USSD & FAQ States
+  const [isUssdActive, setIsUssdActive] = useState<boolean>(false);
+  const [ussdSeconds, setUssdSeconds] = useState<number>(60);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isUssdActive && ussdSeconds > 0) {
+      timer = setTimeout(() => setUssdSeconds((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [isUssdActive, ussdSeconds]);
 
   const handleConnectVoucher = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,25 +75,60 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
 
   const handleSimulatePayment = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsUssdActive(true);
+    setUssdSeconds(60);
+    setSimulatedStatus(null);
+  };
+
+  const handleConfirmSimulatedUssd = () => {
+    setIsUssdActive(false);
     setSimulatedStatus(
       lang === 'sw'
-        ? `Ujumbe wa malipo (USSD Push) umetumwa kwenda ${phoneNumber}. Vocha itatumwa pia WhatsApp na kifaa hiki kitakumbukwa kiotomatiki!`
-        : `USSD STK-Push sent to ${phoneNumber}. Voucher will be delivered via WhatsApp and device MAC bound for auto-login!`
+        ? `🎉 Malipo yamethibitishwa! Umeunganishwa mtandaoni kwa vocha #9482 (MAC Auto-Bound). Vocha imetumwa pia WhatsApp!`
+        : `🎉 Payment confirmed! Connected via voucher #9482 (MAC Auto-Bound). Receipt sent to WhatsApp!`
     );
   };
 
-  const handleSimulateQrScan = () => {
-    setIsScanningQr(true);
-    setSimulatedStatus('Inasoma msimbo wa QR wa vocha kwa kamera...');
-    setTimeout(() => {
-      setIsScanningQr(false);
-      setVoucherCode('8841');
-      setSimulatedStatus(
-        lang === 'sw'
-          ? '📷 Vocha ya QR #8841 imesomwa kwa kamera na kuunganishwa papo hapo bila kuandika kwa mkono!'
-          : '📷 QR Voucher #8841 scanned via camera and authenticated instantly!'
-      );
-    }, 900);
+  const previewDirectCameraRef = useRef<HTMLInputElement | null>(null);
+
+  const handleDirectPreviewPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSimulatedStatus('Inasoma picha ya vocha kutoka kwenye kamera...');
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code && code.data) {
+            const raw = code.data.trim();
+            const cleaned = raw.replace(/^.*[=:/#]/, '').trim() || raw;
+            setVoucherCode(cleaned);
+            setSimulatedStatus(
+              lang === 'sw'
+                ? `🎉 Picha ya vocha #${cleaned} imesomwa kwa kamera na kuunganishwa!`
+                : `🎉 Voucher #${cleaned} photo scanned and connected!`
+            );
+          } else {
+            setVoucherCode('8841');
+            setSimulatedStatus(
+              lang === 'sw'
+                ? '📷 Picha imepigwa kwa kamera! Vocha ya mfano #8841 imeingizwa na kuunganishwa.'
+                : '📷 Photo taken with camera! Sample voucher #8841 applied.'
+            );
+          }
+        }
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAutoConnect = () => {
@@ -351,15 +404,36 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                   {/* Mode 1: Voucher Form with QR Scanner */}
                   {activeTab === 'voucher' && (
                     <form onSubmit={handleConnectVoucher} className="space-y-2.5">
-                      {/* 2. QR Camera Scan Button */}
-                      <button
-                        type="button"
-                        onClick={handleSimulateQrScan}
-                        className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>{isScanningQr ? 'Inasoma QR...' : '📷 SCAN VOCHA KWA KAMERA'}</span>
-                      </button>
+                      {/* Hidden Native Phone Camera Input for 1-Tap Snapshot */}
+                      <input
+                        ref={previewDirectCameraRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleDirectPreviewPhoto}
+                      />
+
+                      {/* 2 Camera Options: 1-Tap Phone Camera + Live Scanner */}
+                      <div className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => previewDirectCameraRef.current?.click()}
+                          className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95 animate-pulse"
+                        >
+                          <Camera className="w-4 h-4 text-stone-950" />
+                          <span>📸 PIGA PICHA KWA KAMERA YA SIMU</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsQrScannerOpen(true)}
+                          className="w-full py-1.5 px-2.5 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-amber-600" />
+                          <span>⚡ Au Fungua Kamera ya Video (Live Viewfinder)</span>
+                        </button>
+                      </div>
 
                       <div>
                         <label className="text-[11px] font-bold text-stone-700 block mb-0.5">
@@ -398,18 +472,34 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                   {activeTab === 'mobile' && (
                     <form onSubmit={handleSimulatePayment} className="space-y-2.5">
                       <div>
-                        <label className="text-[11px] font-bold text-stone-700 block mb-0.5">
+                        <label className="text-[11px] font-bold text-stone-700 block mb-1">
                           {lang === 'sw' ? 'Chagua Kifurushi:' : 'Select Package:'}
                         </label>
-                        <select
-                          value={selectedPlan}
-                          onChange={(e) => setSelectedPlan(e.target.value)}
-                          className="w-full px-3 py-1.5 text-xs border border-stone-300 rounded-lg text-stone-900 bg-white"
-                        >
-                          <option value="2hrs">Saa 2 (2 Hours) - Tsh 500</option>
-                          <option value="1day">Saa 24 (1 Day) - Tsh 1,000</option>
-                          <option value="1week">Siku 7 (1 Week) - Tsh 5,000</option>
-                        </select>
+                        <div className="grid grid-cols-2 gap-1.5 mb-2">
+                          {[
+                            { id: '2hrs', name: 'Saa 2', price: '500', time: '2h' },
+                            { id: '1day', name: 'Siku 1', price: '1,000', time: '24h' },
+                            { id: '1week', name: 'Wiki 1', price: '5,000', time: '7d' },
+                            { id: '1month', name: 'Mwezi 1', price: '25,000', time: '30d' },
+                          ].map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setSelectedPlan(p.id)}
+                              className={`p-2 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                                selectedPlan === p.id
+                                  ? 'bg-amber-500/15 border-amber-500 text-stone-900 ring-1 ring-amber-500'
+                                  : 'bg-white border-stone-200 text-stone-600 hover:border-stone-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-stone-900">{p.name}</span>
+                                <span className="text-[10px] font-black text-amber-600 font-mono">{p.price}</span>
+                              </div>
+                              <span className="text-[8px] text-emerald-600 font-semibold mt-0.5">⏱️ {p.time} • Bila Kikomo</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div>
@@ -436,12 +526,48 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                         <span>Tuma nakala ya risiti kwenye WhatsApp yangu</span>
                       </label>
 
-                      <button
-                        type="submit"
-                        className="w-full py-2 px-4 text-xs font-black text-white bg-stone-900 hover:bg-stone-800 rounded-lg shadow-xs transition-colors cursor-pointer"
-                      >
-                        {lang === 'sw' ? 'LIPA NA UNGANISHA PAPO HAPO' : 'PAY & CONNECT INSTANTLY'}
-                      </button>
+                      {/* Inline USSD Waiting Card */}
+                      {isUssdActive ? (
+                        <div className="p-3 rounded-2xl bg-stone-900 border-2 border-emerald-500/80 text-white space-y-2 text-center animate-in fade-in duration-200">
+                          <div className="w-10 h-10 mx-auto rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-400 animate-pulse">
+                            <Smartphone className="w-5 h-5" />
+                          </div>
+                          <span className="inline-block text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                            • USSD Push Imetumwa
+                          </span>
+                          <div>
+                            <strong className="block text-xs font-mono text-white">{phoneNumber}</strong>
+                            <p className="text-[10px] text-stone-300">
+                              Weka PIN ya mtandao wako kuthibitisha malipo ya <strong>Tsh 1,000</strong>.
+                            </p>
+                          </div>
+                          <div className="py-1 px-2 rounded-lg bg-stone-950 text-[10px] text-emerald-400 font-mono flex items-center justify-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                            <span>Inasubiri PIN... ({ussdSeconds}s)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleConfirmSimulatedUssd}
+                            className="w-full py-1.5 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-[10px] rounded-lg shadow-xs cursor-pointer active:scale-95"
+                          >
+                            ✓ Thibitisha PIN Papo Hapo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsUssdActive(false)}
+                            className="text-[9px] text-stone-400 hover:text-white underline"
+                          >
+                            Badilisha Nambari
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="submit"
+                          className="w-full py-2 px-4 text-xs font-black text-white bg-stone-900 hover:bg-stone-800 rounded-lg shadow-xs transition-colors cursor-pointer"
+                        >
+                          {lang === 'sw' ? 'LIPA NA UNGANISHA PAPO HAPO' : 'PAY & CONNECT INSTANTLY'}
+                        </button>
+                      )}
                     </form>
                   )}
 
@@ -489,6 +615,62 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                       <span>{simulatedStatus}</span>
                     </div>
                   )}
+
+                  {/* 3 Essential Reassurance FAQs (Maswali ya Wateja) */}
+                  <div className="mt-3 pt-2.5 border-t border-stone-200 text-left space-y-1.5">
+                    <span className="text-[10px] font-bold text-stone-700 uppercase flex items-center gap-1">
+                      <HelpCircle className="w-3 h-3 text-amber-600" />
+                      <span>Maswali Yanayoulizwa (FAQ):</span>
+                    </span>
+
+                    <div className="border border-stone-200 rounded-lg bg-white overflow-hidden text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(openFaqIndex === 0 ? null : 0)}
+                        className="w-full p-2 text-left font-bold text-stone-800 flex items-center justify-between cursor-pointer"
+                      >
+                        <span>1. Je, nitaunganishwa mara tu baada ya kulipa?</span>
+                        <ChevronRight className={`w-3 h-3 text-stone-400 transition-transform ${openFaqIndex === 0 ? 'rotate-90' : ''}`} />
+                      </button>
+                      {openFaqIndex === 0 && (
+                        <div className="p-2 pt-0 text-[9px] text-stone-600 border-t border-stone-100 bg-stone-50">
+                          Ndiyo! Mara tu unapoweka PIN ya simu yako na kukatwa, mfumo unakuunganisha ndani ya sekunde 3 bila kuandika vocha.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border border-stone-200 rounded-lg bg-white overflow-hidden text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(openFaqIndex === 1 ? null : 1)}
+                        className="w-full p-2 text-left font-bold text-stone-800 flex items-center justify-between cursor-pointer"
+                      >
+                        <span>2. Nikizima WiFi au kuondoka nitarudi vipi?</span>
+                        <ChevronRight className={`w-3 h-3 text-stone-400 transition-transform ${openFaqIndex === 1 ? 'rotate-90' : ''}`} />
+                      </button>
+                      {openFaqIndex === 1 && (
+                        <div className="p-2 pt-0 text-[9px] text-stone-600 border-t border-stone-100 bg-stone-50">
+                          Simu yako inatambuliwa kiotomatiki kwa MAC Address. Ukirudi unawasha tu WiFi na kuendelea bila kulipa tena.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border border-stone-200 rounded-lg bg-white overflow-hidden text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(openFaqIndex === 2 ? null : 2)}
+                        className="w-full p-2 text-left font-bold text-stone-800 flex items-center justify-between cursor-pointer"
+                      >
+                        <span>3. Vocha yangu inaweza kutumika simu nyingine?</span>
+                        <ChevronRight className={`w-3 h-3 text-stone-400 transition-transform ${openFaqIndex === 2 ? 'rotate-90' : ''}`} />
+                      </button>
+                      {openFaqIndex === 2 && (
+                        <div className="p-2 pt-0 text-[9px] text-stone-600 border-t border-stone-100 bg-stone-50">
+                          Hapana. Vocha inatumika simu moja tu kwa wakati mmoja ili kuzuia wizi na kuhakikisha unapata kasi kamili.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* 4. WhatsApp Diagnostic Telemetry Footer */}
@@ -577,6 +759,21 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
           </div>
         </div>
       </div>
+
+      {/* Real In-Browser & Phone Camera Voucher QR Scanner Modal */}
+      <VoucherQrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScanSuccess={(code) => {
+          setVoucherCode(code);
+          setSimulatedStatus(
+            lang === 'sw'
+              ? `🎉 Vocha ya QR #${code} imesomwa kwa kamera na kuingizwa kiotomatiki!`
+              : `🎉 QR Voucher #${code} scanned via camera and authenticated!`
+          );
+          setIsQrScannerOpen(false);
+        }}
+      />
     </section>
   );
 };

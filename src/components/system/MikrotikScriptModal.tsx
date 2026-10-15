@@ -9,7 +9,7 @@ interface MikrotikScriptModalProps {
 }
 
 export const MikrotikScriptModal: React.FC<MikrotikScriptModalProps> = ({ settings, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'omada' | 'openwrt' | 'mikrotik' | 'walled-garden' | 'saas-api' | 'architecture'>('omada');
+  const [activeTab, setActiveTab] = useState<'mikrotik-html' | 'mikrotik' | 'omada' | 'openwrt' | 'walled-garden' | 'saas-api' | 'architecture'>('mikrotik-html');
   const [copied, setCopied] = useState<boolean>(false);
 
   // 1. TP-Link Omada External Portal & RADIUS Setup Guide (No MikroTik Required)
@@ -229,7 +229,128 @@ add action=accept comment="DNS resolution for captive portal" dst-port=53 protoc
    - Cloud Engine yako inawasiliana na Gateway ya Aina Yoyote kupitia REST API / Webhooks!
    - Mteja wako (Mnunuzi wa SaaS) anaweza kuchagua kutumia OpenWrt, MikroTik, au Linux Mini PC!`;
 
+  // 6. Complete Production-Grade MikroTik login.html File
+  const mikrotikLoginHtml = `<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${settings.hotspotName} - Ingia Mtandaoni</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; min-height: 100vh; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 24px; padding: 22px; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .header { text-align: center; margin-bottom: 18px; }
+    .badge { display: inline-block; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 12px; border-radius: 999px; font-size: 10px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+    h1 { font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+    .sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .packages { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+    .pkg-item { background: #0f172a; border: 1px solid #334155; border-radius: 14px; padding: 12px; text-align: left; cursor: pointer; transition: all 0.2s; }
+    .pkg-item:hover, .pkg-item.selected { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+    .pkg-title { font-size: 12px; font-weight: 700; color: #e2e8f0; }
+    .pkg-price { font-size: 14px; font-weight: 900; color: #f59e0b; margin-top: 3px; }
+    .pkg-info { font-size: 10px; color: #10b981; font-weight: 600; margin-top: 2px; }
+    .input-group { margin-bottom: 12px; }
+    label { display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; }
+    input[type="text"], input[type="tel"] { width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: #ffffff; font-size: 14px; font-weight: 600; outline: none; }
+    input:focus { border-color: #f59e0b; }
+    .btn-submit { width: 100%; padding: 13px; background: #f59e0b; color: #0f172a; border: none; border-radius: 12px; font-size: 13px; font-weight: 900; cursor: pointer; text-transform: uppercase; transition: background 0.2s; }
+    .btn-submit:hover { background: #d97706; }
+    .lipa-box { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 14px; padding: 12px; margin: 14px 0; font-size: 11px; color: #a7f3d0; line-height: 1.5; }
+    .faq-title { font-size: 11px; font-weight: 800; color: #94a3b8; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .faq-item { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 10px; margin-bottom: 6px; font-size: 11px; }
+    .faq-q { font-weight: 700; color: #f1f5f9; }
+    .faq-a { color: #94a3b8; font-size: 10px; margin-top: 4px; line-height: 1.4; }
+    .footer { text-align: center; margin-top: 16px; font-size: 11px; color: #64748b; }
+    .footer a { color: #10b981; font-weight: 700; text-decoration: none; }
+    .error-msg { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 12px; border-radius: 10px; font-size: 11px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <span class="badge">LEMA FAST WIFI • FIBER & STARLINK</span>
+      <h1>${settings.hotspotName}</h1>
+      <p class="sub">${settings.tagline || 'Intaneti ya Kasi ya Fiber & Starlink'}</p>
+    </div>
+
+    $(if error)
+    <div class="error-msg">⚠️ $(error)</div>
+    $(endif)
+
+    <!-- 1. Voucher Input Form (MikroTik Standard Form POST) -->
+    <form name="login" action="$(link-login-only)" method="post">
+      <input type="hidden" name="dst" value="$(link-orig)" />
+      <input type="hidden" name="popup" value="true" />
+
+      <div class="input-group">
+        <label>Una Vocha Mkononi? Weka Hapa:</label>
+        <input type="text" name="username" id="voucher_code" placeholder="WIF- au Tarakimu 4" required />
+        <input type="hidden" name="password" id="voucher_pass" />
+      </div>
+
+      <button type="submit" class="btn-submit" onclick="document.getElementById('voucher_pass').value = document.getElementById('voucher_code').value;">
+        UNGANISHA MTANDAO SASA
+      </button>
+    </form>
+
+    <!-- 2. Package Selector & Mobile Money (Lipa Namba) -->
+    <div class="faq-title">Au Nunua Kifurushi cha Mtandao:</div>
+    <div class="packages">
+      <div class="pkg-item selected">
+        <div class="pkg-title">Saa 2 za Haraka</div>
+        <div class="pkg-price">TZS 500</div>
+        <div class="pkg-info">✓ Bila Kikomo</div>
+      </div>
+      <div class="pkg-item">
+        <div class="pkg-title">Saa 24 (Siku 1) ⭐</div>
+        <div class="pkg-price">TZS 1,000</div>
+        <div class="pkg-info">✓ Bora Zaidi</div>
+      </div>
+      <div class="pkg-item">
+        <div class="pkg-title">Siku 7 (Wiki 1)</div>
+        <div class="pkg-price">TZS 5,000</div>
+        <div class="pkg-info">✓ Unlimited</div>
+      </div>
+      <div class="pkg-item">
+        <div class="pkg-title">Siku 30 (Mwezi 1)</div>
+        <div class="pkg-price">TZS 25,000</div>
+        <div class="pkg-info">✓ Wateja wa Ndani</div>
+      </div>
+    </div>
+
+    <!-- Lipa Namba Info Box -->
+    <div class="lipa-box">
+      <strong>💳 Malipo ya Simu (M-Pesa / Mixx by Yas / Airtel):</strong><br>
+      Tuma kwenda Lipa Namba: <strong style="color:#ffffff; font-family:monospace;">${settings.payoutAccount || '5849201'}</strong> (${settings.accountOwnerName || 'Jimmy Lema'}).<br>
+      Ukishatuma, weka namba ya muamala au piga <strong style="color:#ffffff;">${settings.supportPhone || '0653 578 184'}</strong> kuwashiwa mara moja!
+    </div>
+
+    <!-- 3 Essential FAQs -->
+    <div class="faq-title">Maswali Yanayoulizwa (FAQ):</div>
+    <div class="faq-item">
+      <div class="faq-q">1. Je, nitaunganishwa moja kwa moja baada ya kulipa?</div>
+      <div class="faq-a">Ndiyo! Mara tu malipo yanapokamilika unaunganishwa papo hapo.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">2. Nikizima WiFi au kuondoka nitarudi vipi?</div>
+      <div class="faq-a">Simu yako inatambuliwa kiotomatiki kwa MAC Address. Ukirudi unawasha WiFi na kuendelea bila kulipa tena.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">3. Vocha yangu inaweza kutumika simu nyingine?</div>
+      <div class="faq-a">Hapana. Vocha inatumika simu moja tu kwa wakati mmoja ili kuzuia wizi wa bando lako.</div>
+    </div>
+
+    <div class="footer">
+      Msaada wa Haraka: <a href="https://wa.me/255653578184" target="_blank">${settings.supportPhone || '0653 578 184'} (WhatsApp)</a><br>
+      <span style="font-size: 10px; color: #475569;">IP: $(ip) • MAC: $(mac)</span>
+    </div>
+  </div>
+</body>
+</html>`;
+
   const getActiveCode = () => {
+    if (activeTab === 'mikrotik-html') return mikrotikLoginHtml;
     if (activeTab === 'omada') return omadaScript;
     if (activeTab === 'openwrt') return openwrtScript;
     if (activeTab === 'mikrotik') return mikrotikScript;
@@ -247,7 +368,9 @@ add action=accept comment="DNS resolution for captive portal" dst-port=53 protoc
   const handleDownload = () => {
     const code = getActiveCode();
     const filename =
-      activeTab === 'omada'
+      activeTab === 'mikrotik-html'
+        ? 'login.html'
+        : activeTab === 'omada'
         ? 'tp-link-omada-setup.txt'
         : activeTab === 'openwrt'
         ? 'openwrt-opennds-setup.sh'
@@ -289,6 +412,20 @@ add action=accept comment="DNS resolution for captive portal" dst-port=53 protoc
         {/* Tab navigation */}
         <div className="flex flex-wrap items-center gap-2 p-3 bg-stone-950 border-b border-stone-800 text-xs">
           <button
+            onClick={() => setActiveTab('mikrotik-html')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'mikrotik-html'
+                ? 'bg-amber-400 text-stone-950 font-black shadow-lg shadow-amber-400/20'
+                : 'text-amber-400 hover:bg-stone-850 border border-amber-500/40'
+            }`}
+          >
+            <FileCode2 className="w-3.5 h-3.5" />
+            <span>MikroTik login.html</span>
+            <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded-full font-black uppercase">
+              Pakua
+            </span>
+          </button>
+          <button
             onClick={() => setActiveTab('omada')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
               activeTab === 'omada'
@@ -316,7 +453,7 @@ add action=accept comment="DNS resolution for captive portal" dst-port=53 protoc
                 : 'text-stone-300 hover:bg-stone-850'
             }`}
           >
-            MikroTik RouterOS
+            MikroTik RouterOS (.rsc)
           </button>
           <button
             onClick={() => setActiveTab('walled-garden')}
