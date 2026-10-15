@@ -1205,70 +1205,35 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
 
             {/* TAB 1: Mobile Money STK-Push */}
             {activeTab === 'mobile-stk' && (
-              <form onSubmit={handleStartPayment} className="space-y-4">
-                {/* 4. PROMINENT 1-TAP FREE TRIAL CARD (Kama Chino Wifi) */}
-                <div
-                  onClick={handleFreeTrial}
-                  className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-900 border border-emerald-500/60 shadow-xs text-white flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-400 transition-all group active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0 text-emerald-300">
-                      <Gift className="w-4 h-4 text-emerald-400 animate-bounce" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <strong className="text-xs font-black tracking-tight text-white uppercase">
-                          JARIBU BURE DK 5 KILA SIKU
-                        </strong>
-                        <span className="text-[9px] font-black uppercase bg-emerald-400 text-stone-950 px-1.5 py-0.2 rounded-sm shadow-xs">
-                          BURE
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-emerald-200 mt-0.5">
-                        Jaribu mtandao wako · 20 Mbps · Hakuna gharama
-                      </p>
-                    </div>
+              <form onSubmit={handleStartPayment} className="space-y-3">
+                {/* Compact Top Bar: Free Trial + Signal Quality */}
+                <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-stone-100 border border-stone-200 text-xs">
+                  <div className="flex items-center gap-1.5 text-stone-700 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <span className="font-bold text-[11px] truncate">Spidi Imara: 20 Mbps · 4K Ready</span>
                   </div>
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleFreeTrial();
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-stone-950 font-black text-[11px] shadow-sm uppercase shrink-0 flex items-center gap-1 transition-transform group-hover:scale-105 cursor-pointer"
+                    onClick={handleFreeTrial}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-[10px] uppercase shrink-0 flex items-center gap-1 transition-transform cursor-pointer shadow-xs active:scale-95"
                   >
-                    <span>ANZA</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <Gift className="w-3 h-3" />
+                    <span>Dk 5 Bure</span>
                   </button>
                 </div>
 
-                {/* Lema AI Live Signal Quality Badge */}
-                <div className="p-2.5 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-[11px] flex items-center justify-between text-indigo-950 shadow-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                    <span className="font-bold flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Lema AI:</span>
-                    </span>
-                    <span className="text-emerald-700 font-extrabold truncate">Spidi Imara (20 Mbps)</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-indigo-600 bg-white px-2 py-0.5 rounded-md border border-indigo-200 shrink-0">
-                    Ping 11ms · 4K Ready
-                  </span>
-                </div>
-
-                {/* 3. VIBRANT PACKAGE CARDS (Kama Kiho & Covanet) */}
+                {/* Compact Packages Grid */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-black text-stone-700 uppercase tracking-wide">
-                      Chagua Kifurushi Chako:
+                      Chagua Kifurushi:
                     </label>
                     <span className="text-[10px] text-stone-400 font-mono">
-                      {settings.packages.length} Vifurushi Vipo
+                      {settings.packages.length} Vifurushi
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {settings.packages.map((pkg) => {
                       const isSelected = pkg.id === selectedPackageId;
 
@@ -1276,231 +1241,103 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                         <div
                           key={pkg.id}
                           onClick={() => setSelectedPackageId(pkg.id)}
-                          className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden ${
+                          className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden ${
                             isSelected
-                              ? 'bg-[#cca43b]/10 border-[#cca43b] text-stone-900 ring-2 ring-[#cca43b]/50 shadow-xs'
+                              ? 'bg-amber-500/10 border-amber-500 text-stone-900 ring-2 ring-amber-500/40 shadow-xs'
                               : 'bg-white border-[#e6e2d3] hover:border-stone-400 text-stone-700'
                           }`}
                         >
-                          {/* Top Header: Title & Price */}
-                          <div className="flex items-start justify-between gap-1 mb-1.5">
-                            <div className="min-w-0 pr-1">
-                              <h5 className="text-[11px] font-black uppercase tracking-tight text-stone-900 truncate">
-                                {pkg.durationHours >= 720
-                                  ? 'Mwezi 1'
-                                  : pkg.durationHours >= 168
-                                  ? 'Wiki 1'
-                                  : pkg.durationHours >= 24
-                                  ? 'Siku 1'
-                                  : `${pkg.durationHours} Hrs`}
-                              </h5>
-                              <span className="text-[9px] text-stone-500 font-medium truncate block">
-                                {pkg.name}
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <h5 className="text-xs font-black uppercase tracking-tight text-stone-900 truncate">
+                              {pkg.durationHours >= 720
+                                ? 'Mwezi 1'
+                                : pkg.durationHours >= 168
+                                ? 'Wiki 1'
+                                : pkg.durationHours >= 24
+                                ? 'Siku 1'
+                                : `${pkg.durationHours} Hrs`}
+                            </h5>
+                            {isSelected && (
+                              <span className="w-4 h-4 rounded-full bg-amber-500 text-stone-950 flex items-center justify-center text-[10px] font-black shrink-0">
+                                ✓
                               </span>
-                            </div>
-
-                            <div className="text-right shrink-0">
-                              <span className="text-xs sm:text-sm font-black font-mono text-[#cca43b] block leading-tight">
-                                {pkg.price.toLocaleString()}
-                              </span>
-                              <span className="text-[8px] font-bold text-stone-400 uppercase">TZS</span>
-                            </div>
+                            )}
                           </div>
 
-                          {/* Feature Badges */}
-                          <div className="space-y-1 my-1.5">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-[9px] font-bold bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-                                <Clock className="w-2.5 h-2.5 text-stone-500" />
-                                <span>{pkg.durationHours >= 24 ? `${pkg.durationHours / 24}d` : `${pkg.durationHours}h`}</span>
-                              </span>
-                              <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">
-                                Bila Kikomo
-                              </span>
-                            </div>
-                            <div className="text-[9px] font-semibold text-emerald-600 flex items-center gap-1">
-                              <span>🚀 {pkg.speedDownload || '20M'} Spidi</span>
-                            </div>
+                          <div className="flex items-baseline justify-between gap-1 mt-0.5">
+                            <span className="text-xs sm:text-sm font-black font-mono text-[#cca43b] leading-tight">
+                              TZS {pkg.price.toLocaleString()}
+                            </span>
+                            <span className="text-[9px] font-semibold text-emerald-600 truncate">
+                              Bila Kikomo
+                            </span>
                           </div>
-
-                          {/* Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedPackageId(pkg.id);
-                            }}
-                            className={`w-full py-1.5 px-2 rounded-xl text-[10px] sm:text-[11px] font-black uppercase transition-all flex items-center justify-center gap-1 cursor-pointer mt-1 ${
-                              isSelected
-                                ? 'bg-[#cca43b] text-white shadow-xs'
-                                : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-200'
-                            }`}
-                          >
-                            <span>{isSelected ? '✓ Umechagua' : 'Nunua Sasa'}</span>
-                          </button>
                         </div>
                       );
                     })}
                   </div>
-
-                  {/* Selected Package Indicator Banner */}
-                  <div className="mt-2.5 p-2.5 rounded-xl bg-[#cca43b]/10 border border-[#cca43b]/40 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[9px] text-stone-500 uppercase font-bold block">Kifurushi Kilichochaguliwa:</span>
-                      <strong className="text-stone-900 font-black text-[11px]">
-                        {selectedPkg.name} ({selectedPkg.durationHours >= 24 ? `${selectedPkg.durationHours / 24} Siku` : `${selectedPkg.durationHours} Masaa`})
-                      </strong>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-[#cca43b] font-mono">TZS {selectedPkg.price.toLocaleString()}</span>
-                      <span className="text-[9px] text-emerald-600 font-bold block">✓ Kazi Iko Tayari</span>
-                    </div>
-                  </div>
-
-                  {/* Speed Bursting Teaser Drawer Button */}
-                  <div className="mt-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setShowBandwidthVisualizer(!showBandwidthVisualizer)}
-                      className="w-full flex items-center justify-between p-2.5 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 rounded-xl text-left hover:border-amber-500/40 transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-                          <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-bold text-amber-300 group-hover:text-amber-200 flex items-center gap-1.5">
-                            <span>Tazama Spidi: Burst (15 Mbps) vs Sustained (3 Mbps)</span>
-                          </p>
-                          <p className="text-[9px] text-stone-400">
-                            Fungua video papo hapo bila kubuffer kwa sekunde 10 za mwanzo
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-amber-400 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
-                        {showBandwidthVisualizer ? 'Funga ▲' : 'Jaribu Mita ▼'}
-                      </span>
-                    </button>
-
-                    {showBandwidthVisualizer && (
-                      <div className="mt-2.5 animate-fadeIn">
-                        <BandwidthVisualizationWidget
-                          sustainedSpeedMbps={3}
-                          burstSpeedMbps={15}
-                          burstDurationSec={10}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </div>
 
-                {/* Corporate Mobile Money Selector Grid (M-Pesa, Tigo Pesa, Airtel Money, Halopesa) */}
+                {/* Compact Mobile Money Network Selector */}
                 <div>
-                  <label className="text-xs font-bold text-stone-300 block mb-2">
-                    Chagua Mtandao wa Simu (Mobile Money Network):
+                  <label className="text-xs font-bold text-stone-600 block mb-1.5">
+                    Mtandao wa Malipo:
                   </label>
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-4 gap-1.5">
                     {/* Vodacom M-Pesa */}
                     <button
                       type="button"
                       onClick={() => setSelectedNetwork('mpesa')}
-                      className={`p-3 rounded-2xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col justify-between h-[75px] ${
+                      className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                         selectedNetwork === 'mpesa'
-                          ? 'bg-red-600/10 border-red-500 text-white ring-1 ring-red-500 scale-[1.02] shadow-lg shadow-red-600/10'
-                          : 'bg-stone-850 border-stone-800 hover:border-stone-750 text-stone-400'
+                          ? 'bg-red-600/15 border-red-500 text-stone-900 ring-1 ring-red-500 shadow-xs'
+                          : 'bg-white border-stone-200 hover:border-stone-400 text-stone-600'
                       }`}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-[10px] font-black tracking-widest text-red-500 font-sans uppercase">Vodacom</span>
-                        {selectedNetwork === 'mpesa' && (
-                          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                        )}
-                      </div>
-                      <div className="flex items-end justify-between w-full">
-                        <strong className={`text-xs font-black tracking-tight font-sans uppercase transition-colors ${
-                          selectedNetwork === 'mpesa' ? 'text-stone-950' : 'text-stone-200'
-                        }`}>
-                          M-PESA
-                        </strong>
-                        <span className="w-4 h-4 rounded-full bg-red-600 flex items-center justify-center text-[9px] font-black text-white">M</span>
-                      </div>
+                      <span className="w-5 h-5 rounded-full bg-red-600 text-white font-black text-[10px] flex items-center justify-center">M</span>
+                      <strong className="text-[10px] font-black uppercase text-red-600 tracking-tight">M-Pesa</strong>
                     </button>
 
                     {/* Mixx by Yas */}
                     <button
                       type="button"
                       onClick={() => setSelectedNetwork('tigopesa')}
-                      className={`p-3 rounded-2xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col justify-between h-[75px] ${
+                      className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                         selectedNetwork === 'tigopesa'
-                          ? 'bg-blue-600/10 border-blue-500 text-white ring-1 ring-blue-500 scale-[1.02] shadow-lg shadow-blue-600/10'
-                          : 'bg-stone-850 border-stone-800 hover:border-stone-750 text-stone-400'
+                          ? 'bg-blue-600/15 border-blue-500 text-stone-900 ring-1 ring-blue-500 shadow-xs'
+                          : 'bg-white border-stone-200 hover:border-stone-400 text-stone-600'
                       }`}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <MixxByYasLogo size={26} showText={false} />
-                        {selectedNetwork === 'tigopesa' && (
-                          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
-                        )}
-                      </div>
-                      <div className="flex items-end justify-between w-full">
-                        <strong className={`text-xs font-black tracking-tight font-sans uppercase transition-colors ${
-                          selectedNetwork === 'tigopesa' ? 'text-stone-950' : 'text-stone-200'
-                        }`}>
-                          MIXX BY YAS
-                        </strong>
-                      </div>
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-yellow-300 font-black text-[10px] flex items-center justify-center">Y</span>
+                      <strong className="text-[10px] font-black uppercase text-blue-700 tracking-tight">Mixx/Yas</strong>
                     </button>
 
                     {/* Airtel Money */}
                     <button
                       type="button"
                       onClick={() => setSelectedNetwork('airtel')}
-                      className={`p-3 rounded-2xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col justify-between h-[75px] ${
+                      className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                         selectedNetwork === 'airtel'
-                          ? 'bg-rose-600/10 border-rose-500 text-white ring-1 ring-rose-500 scale-[1.02] shadow-lg shadow-rose-600/10'
-                          : 'bg-stone-850 border-stone-800 hover:border-stone-750 text-stone-400'
+                          ? 'bg-rose-600/15 border-rose-500 text-stone-900 ring-1 ring-rose-500 shadow-xs'
+                          : 'bg-white border-stone-200 hover:border-stone-400 text-stone-600'
                       }`}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-[10px] font-black tracking-widest text-rose-500 font-sans uppercase">Airtel</span>
-                        {selectedNetwork === 'airtel' && (
-                          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                        )}
-                      </div>
-                      <div className="flex items-end justify-between w-full">
-                        <strong className={`text-xs font-black tracking-tight font-sans uppercase transition-colors ${
-                          selectedNetwork === 'airtel' ? 'text-stone-950' : 'text-stone-200'
-                        }`}>
-                          airtel money
-                        </strong>
-                        <span className="w-4 h-4 rounded-full bg-rose-600 flex items-center justify-center text-[9px] font-black text-white">a</span>
-                      </div>
+                      <span className="w-5 h-5 rounded-full bg-rose-600 text-white font-black text-[10px] flex items-center justify-center">a</span>
+                      <strong className="text-[10px] font-black uppercase text-rose-600 tracking-tight">Airtel</strong>
                     </button>
 
                     {/* Halopesa */}
                     <button
                       type="button"
                       onClick={() => setSelectedNetwork('halopesa')}
-                      className={`p-3 rounded-2xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col justify-between h-[75px] ${
+                      className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                         selectedNetwork === 'halopesa'
-                          ? 'bg-orange-500/10 border-orange-500 text-white ring-1 ring-orange-400 scale-[1.02] shadow-lg shadow-orange-500/10'
-                          : 'bg-stone-850 border-stone-800 hover:border-stone-750 text-stone-400'
+                          ? 'bg-orange-500/15 border-orange-500 text-stone-900 ring-1 ring-orange-500 shadow-xs'
+                          : 'bg-white border-stone-200 hover:border-stone-400 text-stone-600'
                       }`}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-[10px] font-black tracking-widest text-orange-400 font-sans uppercase">Halotel</span>
-                        {selectedNetwork === 'halopesa' && (
-                          <span className="w-2 h-2 rounded-full bg-orange-400 animate-ping" />
-                        )}
-                      </div>
-                      <div className="flex items-end justify-between w-full">
-                        <strong className={`text-xs font-black tracking-tight font-sans uppercase transition-colors ${
-                          selectedNetwork === 'halopesa' ? 'text-stone-950' : 'text-stone-200'
-                        }`}>
-                          halopesa
-                        </strong>
-                        <span className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-[9px] font-black text-white">h</span>
-                      </div>
+                      <span className="w-5 h-5 rounded-full bg-orange-500 text-white font-black text-[10px] flex items-center justify-center">h</span>
+                      <strong className="text-[10px] font-black uppercase text-orange-600 tracking-tight">Halopesa</strong>
                     </button>
                   </div>
                 </div>
@@ -1721,33 +1558,20 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                   onChange={handleDirectPortalPhoto}
                 />
 
-                {/* 2 Camera Options: 1-Tap Direct Camera Shutter + Live Scanner */}
-                <div className="space-y-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => portalDirectCameraInputRef.current?.click()}
-                      className="py-3 px-3 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-[0.98] animate-pulse"
-                    >
-                      <Camera className="w-4 h-4 text-stone-950" />
-                      <span>📸 PIGA PICHA KWA KAMERA YA SIMU</span>
-                    </button>
+                {/* Single Clean Live QR Camera Scan Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowQrScanner(true)}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-98"
+                >
+                  <Camera className="w-4 h-4 text-stone-950" />
+                  <span>📷 SCAN VOCHA KWA KAMERA (QR CODE)</span>
+                </button>
+                <p className="text-[10px] text-stone-500 text-center font-medium -mt-2">
+                  Elekeza kamera kwenye msimbo wa QR — inasoma kiotomatiki
+                </p>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowQrScanner(true)}
-                      className="py-3 px-3 rounded-2xl bg-stone-900 border border-amber-500/40 hover:bg-stone-850 text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-[0.98]"
-                    >
-                      <QrCode className="w-4 h-4 text-amber-400" />
-                      <span>⚡ Mita ya Video (Live Scanner)</span>
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-stone-500 text-center">
-                    Gusa <strong>"Piga Picha kwa Kamera"</strong> kufungua kamera ya simu yako moja kwa moja na kusoma vocha!
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 pt-1">
                   <div className="h-px bg-stone-200 flex-1" />
                   <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider">Au Andika Namba</span>
                   <div className="h-px bg-stone-200 flex-1" />

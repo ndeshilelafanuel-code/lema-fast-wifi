@@ -325,42 +325,30 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                     </div>
                   )}
 
-                  {/* 5. SPONSORED AD BANNER (TOP SLIDESHOW & WATCH-TO-SURF) */}
-                  <div className="mb-2.5 p-2.5 rounded-2xl bg-gradient-to-r from-purple-950 via-purple-900 to-stone-900 border border-purple-500/40 text-white shadow-xs text-left">
+                  {/* 5. SPONSORED AD BANNER (COMPACT SPACE-SAVING BAR) */}
+                  <div className="mb-2 p-2 rounded-xl bg-gradient-to-r from-purple-950 via-purple-900 to-stone-900 border border-purple-500/40 text-white shadow-xs text-left">
                     <div className="flex items-center justify-between text-[9px] mb-1">
-                      <span className="bg-purple-500 text-white font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                        <Megaphone className="w-2.5 h-2.5" /> Mfadhili Mtaani
+                      <span className="bg-purple-500 text-white font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider flex items-center gap-1">
+                        <Megaphone className="w-2.5 h-2.5" /> Tangazo: Glamour Salon
                       </span>
-                      <span className="text-purple-300 font-mono text-[9px]">Tsh 20,000/Mwezi</span>
-                    </div>
-                    <h5 className="font-bold text-[11px] leading-tight text-white">GLAMOUR TOUCH SALON & SPA</h5>
-                    <p className="text-[10px] text-stone-300 leading-snug line-clamp-1 mb-2">
-                      Punguzo la 20% wiki hii! Tembelea mtaa wa 3 au wasiliana WhatsApp.
-                    </p>
-                    <div className="flex items-center gap-1.5 pt-1.5 border-t border-purple-500/30">
                       <button
                         type="button"
                         onClick={handleStartWatchAd}
-                        className="flex-1 py-1 px-2 bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-[10px] rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-xs"
+                        className="py-0.5 px-2 bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-[9px] rounded-md transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                       >
-                        <Play className="w-2.5 h-2.5 fill-current" />
+                        <Play className="w-2 h-2 fill-current" />
                         <span>Tazama (10s) Upate Bure 🎬</span>
                       </button>
-                      <a
-                        href="https://wa.me/255653578184?text=Habari!+Nimeona+tangazo+lako+kwenye+LEMA+FAST+WiFi"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-1 px-2 bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold rounded-lg border border-white/20 flex items-center gap-1 shrink-0"
-                      >
-                        <Phone className="w-2.5 h-2.5 text-emerald-400" />
-                        <span>WhatsApp</span>
-                      </a>
                     </div>
+                    <p className="text-[10px] text-stone-300 leading-tight truncate">
+                      Punguzo la 20% wiki hii mtaa wa 3 · WhatsApp: 0653578184
+                    </p>
                   </div>
 
                   {/* Segmented Mode Selector */}
-                  <div className="flex items-center gap-1 p-1 bg-stone-200 rounded-lg text-xs font-semibold mb-3">
+                  <div className="flex items-center gap-1 p-1 bg-stone-200 rounded-lg text-xs font-semibold mb-2.5">
                     <button
+                      type="button"
                       onClick={() => {
                         setActiveTab('voucher');
                         setSimulatedStatus(null);
@@ -374,6 +362,7 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                       {lang === 'sw' ? 'Weka Vocha' : 'Voucher'}
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         setActiveTab('mobile');
                         setSimulatedStatus(null);
@@ -387,6 +376,7 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                       {lang === 'sw' ? 'Lipa Simu' : 'Pay Mobile'}
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         setActiveTab('trial');
                         setSimulatedStatus(null);
@@ -401,50 +391,32 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                     </button>
                   </div>
 
-                  {/* Mode 1: Voucher Form with QR Scanner */}
+                  {/* Mode 1: Voucher Form with Single Clean QR Scanner Button */}
                   {activeTab === 'voucher' && (
-                    <form onSubmit={handleConnectVoucher} className="space-y-2.5">
-                      {/* Hidden Native Phone Camera Input for 1-Tap Snapshot */}
-                      <input
-                        ref={previewDirectCameraRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handleDirectPreviewPhoto}
-                      />
-
-                      {/* 2 Camera Options: 1-Tap Phone Camera + Live Scanner */}
-                      <div className="space-y-1.5">
-                        <button
-                          type="button"
-                          onClick={() => previewDirectCameraRef.current?.click()}
-                          className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95 animate-pulse"
-                        >
-                          <Camera className="w-4 h-4 text-stone-950" />
-                          <span>📸 PIGA PICHA KWA KAMERA YA SIMU</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setIsQrScannerOpen(true)}
-                          className="w-full py-1.5 px-2.5 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                        >
-                          <QrCode className="w-3.5 h-3.5 text-amber-600" />
-                          <span>⚡ Au Fungua Kamera ya Video (Live Viewfinder)</span>
-                        </button>
-                      </div>
+                    <form onSubmit={handleConnectVoucher} className="space-y-2">
+                      {/* Single Direct Scan Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsQrScannerOpen(true)}
+                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-black text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-98"
+                      >
+                        <Camera className="w-4 h-4 text-stone-950" />
+                        <span>📷 SCAN VOCHA KWA KAMERA (QR)</span>
+                      </button>
+                      <p className="text-[10px] text-stone-500 text-center font-medium -mt-1">
+                        Elekeza kamera kwenye QR code — inasoma kiotomatiki
+                      </p>
 
                       <div>
-                        <label className="text-[11px] font-bold text-stone-700 block mb-0.5">
+                        <label className="text-[10px] font-bold text-stone-700 block mb-0.5">
                           {lang === 'sw' ? 'Au Andika Namba ya Vocha:' : 'Or Enter Voucher Code:'}
                         </label>
                         <input
                           type="text"
                           value={voucherCode}
                           onChange={(e) => setVoucherCode(e.target.value)}
-                          placeholder="Mfano: 8492"
-                          className="w-full px-3 py-1.5 text-sm font-mono text-center border border-stone-300 rounded-lg text-stone-900 bg-white"
+                          placeholder="Mfano: 9482"
+                          className="w-full px-3 py-1.5 text-sm font-mono text-center font-bold border border-stone-300 rounded-lg text-stone-900 bg-white focus:outline-none focus:border-amber-500"
                         />
                       </div>
 
@@ -456,7 +428,7 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                           onChange={(e) => setRememberDeviceChecked(e.target.checked)}
                           className="rounded text-amber-500"
                         />
-                        <span>Kumbuka kifaa hiki (MAC Binding Auto-Login)</span>
+                        <span>Kumbuka kifaa hiki (Auto-Login MAC)</span>
                       </label>
 
                       <button
