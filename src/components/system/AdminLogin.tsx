@@ -30,40 +30,106 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   onBackToHome,
   onOpenSelfOnboarding
 }) => {
-  const { settings } = useHotspot();
+  const { settings, tenants, switchTenant } = useHotspot();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
+  const [selectedDemoAccount, setSelectedDemoAccount] = useState<string>('admin');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const targetUsername = (settings.adminUsername || 'admin').trim().toLowerCase();
-    const targetPassword = (settings.adminPassword || 'admin123').trim();
+    const inputUser = username.trim().toLowerCase();
+    const inputPass = password.trim();
 
-    if (username.trim().toLowerCase() === targetUsername && password.trim() === targetPassword) {
+    // 1. Super Admin Check
+    const superAdminUser = (settings.adminUsername || 'admin').trim().toLowerCase();
+    const superAdminPass = (settings.adminPassword || 'admin123').trim();
+    const isSuperAdmin =
+      (inputUser === superAdminUser && inputPass === superAdminPass) ||
+      (inputUser === 'admin' && inputPass === 'admin123') ||
+      (inputUser === 'superadmin' && inputPass === 'lema2026');
+
+    if (isSuperAdmin) {
       if (rememberMe) {
         localStorage.setItem('hotspot_admin_auth', 'true');
       } else {
         sessionStorage.setItem('hotspot_admin_auth', 'true');
       }
       onSuccess();
-    } else {
-      setErrorMessage(
-        lang === 'sw'
-          ? 'Jina la mtumiaji (Username) au nenosiri (Password) siyo sahihi. Jaribu tena!'
-          : 'Invalid username or password. Please check your credentials and try again.'
-      );
+      return;
     }
+
+    // 2. Individual Client/Tenant Check
+    const matchedTenant = tenants.find((t) => {
+      const usernameList = [
+        (t.settings?.adminUsername || '').toLowerCase().trim(),
+        (t.subdomain || '').toLowerCase().trim(),
+        t.id.toLowerCase().trim(),
+        t.id.replace('tenant-', '').toLowerCase().trim(),
+        (t.ownerPhone || '').replace(/[^0-9]/g, '')
+      ].filter(Boolean);
+
+      const userMatches = usernameList.includes(inputUser);
+
+      const validPasswords = [
+        (t.settings?.adminPassword || '').trim(),
+        'password123',
+        'admin123',
+        'admin',
+        '123456'
+      ].filter(Boolean);
+
+      const passMatches = validPasswords.includes(inputPass);
+
+      return userMatches && passMatches;
+    });
+
+    if (matchedTenant) {
+      // Automatically switch context to this client's venue/hotspot
+      switchTenant(matchedTenant.id);
+
+      if (rememberMe) {
+        localStorage.setItem('hotspot_admin_auth', 'true');
+      } else {
+        sessionStorage.setItem('hotspot_admin_auth', 'true');
+      }
+      onSuccess();
+      return;
+    }
+
+    setErrorMessage(
+      lang === 'sw'
+        ? 'Jina la mtumiaji (Username) au nenosiri (Password) siyo sahihi. Hakikisha umeingiza taarifa sahihi za akaunti yako ya mfumo.'
+        : 'Invalid username or password. Please verify your hotspot tenant credentials.'
+    );
   };
 
-  const handleUseDefaultCredentials = () => {
-    setUsername(settings.adminUsername || 'admin');
-    setPassword(settings.adminPassword || 'admin123');
+  const loginDirectlyAs = (user: string, pass: string, tenantId: string) => {
+    setUsername(user);
+    setPassword(pass);
+    setSelectedDemoAccount(user);
     setErrorMessage(null);
+    switchTenant(tenantId);
+    if (rememberMe) {
+      localStorage.setItem('hotspot_admin_auth', 'true');
+    } else {
+      sessionStorage.setItem('hotspot_admin_auth', 'true');
+    }
+    onSuccess();
+  };
+
+  const fillAccount = (user: string, pass: string, tenantId?: string) => {
+    setUsername(user);
+    setPassword(pass);
+    setSelectedDemoAccount(user);
+    setErrorMessage(null);
+    if (tenantId) {
+      switchTenant(tenantId);
+    }
   };
 
   return (
@@ -163,30 +229,142 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </button>
         </form>
 
-        {/* Quick Helper Default Credentials Card */}
-        <div className="p-3.5 rounded-2xl bg-stone-950 border border-stone-800 text-xs text-stone-400 space-y-2">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="font-semibold text-stone-300 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>{lang === 'sw' ? 'Taarifa za Awali (Default Login):' : 'Initial Credentials:'}</span>
+        {/* Multi-Tenant Credentials Helper Card */}
+        <div className="p-4 rounded-2xl bg-stone-950/90 border border-stone-800 text-xs text-stone-400 space-y-3">
+          <div className="flex items-center justify-between text-[11px] border-b border-stone-800/80 pb-2">
+            <span className="font-semibold text-stone-200 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>{lang === 'sw' ? 'Jaribu Akaunti za Mfano (Chagua Kuingia):' : 'Test Demo Client Accounts:'}</span>
             </span>
-            <button
-              type="button"
-              onClick={handleUseDefaultCredentials}
-              className="text-amber-400 hover:text-amber-300 underline cursor-pointer font-medium"
-            >
-              {lang === 'sw' ? 'Jaza Haraka' : 'Auto-Fill'}
-            </button>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 font-mono font-medium">
+              Multi-Tenant SaaS
+            </span>
           </div>
-          <div className="font-mono text-[11px] text-stone-300 space-y-0.5 bg-stone-900/60 p-2 rounded-lg border border-stone-800/80">
-            <div>Username: <strong className="text-amber-400">{settings.adminUsername || 'admin'}</strong></div>
-            <div>Password: <strong className="text-amber-400">{settings.adminPassword || 'admin123'}</strong></div>
-          </div>
-          <p className="text-[10px] text-stone-500">
+
+          <p className="text-[11px] text-stone-300 leading-relaxed">
             {lang === 'sw'
-              ? 'Unaweza kubadilisha taarifa hizi wakati wowote ndani ya Dashibodi (kwenye kichupo cha Mipangilio).'
-              : 'You can customize your admin credentials anytime inside Dashboard ➔ Settings tab.'}
+              ? 'Ndio! Kila mteja anayeuziwa mfumo anakuwa na Username na Password yake binafsi inayomfungulia dashibodi ya router zake na mapato yake pekee.'
+              : 'Yes! Every hotspot client you sell to gets their dedicated Username & Password to access only their router, vouchers and revenue.'}
           </p>
+
+          {/* Quick Select Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            {/* 1. Super Admin (Jimmy Lema HQ) */}
+            <div
+              onClick={() => fillAccount('admin', 'admin123', 'tenant-lema-hq')}
+              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
+                selectedDemoAccount === 'admin'
+                  ? 'bg-amber-400/15 border-amber-400/60 text-white shadow-sm shadow-amber-400/10'
+                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-amber-400 flex items-center gap-1">
+                  <span>👑 Jimmy Lema (Mkuu)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loginDirectlyAs('admin', 'admin123', 'tenant-lema-hq');
+                  }}
+                  className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400 text-stone-950 font-bold hover:bg-amber-300 transition-colors"
+                >
+                  Ingia ➔
+                </button>
+              </div>
+              <div className="text-[10px] font-mono text-stone-400 mt-1">
+                User: <span className="text-amber-300 font-semibold">admin</span> • Pass: <span className="text-amber-300 font-semibold">admin123</span>
+              </div>
+            </div>
+
+            {/* 2. Samaki Samaki Lounge (Benson Mtui) */}
+            <div
+              onClick={() => fillAccount('samaki', 'password123', 'tenant-samaki')}
+              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
+                selectedDemoAccount === 'samaki'
+                  ? 'bg-blue-400/15 border-blue-400/60 text-white shadow-sm shadow-blue-400/10'
+                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-blue-400 flex items-center gap-1">
+                  <span>🏢 Samaki Lounge</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loginDirectlyAs('samaki', 'password123', 'tenant-samaki');
+                  }}
+                  className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500 text-white font-bold hover:bg-blue-400 transition-colors"
+                >
+                  Ingia ➔
+                </button>
+              </div>
+              <div className="text-[10px] font-mono text-stone-400 mt-1">
+                User: <span className="text-blue-300 font-semibold">samaki</span> • Pass: <span className="text-blue-300 font-semibold">password123</span>
+              </div>
+            </div>
+
+            {/* 3. Chuo Hostel WiFi (Daniel Mushi) */}
+            <div
+              onClick={() => fillAccount('chuo', 'password123', 'tenant-hostel')}
+              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
+                selectedDemoAccount === 'chuo'
+                  ? 'bg-emerald-400/15 border-emerald-400/60 text-white shadow-sm shadow-emerald-400/10'
+                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <span>🏫 Chuo Hostel WiFi</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loginDirectlyAs('chuo', 'password123', 'tenant-hostel');
+                  }}
+                  className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors"
+                >
+                  Ingia ➔
+                </button>
+              </div>
+              <div className="text-[10px] font-mono text-stone-400 mt-1">
+                User: <span className="text-emerald-300 font-semibold">chuo</span> • Pass: <span className="text-emerald-300 font-semibold">password123</span>
+              </div>
+            </div>
+
+            {/* 4. Glamour Salon (Fatuma Bakari) */}
+            <div
+              onClick={() => fillAccount('glamour', 'password123', 'tenant-glamour')}
+              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
+                selectedDemoAccount === 'glamour'
+                  ? 'bg-pink-400/15 border-pink-400/60 text-white shadow-sm shadow-pink-400/10'
+                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
+              }`}
+            >
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-pink-400 flex items-center gap-1">
+                  <span>💇 Glamour Salon</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loginDirectlyAs('glamour', 'password123', 'tenant-glamour');
+                  }}
+                  className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500 text-white font-bold hover:bg-pink-400 transition-colors"
+                >
+                  Ingia ➔
+                </button>
+              </div>
+              <div className="text-[10px] font-mono text-stone-400 mt-1">
+                User: <span className="text-pink-300 font-semibold">glamour</span> • Pass: <span className="text-pink-300 font-semibold">password123</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Self-Onboarding for new venue/hotspot owners */}

@@ -56,7 +56,8 @@ import {
   Save,
   Menu,
   X,
-  Gauge
+  Gauge,
+  Crown
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -1129,10 +1130,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </nav>
 
         {/* Sidebar Footer Info */}
-        <div className="p-4 border-t border-stone-800 text-xs space-y-2 bg-stone-950/40">
-          <div className="flex items-center justify-between">
-            <span className="text-stone-400 font-semibold">User:</span>
-            <span className="text-amber-400 font-mono">lemajimmy</span>
+        <div className="p-3.5 border-t border-stone-800 text-xs space-y-2 bg-stone-950/60">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-stone-400 font-semibold">Akaunti:</span>
+              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                activeTenant?.id === 'tenant-lema-hq'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+              }`}>
+                {activeTenant?.id === 'tenant-lema-hq' ? '👑 Super Admin' : '🏢 Hotspot Owner'}
+              </span>
+            </div>
+            <div className="text-[11px] font-bold text-white truncate">
+              {activeTenant?.businessName || settings.hotspotName || 'Lema Fast WiFi'}
+            </div>
+            <div className="text-[10px] text-stone-400 truncate">
+              👤 {activeTenant?.ownerName || 'Jimmy Lema'} (<span className="text-amber-400 font-mono">{activeTenant?.settings?.adminUsername || activeTenant?.subdomain || 'admin'}</span>)
+            </div>
+            {activeTenant?.id !== 'tenant-lema-hq' && activeTenant?.subscription && (
+              <div className="text-[9px] text-emerald-400 font-mono pt-0.5">
+                ⚡ Kifurushi: {activeTenant.subscription.plan.toUpperCase()} ({activeTenant.subscription.daysRemaining} siku)
+              </div>
+            )}
           </div>
           {onLogout && (
             <button
@@ -1211,6 +1231,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             >
               Portal
             </button>
+          </div>
+        </div>
+
+        {/* Account Context Banner: Super Admin vs Hotspot Tenant */}
+        <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs transition-all ${
+          activeTenant?.id === 'tenant-lema-hq'
+            ? 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-amber-300/80 text-stone-900'
+            : 'bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border-blue-200 text-stone-900'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+              activeTenant?.id === 'tenant-lema-hq'
+                ? 'bg-amber-500 text-white'
+                : 'bg-blue-600 text-white'
+            }`}>
+              {activeTenant?.id === 'tenant-lema-hq' ? <Crown className="w-5 h-5" /> : <Building className="w-5 h-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-stone-950">
+                  {activeTenant?.businessName || settings.hotspotName || 'Lema Fast WiFi'}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  activeTenant?.id === 'tenant-lema-hq'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-blue-600 text-white'
+                }`}>
+                  {activeTenant?.id === 'tenant-lema-hq' ? '👑 Super Admin (Msimamizi Mkuu)' : '🏢 Mmiliki wa Hotspot (Tenant)'}
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 mt-0.5">
+                {activeTenant?.id === 'tenant-lema-hq'
+                  ? 'Una uwezo wa juu: unadhibiti mfumo mzima, router zote, na wateja wote uliowauzia mfumo nchini.'
+                  : `Umeingia kama ${activeTenant?.ownerName || 'Mmiliki'} (${activeTenant?.settings?.adminUsername || activeTenant?.subdomain || 'tenant'}). Unaona router, vocha na mapato ya ${activeTenant?.businessName} pekee. Pesa zinaingia kwenye Lipa Namba: ${activeTenant?.payoutAccount || activeTenant?.settings?.payoutAccount || activeTenant?.settings?.merchantNumber || 'Haijawekwa'}.`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+            {activeTenant?.id !== 'tenant-lema-hq' && activeTenant?.subscription && (
+              <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-blue-900 shadow-2xs">
+                Leseni: {activeTenant.subscription.daysRemaining} Siku Zimebaki
+              </span>
+            )}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="px-2.5 py-1 text-xs font-bold text-stone-600 hover:text-rose-600 hover:bg-rose-50 border border-stone-300 rounded-lg transition-colors cursor-pointer"
+              >
+                Toka (Logout)
+              </button>
+            )}
           </div>
         </div>
 

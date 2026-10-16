@@ -121,7 +121,9 @@ export const ClientSelfOnboarding: React.FC<ClientSelfOnboardingProps> = ({
           { id: 'p1', name: 'Saa 2', price: 500, durationHours: 2, speedDownload: '2M', speedUpload: '1M' },
           { id: 'p2', name: 'Saa 24', price: 1000, durationHours: 24, speedDownload: '3M', speedUpload: '1M', isPopular: true },
           { id: 'p3', name: 'Siku 7', price: 5000, durationHours: 168, speedDownload: '4M', speedUpload: '2M' }
-        ]
+        ],
+        adminUsername: slug.toLowerCase() || 'owner',
+        adminPassword: 'password123'
       }
     };
 

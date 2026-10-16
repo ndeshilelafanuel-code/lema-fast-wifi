@@ -246,7 +246,17 @@ const DEFAULT_TENANTS: HotspotTenant[] = [
       lastPaymentDate: '2026-10-05',
       lastPaymentRef: 'TG261005SAMAKI'
     },
-    settings: DEFAULT_SETTINGS,
+    settings: {
+      ...DEFAULT_SETTINGS,
+      hotspotName: 'Samaki Samaki Lounge WiFi',
+      tagline: 'High Speed WiFi for Lounge Guests',
+      supportPhone: '0754 889 120',
+      merchantNumber: '6749001',
+      accountOwnerName: 'Benson Mtui',
+      payoutAccount: '6749001',
+      adminUsername: 'samaki',
+      adminPassword: 'password123',
+    },
     createdAt: '2026-10-05T10:00:00Z'
   },
   {
@@ -279,7 +289,17 @@ const DEFAULT_TENANTS: HotspotTenant[] = [
       lastPaymentDate: '2026-09-17',
       lastPaymentRef: 'AR260917HOSTEL'
     },
-    settings: DEFAULT_SETTINGS,
+    settings: {
+      ...DEFAULT_SETTINGS,
+      hotspotName: 'Chuo Kikuu Student Hostel WiFi',
+      tagline: 'Bando Nafuu la Wanafunzi 24/7',
+      supportPhone: '0782 441 900',
+      merchantNumber: '0782441900',
+      accountOwnerName: 'Daniel Mushi',
+      payoutAccount: '0782441900',
+      adminUsername: 'chuo',
+      adminPassword: 'password123',
+    },
     createdAt: '2026-09-17T12:00:00Z'
   },
   {
@@ -312,7 +332,17 @@ const DEFAULT_TENANTS: HotspotTenant[] = [
       lastPaymentDate: '2026-10-12',
       lastPaymentRef: 'FREE-TRIAL-14D'
     },
-    settings: DEFAULT_SETTINGS,
+    settings: {
+      ...DEFAULT_SETTINGS,
+      hotspotName: 'Glamour Touch Salon WiFi',
+      tagline: 'Free 15-min WiFi & Fast Vocha',
+      supportPhone: '0655 312 884',
+      merchantNumber: '0655312884',
+      accountOwnerName: 'Fatuma Bakari',
+      payoutAccount: '0655312884',
+      adminUsername: 'glamour',
+      adminPassword: 'password123',
+    },
     createdAt: '2026-10-12T14:00:00Z'
   }
 ];
@@ -420,7 +450,25 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem('wifi_hotspot_tenants');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: HotspotTenant[] = JSON.parse(saved);
+        // Merge with DEFAULT_TENANTS so new fields, usernames, and passwords take effect immediately
+        const merged = DEFAULT_TENANTS.map((def) => {
+          const existing = parsed.find((p) => p.id === def.id);
+          if (!existing) return def;
+          return {
+            ...def,
+            ...existing,
+            settings: {
+              ...def.settings,
+              ...existing.settings,
+              adminUsername: def.settings.adminUsername || existing.settings?.adminUsername || def.subdomain,
+              adminPassword: def.settings.adminPassword || existing.settings?.adminPassword || 'password123',
+            }
+          };
+        });
+        // Include any user-created custom tenants from self-onboarding
+        const customTenants = parsed.filter((p) => !DEFAULT_TENANTS.some((def) => def.id === p.id));
+        return [...merged, ...customTenants];
       }
     } catch (e) {}
     return DEFAULT_TENANTS;

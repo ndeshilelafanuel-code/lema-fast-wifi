@@ -117,7 +117,7 @@ export interface HotspotSettings {
   adminPassword?: string;
 
   // Automated SMS Notifications & Templates (SwalaSMS Official)
-  smsProvider?: 'swalasms';
+  smsProvider?: 'swalasms' | 'beem';
   smsSenderId?: string;
   smsApiKey?: string;
   smsSecretKey?: string;
