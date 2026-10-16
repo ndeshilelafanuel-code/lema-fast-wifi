@@ -299,6 +299,181 @@ app.post('/api/v1/whatsapp/test-send', async (req, res) => {
   return res.json({ success: true, targetPhone, result });
 });
 
+// -------------------------------------------------------------
+// SMS GATEWAY INTEGRATION (SWALASMS TANZANIA - swalasms.com)
+// -------------------------------------------------------------
+interface SmsGatewayConfig {
+  provider: 'swalasms';
+  senderId: string;
+  apiKey: string;
+  enabled: boolean;
+}
+
+let smsGatewayConfig: SmsGatewayConfig = {
+  provider: 'swalasms',
+  senderId: process.env.SMS_SENDER_ID || 'LEMAWIFI',
+  apiKey: process.env.SMS_API_KEY || '',
+  enabled: true
+};
+
+async function sendSmsMessage(targetPhone: string, message: string) {
+  const { international, local } = normalizeTzPhone(targetPhone);
+  // SwalaSMS requires E.164 format with plus sign (e.g., +255712345678)
+  const e164Phone = international.startsWith('+') ? international : `+${international}`;
+
+  console.log(`[SwalaSMS Gateway] Preparing SMS to ${local} (${e164Phone}) with Sender ID "${smsGatewayConfig.senderId}": "${message.slice(0, 60)}..."`);
+
+  const rawKey = (smsGatewayConfig.apiKey || '').trim();
+  const isWellFormedKey = rawKey.startsWith('swl_live_') || rawKey.startsWith('swl_test_');
+
+  // If a legacy mock or placeholder key is present (e.g. beem_api_...), prevent 401 crash and warn gracefully
+  if (rawKey && !isWellFormedKey) {
+    console.warn(`[SwalaSMS Gateway] Key "${rawKey}" does not match swl_ prefix. Returning friendly auth guidance.`);
+    return {
+      success: false,
+      errorCode: 'AUTHENTICATION_FAILED',
+      message: 'Funguo ya SwalaSMS inapaswa kuanza na "swl_live_" au "swl_test_".',
+      hint: 'Tafadhali nenda kwenye akaunti yako ya SwalaSMS (swalasms.com/sms/api-keys), bonyeza "Create API Key", kisha ubandike hapa.',
+      simulated: true,
+      recipient: e164Phone,
+      senderId: smsGatewayConfig.senderId
+    };
+  }
+
+  // SwalaSMS Official API v1 (https://api.swalasms.com/v1/sms/messages)
+  if (isWellFormedKey) {
+    try {
+      const response = await fetch('https://api.swalasms.com/v1/sms/messages', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${rawKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          recipient: e164Phone,
+          sender_id: smsGatewayConfig.senderId || 'LEMAWIFI',
+          body: message
+        })
+      });
+
+      const data = await response.json();
+      console.log('[SwalaSMS Response]:', data);
+
+      if (data?.error_code === 'AUTHENTICATION_FAILED' || response.status === 401) {
+        return {
+          success: false,
+          errorCode: 'AUTHENTICATION_FAILED',
+          message: data?.message || 'Unauthorized API key.',
+          hint: 'API Key ya SwalaSMS haijathibitishwa na SwalaSMS. Hakikisha umeunda funguo kwenye ukurasa wa SwalaSMS (swalasms.com/sms/api-keys) na umeipa ruhusa ya sms:send.',
+          data
+        };
+      }
+
+      if (!data?.success && response.status >= 400) {
+        return {
+          success: false,
+          errorCode: data?.error_code || 'API_ERROR',
+          message: data?.message || 'Hitilafu ya kutuma ujumbe kupitia SwalaSMS',
+          data
+        };
+      }
+
+      return { success: response.status === 202 || data?.success, provider: 'swalasms', data };
+    } catch (err: any) {
+      console.error('[SwalaSMS Error]:', err?.message);
+      return { success: false, provider: 'swalasms', error: err?.message };
+    }
+  }
+
+  // Simulated SMS if no API token yet provided
+  console.log(`[SwalaSMS Simulator] SMS to ${local} (${e164Phone}) with Sender ID "${smsGatewayConfig.senderId}": "${message}"`);
+  return {
+    success: true,
+    simulated: true,
+    recipient: e164Phone,
+    senderId: smsGatewayConfig.senderId,
+    note: 'Ujumbe umetumwa kwa majaribio (Simulation). Weka API Key ya SwalaSMS inayoanza na swl_live_ kutuma live hewani.'
+  };
+}
+
+// SMS Endpoints
+app.get('/api/v1/sms/config', (_req, res) => {
+  return res.json({
+    provider: 'swalasms',
+    senderId: smsGatewayConfig.senderId,
+    hasApiKey: Boolean(smsGatewayConfig.apiKey),
+    enabled: smsGatewayConfig.enabled
+  });
+});
+
+app.get('/api/v1/sms/balance', async (_req, res) => {
+  const rawKey = (smsGatewayConfig.apiKey || '').trim();
+  const isWellFormedKey = rawKey.startsWith('swl_live_') || rawKey.startsWith('swl_test_');
+
+  if (!isWellFormedKey) {
+    return res.json({
+      success: true,
+      simulated: true,
+      balance: 100,
+      currency: 'SMS',
+      message: 'Hali ya majaribio (Weka API Key ya SwalaSMS inayoanza na swl_live_ kuona salio la live)'
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.swalasms.com/v1/balance', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${rawKey}`,
+        'Accept': 'application/json'
+      }
+    });
+    const data = await response.json();
+    if (data?.success && data?.data) {
+      return res.json({
+        success: true,
+        balance: data.data.balance,
+        currency: data.data.currency || 'SMS',
+        countries: data.data.countries,
+        data: data.data
+      });
+    }
+    return res.json({
+      success: false,
+      balance: 0,
+      message: data?.message || 'Imeshindikana kusoma salio toka SwalaSMS',
+      data
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, balance: 0, error: err?.message });
+  }
+});
+
+app.post('/api/v1/sms/config', (req, res) => {
+  const { senderId, apiKey, enabled } = req.body;
+  smsGatewayConfig.provider = 'swalasms';
+  if (senderId) smsGatewayConfig.senderId = String(senderId).trim().toUpperCase();
+  if (apiKey !== undefined) smsGatewayConfig.apiKey = String(apiKey).trim();
+  if (typeof enabled === 'boolean') smsGatewayConfig.enabled = enabled;
+
+  console.log('[SwalaSMS Config Updated]:', {
+    provider: 'swalasms',
+    senderId: smsGatewayConfig.senderId,
+    hasApiKey: Boolean(smsGatewayConfig.apiKey)
+  });
+
+  return res.json({ success: true, config: smsGatewayConfig });
+});
+
+app.post('/api/v1/sms/test-send', async (req, res) => {
+  const { phone, message } = req.body;
+  const targetPhone = phone || '0653578184';
+  const textToSend = message || `Asante kwa kujiunga na LEMA FAST WIFI! Vocha yako ni: 8492. Kifurushi: Masaa 24. Msaada piga 0653578184.`;
+  const result = await sendSmsMessage(targetPhone, textToSend);
+  return res.json({ success: true, targetPhone, result });
+});
+
 
 // Intelligent Bot Responder Logic
 function generateBotReply(rawText: string, senderName: string, phone: string): string {
@@ -852,6 +1027,10 @@ _Asante kwa kutumia Lema Fast WiFi! Msaada: 0653 578 184._`;
 
     await sendWhatsAppMessage(international, waText);
 
+    // Send GSM SMS with voucher code via SwalaSMS / Beem
+    const smsText = `Asante kwa kujiunga na LEMA FAST WIFI! Vocha yako ni: ${voucherCode}. Kifurushi: ${order?.packageName || 'Intaneti'}. Msaada piga 0653578184.`;
+    await sendSmsMessage(phoneToNotify, smsText);
+
     return res.status(200).json({ status: 'success', message: 'Malipo yamepokelewa na vocha imezalishwa' });
   }
 
@@ -876,7 +1055,7 @@ app.post('/api/v1/payments/simulate-confirm', async (req, res) => {
   order.reference = `STK-${Math.floor(100000 + Math.random() * 900000)}TZ`;
   order.completedAt = new Date().toISOString();
 
-  // Send WhatsApp message if phone provided
+  // Send WhatsApp and SMS message if phone provided
   if (order.phone) {
     const { international } = normalizeTzPhone(order.phone);
     const waText = `🎉 *LEMA FAST WIFI - THIBITISHO LA MALIPO*
@@ -889,6 +1068,9 @@ Malipo yako ya *TZS ${order.amount.toLocaleString()}* yamethibitishwa!
 Ingiza tarakimu hizi: *${voucherCode}* kwenye mtandao wa *Lema Fast WiFi* kuanza kutumia mara moja.`;
 
     await sendWhatsAppMessage(international, waText);
+
+    const smsText = `Asante kwa kujiunga na LEMA FAST WIFI! Vocha yako ni: ${voucherCode}. Kifurushi: ${order.packageName}. Msaada: 0653578184.`;
+    await sendSmsMessage(order.phone, smsText);
   }
 
   return res.json({

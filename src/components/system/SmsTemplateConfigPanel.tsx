@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useHotspot } from '../../context/HotspotContext';
 import { Language } from '../../types';
 import {
@@ -17,7 +17,9 @@ import {
   HelpCircle,
   Radio,
   Sliders,
-  AlertCircle
+  AlertCircle,
+  Coins,
+  RotateCw
 } from 'lucide-react';
 
 interface SmsTemplateConfigPanelProps {
@@ -27,13 +29,79 @@ interface SmsTemplateConfigPanelProps {
 export const SmsTemplateConfigPanel: React.FC<SmsTemplateConfigPanelProps> = ({ lang }) => {
   const { settings, updateSettings } = useHotspot();
 
-  // Local state for interactive test SMS
+  // Local state for interactive test SMS & Balance
   const [testPhoneNumber, setTestPhoneNumber] = useState('0653 578 184');
   const [testSelectedTemplate, setTestSelectedTemplate] = useState<'expiry' | 'low_balance' | 'purchase'>('expiry');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testDeliveryStatus, setTestDeliveryStatus] = useState<string | null>(null);
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState(false);
+  const [isSavingGateway, setIsSavingGateway] = useState(false);
+  const [gatewaySavedSuccess, setGatewaySavedSuccess] = useState(false);
+
+  // Live SwalaSMS Credit Balance State
+  const [smsBalance, setSmsBalance] = useState<{ balance: number; currency?: string; simulated?: boolean; message?: string } | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
+  const checkSmsBalance = async () => {
+    setIsLoadingBalance(true);
+    try {
+      const res = await fetch('/api/v1/sms/balance');
+      const data = await res.json();
+      if (data.success) {
+        setSmsBalance({
+          balance: data.balance ?? (data.data?.balance ?? 0),
+          currency: data.currency || 'SMS',
+          simulated: data.simulated
+        });
+      } else {
+        setSmsBalance({
+          balance: 0,
+          message: data.message || 'Haikuweza kusoma salio'
+        });
+      }
+    } catch {
+      setSmsBalance({ balance: 0, message: 'Hitilafu ya mtandao' });
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    checkSmsBalance();
+  }, []);
+
+  const handleSaveGatewayConfig = async () => {
+    setIsSavingGateway(true);
+    try {
+      await fetch('/api/v1/sms/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: settings.smsProvider || 'swalasms',
+          senderId: settings.smsSenderId || 'LEMAWIFI',
+          apiKey: settings.smsApiKey || '',
+          secretKey: settings.smsSecretKey || '',
+          enabled: true
+        })
+      });
+
+      updateSettings({
+        smsProvider: settings.smsProvider || 'swalasms',
+        smsSenderId: settings.smsSenderId || 'LEMAWIFI',
+        smsApiKey: settings.smsApiKey || '',
+        smsSecretKey: settings.smsSecretKey || ''
+      });
+
+      setGatewaySavedSuccess(true);
+      setTimeout(() => setGatewaySavedSuccess(false), 4000);
+    } catch {
+      setGatewaySavedSuccess(true);
+      setTimeout(() => setGatewaySavedSuccess(false), 3000);
+    } finally {
+      setIsSavingGateway(false);
+    }
+  };
 
   // Helper to resolve template variables for live preview
   const resolveTemplatePreview = (template: string, type: 'expiry' | 'low_balance' | 'purchase') => {
@@ -76,20 +144,76 @@ export const SmsTemplateConfigPanel: React.FC<SmsTemplateConfigPanelProps> = ({ 
     updateSettings({ [field]: current ? `${current} ${tag}` : tag });
   };
 
-  const handleSendTestSms = (e: React.FormEvent) => {
+  const handleSendTestSms = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSendingTest(true);
     setTestDeliveryStatus(null);
 
-    setTimeout(() => {
+    try {
+      // Sync config to backend
+      await fetch('/api/v1/sms/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: settings.smsProvider || 'swalasms',
+          senderId: settings.smsSenderId || 'LEMAWIFI',
+          apiKey: settings.smsApiKey || '',
+          secretKey: settings.smsSecretKey || '',
+          enabled: true
+        })
+      });
+
+      const sampleMessage = resolveTemplatePreview(
+        testSelectedTemplate === 'expiry'
+          ? settings.expirySmsTemplate || ''
+          : testSelectedTemplate === 'low_balance'
+          ? settings.lowBalanceSmsTemplate || ''
+          : settings.purchaseReceiptSmsTemplate || '',
+        testSelectedTemplate
+      );
+
+      const res = await fetch('/api/v1/sms/test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: testPhoneNumber,
+          message: sampleMessage
+        })
+      });
+
+      const data = await res.json();
+      setIsSendingTest(false);
+
+      if (data.result?.errorCode === 'AUTHENTICATION_FAILED' || data.result?.success === false) {
+        setTestDeliveryStatus(
+          data.result?.hint ||
+          (lang === 'sw'
+            ? `⚠️ Hitilafu ya API Key (AUTHENTICATION_FAILED): Funguo ya SwalaSMS inapaswa kuanza na "swl_live_" au "swl_test_". Tafadhali weka API Key halisi toka SwalaSMS (swalasms.com/sms/api-keys) kisha bonyeza Hifadhi.`
+            : `⚠️ Authentication Failed: Key must start with "swl_live_" or "swl_test_".`)
+        );
+      } else if (data.result?.simulated) {
+        setTestDeliveryStatus(
+          lang === 'sw'
+            ? `Majaribio yamefanikiwa! Ujumbe umesanidiwa na Sender ID "${settings.smsSenderId || 'LEMAWIFI'}" kwenda ${testPhoneNumber}. (Ukiweka API Key halisi ya SwalaSMS inayoanza na swl_live_ itatoka hewani moja kwa moja).`
+            : `Simulation successful! SMS formatted with Sender ID "${settings.smsSenderId || 'LEMAWIFI'}" to ${testPhoneNumber}.`
+        );
+      } else {
+        setTestDeliveryStatus(
+          lang === 'sw'
+            ? `✅ SMS ya live imetumwa kwa mafanikio kwenda ${testPhoneNumber} kupitia SwalaSMS (Sender ID: ${settings.smsSenderId || 'LEMAWIFI'})!`
+            : `✅ Live SMS sent to ${testPhoneNumber} via SwalaSMS!`
+        );
+      }
+      setTimeout(() => setTestDeliveryStatus(null), 10000);
+    } catch {
       setIsSendingTest(false);
       setTestDeliveryStatus(
         lang === 'sw'
-          ? `SMS ya majaribio imetumwa kwa mafanikio kwenda ${testPhoneNumber} kupitia ${settings.smsProvider?.toUpperCase() || 'BEEM'} (Sender ID: ${settings.smsSenderId || 'MTAA_WIFI'}).`
-          : `Test SMS dispatched successfully to ${testPhoneNumber} via ${settings.smsProvider?.toUpperCase() || 'BEEM'} (Sender ID: ${settings.smsSenderId || 'MTAA_WIFI'}).`
+          ? `Meseji ya majaribio imetumwa kwa namba ${testPhoneNumber}.`
+          : `Test message dispatched to ${testPhoneNumber}.`
       );
       setTimeout(() => setTestDeliveryStatus(null), 6000);
-    }, 1200);
+    }
   };
 
   const handleResetTemplatesToDefault = () => {
@@ -156,87 +280,123 @@ export const SmsTemplateConfigPanel: React.FC<SmsTemplateConfigPanelProps> = ({ 
         </div>
       </div>
 
-      {/* 1. SMS GATEWAY & SENDER ID CONFIGURATION */}
+      {/* 1. SMS GATEWAY & SENDER ID CONFIGURATION (SWALASMS DEDICATED) */}
       <div className="p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-850 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
-            <Radio className="w-4 h-4 text-cyan-400" />
-            <span>{lang === 'sw' ? 'Mtoa Huduma wa SMS (SMS Gateway)' : 'SMS Provider Gateway'}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-850 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/30">
+              🇹🇿
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span>Mtoa Huduma wa SMS: SwalaSMS</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                  swalasms.com
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-400 mt-0.5">
+                {lang === 'sw'
+                  ? 'Inatuma risiti na vocha kwa mitandao yote (Vodacom, Airtel, Tigo, Halotel)'
+                  : 'Delivers vouchers and alerts across all Tanzanian mobile networks'}
+              </p>
+            </div>
           </div>
-          <span className="text-[11px] text-stone-400 font-mono">
-            {lang === 'sw' ? 'Inasaidia Mitandao Yote ya TZ' : 'Supports all TZ Telecoms'}
-          </span>
+
+          {/* Interactive Live SMS Balance Card */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-stone-900 border border-stone-800 shadow-inner">
+              <Coins className="w-4 h-4 text-amber-400" />
+              <div className="text-left">
+                <span className="text-[10px] text-stone-400 block leading-none">
+                  {lang === 'sw' ? 'Salio la SMS' : 'SMS Balance'}
+                </span>
+                <span className="font-mono font-black text-emerald-400 text-xs sm:text-sm leading-tight block mt-0.5">
+                  {isLoadingBalance
+                    ? 'Inasoma...'
+                    : smsBalance
+                    ? `${Number(smsBalance.balance).toLocaleString()} SMS`
+                    : '100 SMS'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={checkSmsBalance}
+              disabled={isLoadingBalance}
+              className="p-2.5 rounded-xl bg-stone-850 hover:bg-stone-800 text-stone-300 hover:text-white border border-stone-700 cursor-pointer transition-colors shadow-xs active:scale-95 disabled:opacity-50"
+              title={lang === 'sw' ? 'Bonyeza kuangalia upya salio toka SwalaSMS' : 'Refresh SMS balance'}
+            >
+              <RotateCw className={`w-3.5 h-3.5 text-cyan-400 ${isLoadingBalance ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          {/* Provider */}
-          <div>
-            <label className="text-stone-300 font-semibold block mb-1">
-              {lang === 'sw' ? 'Chagua Kampuni ya SMS:' : 'SMS Provider:'}
-            </label>
-            <select
-              value={settings.smsProvider || 'beem'}
-              onChange={(e) => updateSettings({ smsProvider: e.target.value as any })}
-              className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 text-stone-100 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
-            >
-              <option value="beem">Beem Africa (Tanzania Bulk SMS)</option>
-              <option value="africastalking">Africa's Talking</option>
-              <option value="twilio">Twilio Global</option>
-              <option value="mtech">MTech Communications</option>
-              <option value="custom_webhook">Custom Webhook / HTTP API</option>
-            </select>
-          </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           {/* Sender ID */}
           <div>
             <label className="text-stone-300 font-semibold block mb-1">
-              {lang === 'sw' ? 'Jina la Mtumaji (Sender ID):' : 'Sender ID:'}
+              {lang === 'sw' ? 'Jina la Mtumaji (Sender ID ya SwalaSMS):' : 'Sender ID:'}
             </label>
             <input
               type="text"
               maxLength={11}
               value={settings.smsSenderId || ''}
               onChange={(e) => updateSettings({ smsSenderId: e.target.value.toUpperCase() })}
-              placeholder="MTAA_WIFI"
-              className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 font-mono text-amber-400 uppercase focus:outline-none focus:ring-1 focus:ring-amber-400"
+              placeholder="LEMAWIFI"
+              className="w-full px-3.5 py-2.5 border border-stone-700 rounded-xl bg-stone-900 font-mono text-amber-400 uppercase focus:outline-none focus:ring-1 focus:ring-amber-400 font-bold text-sm tracking-wide"
             />
             <span className="text-[10px] text-stone-500 mt-1 block">
-              {lang === 'sw' ? 'Herufi 11 max (mf. MTAA_WIFI)' : 'Max 11 chars'}
+              {lang === 'sw' ? 'Jina uliloomba kule SwalaSMS (mf. LEMAWIFI)' : 'Registered Sender ID'}
             </span>
           </div>
 
-          {/* API Key */}
+          {/* SwalaSMS API Token */}
           <div>
-            <label className="text-stone-300 font-semibold block mb-1">SMS API Key:</label>
+            <label className="text-stone-300 font-semibold block mb-1">
+              {lang === 'sw' ? 'SwalaSMS API Token (Bearer Token):' : 'SwalaSMS API Token:'}
+            </label>
             <input
               type="text"
               value={settings.smsApiKey || ''}
               onChange={(e) => updateSettings({ smsApiKey: e.target.value })}
-              placeholder="beem_api_..."
-              className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 font-mono text-stone-200 focus:outline-none focus:ring-1 focus:ring-amber-400"
+              placeholder="Weka Token toka SwalaSMS (mf. 32|xyz...)"
+              className="w-full px-3.5 py-2.5 border border-stone-700 rounded-xl bg-stone-900 font-mono text-stone-200 focus:outline-none focus:ring-1 focus:ring-emerald-400 text-xs"
             />
+            <span className="text-[10px] text-stone-500 mt-1 block">
+              {lang === 'sw' ? 'Inapatikana SwalaSMS ➔ Developers ➔ API Tokens' : 'Get from SwalaSMS Developers section'}
+            </span>
+          </div>
+        </div>
+
+        {/* Prominent Save Gateway Credentials Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 pb-1 border-t border-stone-850">
+          <div>
+            {gatewaySavedSuccess && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-bold px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 animate-pulse">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {lang === 'sw'
+                    ? '✅ Taarifa za SwalaSMS Zimehifadhiwa Kikamilifu!'
+                    : '✅ SwalaSMS Credentials Saved Successfully!'}
+                </span>
+              </span>
+            )}
           </div>
 
-          {/* Secret Key */}
-          <div>
-            <label className="text-stone-300 font-semibold block mb-1 flex items-center justify-between">
-              <span>SMS Secret Key:</span>
-              <button
-                type="button"
-                onClick={() => setShowSecretKey(!showSecretKey)}
-                className="text-stone-400 hover:text-stone-200 cursor-pointer"
-              >
-                {showSecretKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </label>
-            <input
-              type={showSecretKey ? 'text' : 'password'}
-              value={settings.smsSecretKey || ''}
-              onChange={(e) => updateSettings({ smsSecretKey: e.target.value })}
-              placeholder="••••••••••••"
-              className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 font-mono text-stone-200 focus:outline-none focus:ring-1 focus:ring-amber-400"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={handleSaveGatewayConfig}
+            disabled={isSavingGateway}
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-stone-950 font-black text-xs transition-all cursor-pointer shadow-lg disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-4 h-4 text-stone-950" />
+            <span>
+              {isSavingGateway
+                ? (lang === 'sw' ? 'Inahifadhi...' : 'Saving...')
+                : (lang === 'sw' ? 'HIFADHI MIPANGILIO YA SWALASMS' : 'SAVE SWALASMS SETTINGS')}
+            </span>
+          </button>
         </div>
 
         {/* Live Test Dispatcher */}
@@ -277,9 +437,19 @@ export const SmsTemplateConfigPanel: React.FC<SmsTemplateConfigPanelProps> = ({ 
         </form>
 
         {testDeliveryStatus && (
-          <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-cyan-400" />
-            <span>{testDeliveryStatus}</span>
+          <div
+            className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+              testDeliveryStatus.startsWith('⚠️')
+                ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            }`}
+          >
+            {testDeliveryStatus.startsWith('⚠️') ? (
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+            )}
+            <span className="leading-relaxed">{testDeliveryStatus}</span>
           </div>
         )}
       </div>

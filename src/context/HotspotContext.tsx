@@ -89,10 +89,10 @@ const DEFAULT_SETTINGS: HotspotSettings = {
   packages: DEFAULT_PACKAGES,
   adminUsername: 'admin',
   adminPassword: 'admin123',
-  smsProvider: 'beem',
-  smsSenderId: 'LEMA_WIFI',
-  smsApiKey: 'beem_api_993410',
-  smsSecretKey: 'beem_sec_778120',
+  smsProvider: 'swalasms',
+  smsSenderId: 'LEMAWIFI',
+  smsApiKey: '',
+  smsSecretKey: '',
   enableExpirySms: true,
   expiryWarningMinutes: 15,
   expirySmsTemplate: 'Habari! Vocha yako ya {KIFURUSHI} kwenye {WIFI_NAME} inamalizika baada ya dakika {DAKIKA}. Bonyeza {PORTAL_URL} kuongeza muda sasa kwa M-Pesa.',
@@ -189,6 +189,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
           payoutMethod: parsed.payoutMethod || DEFAULT_SETTINGS.payoutMethod,
           payoutFrequency: parsed.payoutFrequency || DEFAULT_SETTINGS.payoutFrequency,
           payoutBankName: parsed.payoutBankName || DEFAULT_SETTINGS.payoutBankName,
+          smsProvider: 'swalasms',
+          smsSenderId: (parsed.smsSenderId && parsed.smsSenderId !== 'MTAA_WIFI' && parsed.smsSenderId !== 'LEMA_WIFI') ? parsed.smsSenderId : 'LEMAWIFI',
+          smsApiKey: (parsed.smsApiKey && !parsed.smsApiKey.startsWith('beem_')) ? parsed.smsApiKey : '',
+          smsSecretKey: '',
         };
       }
     } catch (e) {

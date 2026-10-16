@@ -116,8 +116,8 @@ export interface HotspotSettings {
   adminUsername?: string;
   adminPassword?: string;
 
-  // Automated SMS Notifications & Templates
-  smsProvider?: 'beem' | 'africastalking' | 'twilio' | 'mtech' | 'custom_webhook';
+  // Automated SMS Notifications & Templates (SwalaSMS Official)
+  smsProvider?: 'swalasms';
   smsSenderId?: string;
   smsApiKey?: string;
   smsSecretKey?: string;
