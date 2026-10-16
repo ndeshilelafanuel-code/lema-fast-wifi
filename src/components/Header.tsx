@@ -11,7 +11,9 @@ import {
   LayoutDashboard,
   Smartphone,
   Home,
-  Lock
+  Lock,
+  Sparkles,
+  Building2
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -88,6 +90,18 @@ export const Header: React.FC<HeaderProps> = ({
               <Lock className="w-3.5 h-3.5" />
               <span>{lang === 'sw' ? 'Admin' : 'Admin'}</span>
             </button>
+
+            <button
+              onClick={() => onViewChange('super-admin')}
+              className={`flex items-center gap-1.5 px-3 py-1 font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                appView === 'super-admin'
+                  ? 'bg-purple-500 text-white shadow-xs'
+                  : 'text-purple-300 hover:text-white hover:bg-purple-950/40'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>{lang === 'sw' ? 'Uza Mfumo (SaaS)' : 'SaaS Reseller'}</span>
+            </button>
           </div>
         </div>
 
@@ -150,6 +164,14 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               Portal
+            </button>
+            <button
+              onClick={() => onViewChange('super-admin')}
+              className={`px-2 py-1 rounded font-bold ${
+                appView === 'super-admin' ? 'bg-purple-500 text-white' : 'text-purple-300'
+              }`}
+            >
+              SaaS
             </button>
           </div>
 

@@ -13,19 +13,22 @@ import {
   Wifi,
   Sparkles,
   AlertCircle,
-  Home
+  Home,
+  Gift
 } from 'lucide-react';
 
 interface AdminLoginProps {
   lang: Language;
   onSuccess: () => void;
   onBackToHome: () => void;
+  onOpenSelfOnboarding?: () => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({
   lang,
   onSuccess,
   onBackToHome,
+  onOpenSelfOnboarding
 }) => {
   const { settings } = useHotspot();
   const [username, setUsername] = useState('');
@@ -185,6 +188,28 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
               : 'You can customize your admin credentials anytime inside Dashboard ➔ Settings tab.'}
           </p>
         </div>
+
+        {/* Self-Onboarding for new venue/hotspot owners */}
+        {onOpenSelfOnboarding && (
+          <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 flex items-center justify-between gap-3 text-xs">
+            <div className="space-y-0.5">
+              <span className="font-bold text-white flex items-center gap-1.5 text-[11px]">
+                <Gift className="w-3.5 h-3.5 text-amber-400" />
+                <span>Mmiliki Mpya wa Hotspot?</span>
+              </span>
+              <p className="text-[10px] text-purple-300">
+                Pata akaunti yako & siku 14 za bure bila malipo ya awali.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenSelfOnboarding}
+              className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shrink-0 cursor-pointer transition-all shadow-sm"
+            >
+              Jisajili Hapa
+            </button>
+          </div>
+        )}
 
         {/* Back to Home Link */}
         <div className="text-center pt-1 border-t border-stone-800">

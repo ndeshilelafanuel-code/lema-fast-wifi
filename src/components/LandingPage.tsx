@@ -23,7 +23,8 @@ import {
   Sparkles,
   Signal,
   ShieldAlert,
-  Server
+  Server,
+  Gift
 } from 'lucide-react';
 import heroWifiSceneImg from '../assets/images/hero_wifi_scene_1791617825078.jpg';
 import telecomTowerImg from '../assets/images/telecom_tower_antenna_1791617835995.jpg';
@@ -103,6 +104,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
                 >
                   <LayoutDashboard className="w-4 h-4 text-amber-400" />
                   <span>Fungua Admin Dashboard</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate('saas-onboarding')}
+                  className="px-6 py-4 rounded-xl bg-gradient-to-r from-purple-900/60 to-purple-800/60 hover:from-purple-800 hover:to-purple-700 text-purple-200 hover:text-white font-bold text-sm border border-purple-500/40 transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-purple-950/40"
+                >
+                  <Gift className="w-4 h-4 text-amber-300" />
+                  <span>Jisajili kama Mmiliki (Siku 14 Bure)</span>
                 </button>
 
                 <button
@@ -705,6 +715,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
               >
                 <LayoutDashboard className="w-4 h-4 text-amber-400" />
                 <span>Fungua Admin Dashboard</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('super-admin')}
+                className="px-5 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-600/30 active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-purple-200" />
+                <span>Uza Mfumo Huu (SaaS)</span>
               </button>
             </div>
           </div>

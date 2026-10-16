@@ -25,6 +25,8 @@ import { AdminDashboard } from './components/system/AdminDashboard';
 import { CustomerPortal } from './components/system/CustomerPortal';
 import { AdminLogin } from './components/system/AdminLogin';
 import { LandingPage } from './components/LandingPage';
+import { SaasResellerModule } from './components/system/SaasResellerModule';
+import { ClientSelfOnboarding } from './components/system/ClientSelfOnboarding';
 
 export default function App() {
   const [lang, setLang] = useState<Language>('sw');
@@ -100,6 +102,7 @@ export default function App() {
                 lang={lang}
                 onSuccess={() => setIsAdminLoggedIn(true)}
                 onBackToHome={() => setAppView('landing')}
+                onOpenSelfOnboarding={() => setAppView('saas-onboarding')}
               />
             ) : (
               <AdminDashboard
@@ -118,6 +121,27 @@ export default function App() {
 
           {appView === 'customer-portal' && (
             <CustomerPortal lang={lang} />
+          )}
+
+          {appView === 'super-admin' && (
+            <SaasResellerModule
+              lang={lang}
+              onOpenCustomerPortal={() => setAppView('customer-portal')}
+              onBackToDashboard={() => setAppView('admin-dashboard')}
+              onOpenSelfOnboarding={() => setAppView('saas-onboarding')}
+            />
+          )}
+
+          {appView === 'saas-onboarding' && (
+            <ClientSelfOnboarding
+              lang={lang}
+              onBackToHome={() => setAppView('landing')}
+              onOpenDashboard={() => {
+                setIsAdminLoggedIn(true);
+                localStorage.setItem('hotspot_admin_auth', 'true');
+                setAppView('admin-dashboard');
+              }}
+            />
           )}
 
           {appView === 'guide' && (

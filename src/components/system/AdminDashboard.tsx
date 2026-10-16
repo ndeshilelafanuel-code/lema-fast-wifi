@@ -308,6 +308,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     disconnectSession,
     resetDemoData,
     currentClientSession,
+    activeTenant,
+    renewTenantSubscription,
   } = useHotspot();
 
   // Active navigation tab (matching exactly RodLink and Wotefy modules!)
@@ -1353,6 +1355,68 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* 1. MODULE: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn text-[#3a3431] font-sans pb-10">
+            
+            {/* SaaS CLIENT SUBSCRIPTION & HOTSPOT IDENTIFIER BANNER */}
+            {activeTenant && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white border border-stone-700/80 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center font-black text-lg shrink-0">
+                    🏢
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-stone-400 font-medium">Kituo cha Hotspot:</span>
+                      <strong className="text-sm sm:text-base font-black text-white">{activeTenant.businessName}</strong>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-300 font-bold border border-purple-500/40 uppercase">
+                        {activeTenant.subscription.planName}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-300 mt-0.5">
+                      Mmiliki: <strong className="text-amber-400">{activeTenant.ownerName}</strong> ({activeTenant.ownerPhone}) • Eneo: {activeTenant.locationArea}, {activeTenant.locationCity}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="text-left md:text-right">
+                    <p className="text-[10px] text-stone-400">Ada ya Mwezi & Tarehe ya Bili</p>
+                    <p className="text-xs font-bold text-amber-300">
+                      Tsh {activeTenant.subscription.monthlyFee.toLocaleString()} / Tarehe {activeTenant.subscription.nextBillingDate}
+                    </p>
+                  </div>
+
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                    activeTenant.subscription.status === 'active'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : activeTenant.subscription.status === 'due'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : activeTenant.subscription.status === 'trial'
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                      : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  }`}>
+                    {activeTenant.subscription.status === 'active' && `🟢 Leseni Ipo Hewani (${activeTenant.subscription.daysRemaining}d)`}
+                    {activeTenant.subscription.status === 'due' && '🟡 Bili Imeiva (Lipa Sasa)'}
+                    {activeTenant.subscription.status === 'trial' && '🔵 Free Trial (Jaribio)'}
+                    {activeTenant.subscription.status === 'suspended' && '🔴 Mfumo Umezimwa'}
+                  </span>
+
+                  {activeTenant.subscription.status !== 'active' && (
+                    <button
+                      onClick={() => {
+                        if (renewTenantSubscription) {
+                          renewTenantSubscription(activeTenant.id, 1);
+                          showToast('Malipo Yamefanikiwa', `Leseni ya ${activeTenant.businessName} imeongezwa siku 30 mbele!`, 'success');
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                      <span>Lipia Mwezi Huu (STK)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* 2. ACCESS POINT FILTER BAR */}
             <div className="bg-[#f5f2eb] border border-[#e6e2d3] rounded-2xl p-2.5 flex items-center justify-between gap-4">

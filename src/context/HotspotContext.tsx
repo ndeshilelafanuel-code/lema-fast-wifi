@@ -7,6 +7,7 @@ import {
   HotspotSettings,
   NetworkTower,
   HotspotAdvertisement,
+  HotspotTenant,
 } from '../types';
 
 interface HotspotContextType {
@@ -36,6 +37,16 @@ interface HotspotContextType {
   reconnectByReference: (refNo: string) => { success: boolean; message: string; session?: ActiveSession };
   resetDemoData: () => void;
   currentClientSession: ActiveSession | null;
+  // Multi-Tenant SaaS Platform
+  tenants: HotspotTenant[];
+  activeTenantId: string;
+  activeTenant: HotspotTenant;
+  switchTenant: (tenantId: string) => void;
+  addTenant: (tenantData: Omit<HotspotTenant, 'id' | 'createdAt'>) => HotspotTenant;
+  updateTenant: (id: string, updates: Partial<HotspotTenant>) => void;
+  deleteTenant: (id: string) => void;
+  renewTenantSubscription: (id: string, months?: number, ref?: string) => void;
+  toggleTenantStatus: (id: string) => void;
 }
 
 const DEFAULT_PACKAGES: HotspotPackage[] = [
@@ -171,6 +182,141 @@ const DEFAULT_ADS: HotspotAdvertisement[] = [
   }
 ];
 
+const DEFAULT_TENANTS: HotspotTenant[] = [
+  {
+    id: 'tenant-lema-hq',
+    subdomain: 'lema',
+    businessName: 'Lema Fast WiFi (HQ Pilot)',
+    ownerName: 'Jimmy Lema',
+    ownerPhone: '0653 578 184',
+    locationCity: 'Dar es Salaam',
+    locationArea: 'Sinza Mori',
+    brandColor: '#cca43b',
+    tagline: 'Intaneti ya Kasi ya Fiber & Starlink',
+    routerType: 'mikrotik',
+    routerIpOrHost: '192.168.88.1',
+    payoutAccount: '5849201',
+    payoutMethod: 'lipa_namba',
+    accountOwnerName: 'Jimmy Lema',
+    subscription: {
+      id: 'sub-101',
+      plan: 'pro',
+      planName: 'Business Pro Tier (Hotspot 3)',
+      monthlyFee: 50000,
+      status: 'active',
+      startDate: '2026-10-01',
+      nextBillingDate: '2026-11-01',
+      daysRemaining: 16,
+      autoRenew: true,
+      maxRouters: 3,
+      maxConcurrentUsers: 250,
+      lastPaymentDate: '2026-10-01',
+      lastPaymentRef: 'MP261001LEMA'
+    },
+    settings: DEFAULT_SETTINGS,
+    createdAt: '2026-10-01T08:00:00Z'
+  },
+  {
+    id: 'tenant-samaki',
+    subdomain: 'samaki',
+    businessName: 'Samaki Samaki Lounge WiFi',
+    ownerName: 'Benson Mtui',
+    ownerPhone: '0754 889 120',
+    locationCity: 'Dar es Salaam',
+    locationArea: 'Masaki & City Mall',
+    brandColor: '#3b82f6',
+    tagline: 'High Speed WiFi for Lounge Guests',
+    routerType: 'mikrotik',
+    routerIpOrHost: '192.168.89.1',
+    payoutAccount: '6749001',
+    payoutMethod: 'lipa_namba',
+    accountOwnerName: 'Benson Mtui',
+    subscription: {
+      id: 'sub-102',
+      plan: 'enterprise',
+      planName: 'Enterprise Tier (Matawi Mengi)',
+      monthlyFee: 100000,
+      status: 'active',
+      startDate: '2026-10-05',
+      nextBillingDate: '2026-11-05',
+      daysRemaining: 20,
+      autoRenew: true,
+      maxRouters: 6,
+      maxConcurrentUsers: 600,
+      lastPaymentDate: '2026-10-05',
+      lastPaymentRef: 'TG261005SAMAKI'
+    },
+    settings: DEFAULT_SETTINGS,
+    createdAt: '2026-10-05T10:00:00Z'
+  },
+  {
+    id: 'tenant-hostel',
+    subdomain: 'chuo',
+    businessName: 'Chuo Kikuu Student Hostel WiFi',
+    ownerName: 'Daniel Mushi',
+    ownerPhone: '0782 441 900',
+    locationCity: 'Arusha',
+    locationArea: 'Njiro Complex',
+    brandColor: '#10b981',
+    tagline: 'Bando Nafuu la Wanafunzi 24/7',
+    routerType: 'mikrotik',
+    routerIpOrHost: '192.168.90.1',
+    payoutAccount: '0782441900',
+    payoutMethod: 'mobile_phone',
+    accountOwnerName: 'Daniel Mushi',
+    subscription: {
+      id: 'sub-103',
+      plan: 'pro',
+      planName: 'Business Pro Tier (Hotspot 3)',
+      monthlyFee: 50000,
+      status: 'due',
+      startDate: '2026-09-17',
+      nextBillingDate: '2026-10-17',
+      daysRemaining: 1,
+      autoRenew: true,
+      maxRouters: 3,
+      maxConcurrentUsers: 300,
+      lastPaymentDate: '2026-09-17',
+      lastPaymentRef: 'AR260917HOSTEL'
+    },
+    settings: DEFAULT_SETTINGS,
+    createdAt: '2026-09-17T12:00:00Z'
+  },
+  {
+    id: 'tenant-glamour',
+    subdomain: 'glamour',
+    businessName: 'Glamour Touch Executive Salon & Barbershop',
+    ownerName: 'Fatuma Bakari',
+    ownerPhone: '0655 312 884',
+    locationCity: 'Mwanza',
+    locationArea: 'Nyamagana Mjini',
+    brandColor: '#ec4899',
+    tagline: 'Free 15-min WiFi & Fast Vocha',
+    routerType: 'ruijie',
+    routerIpOrHost: '192.168.91.1',
+    payoutAccount: '0655312884',
+    payoutMethod: 'mobile_phone',
+    accountOwnerName: 'Fatuma Bakari',
+    subscription: {
+      id: 'sub-104',
+      plan: 'starter',
+      planName: 'Starter Tier (Hotspot 1)',
+      monthlyFee: 30000,
+      status: 'trial',
+      startDate: '2026-10-12',
+      nextBillingDate: '2026-10-26',
+      daysRemaining: 10,
+      autoRenew: false,
+      maxRouters: 1,
+      maxConcurrentUsers: 80,
+      lastPaymentDate: '2026-10-12',
+      lastPaymentRef: 'FREE-TRIAL-14D'
+    },
+    settings: DEFAULT_SETTINGS,
+    createdAt: '2026-10-12T14:00:00Z'
+  }
+];
+
 const HotspotContext = createContext<HotspotContextType | undefined>(undefined);
 
 export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -268,6 +414,33 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {}
     return DEFAULT_ADS;
   });
+
+  // Multi-Tenant SaaS Platform State
+  const [tenants, setTenants] = useState<HotspotTenant[]>(() => {
+    try {
+      const saved = localStorage.getItem('wifi_hotspot_tenants');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {}
+    return DEFAULT_TENANTS;
+  });
+
+  const [activeTenantId, setActiveTenantId] = useState<string>(() => {
+    const saved = localStorage.getItem('wifi_active_tenant_id');
+    return saved || 'tenant-lema-hq';
+  });
+
+  const activeTenant = tenants.find((t) => t.id === activeTenantId) || tenants[0] || DEFAULT_TENANTS[0];
+
+  // Save tenants to localStorage
+  useEffect(() => {
+    localStorage.setItem('wifi_hotspot_tenants', JSON.stringify(tenants));
+  }, [tenants]);
+
+  useEffect(() => {
+    localStorage.setItem('wifi_active_tenant_id', activeTenantId);
+  }, [activeTenantId]);
 
   // Save to localStorage whenever state changes
   useEffect(() => {
@@ -637,6 +810,71 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAds((prev) => prev.map((a) => (a.id === id ? { ...a, clicks: (a.clicks || 0) + 1 } : a)));
   };
 
+  const switchTenant = (tenantId: string) => {
+    setActiveTenantId(tenantId);
+    const target = tenants.find((t) => t.id === tenantId);
+    if (target) {
+      setSettings(target.settings);
+    }
+  };
+
+  const addTenant = (tenantData: Omit<HotspotTenant, 'id' | 'createdAt'>): HotspotTenant => {
+    const newTenant: HotspotTenant = {
+      ...tenantData,
+      id: `tenant-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    setTenants((prev) => [newTenant, ...prev]);
+    return newTenant;
+  };
+
+  const updateTenant = (id: string, updates: Partial<HotspotTenant>) => {
+    setTenants((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+  };
+
+  const deleteTenant = (id: string) => {
+    setTenants((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const renewTenantSubscription = (id: string, months: number = 1, ref?: string) => {
+    setTenants((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const now = new Date();
+        const currentNext = new Date(t.subscription.nextBillingDate);
+        const baseDate = currentNext > now ? currentNext : now;
+        const newBillingDate = new Date(baseDate.getTime() + months * 30 * 24 * 3600 * 1000);
+        return {
+          ...t,
+          subscription: {
+            ...t.subscription,
+            status: 'active',
+            nextBillingDate: newBillingDate.toISOString().split('T')[0],
+            daysRemaining: Math.max(1, Math.ceil((newBillingDate.getTime() - now.getTime()) / (24 * 3600 * 1000))),
+            lastPaymentDate: now.toISOString().split('T')[0],
+            lastPaymentRef: ref || `SUB-REN-${Date.now()}`
+          }
+        };
+      })
+    );
+  };
+
+  const toggleTenantStatus = (id: string) => {
+    setTenants((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const newStatus = t.subscription.status === 'suspended' ? 'active' : 'suspended';
+        return {
+          ...t,
+          subscription: {
+            ...t.subscription,
+            status: newStatus
+          }
+        };
+      })
+    );
+  };
+
   const resetDemoData = () => {
     setSettings(DEFAULT_SETTINGS);
     setVouchers(SEED_VOUCHERS);
@@ -644,6 +882,8 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActiveSessions(SEED_ACTIVE_SESSIONS);
     setTowers(DEFAULT_TOWERS);
     setAds(DEFAULT_ADS);
+    setTenants(DEFAULT_TENANTS);
+    setActiveTenantId('tenant-lema-hq');
     setCurrentClientSession(null);
     localStorage.clear();
   };
@@ -674,6 +914,15 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         reconnectByReference,
         resetDemoData,
         currentClientSession,
+        tenants,
+        activeTenantId,
+        activeTenant,
+        switchTenant,
+        addTenant,
+        updateTenant,
+        deleteTenant,
+        renewTenantSubscription,
+        toggleTenantStatus,
       }}
     >
       {children}

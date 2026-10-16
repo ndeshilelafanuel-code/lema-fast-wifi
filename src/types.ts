@@ -2,7 +2,7 @@ export type Language = 'sw' | 'en';
 
 export type SystemMode = 'standard' | 'ap-only';
 
-export type AppView = 'landing' | 'guide' | 'admin-dashboard' | 'customer-portal';
+export type AppView = 'landing' | 'guide' | 'admin-dashboard' | 'customer-portal' | 'super-admin' | 'saas-onboarding';
 
 export interface HotspotPackage {
   id: string;
@@ -177,4 +177,45 @@ export interface FaqItem {
   id: string;
   question: { sw: string; en: string };
   answer: { sw: string; en: string };
+}
+
+// Multi-Tenant SaaS Platform Types (Selling Hotspot Billing System to Multiple Clients)
+export type TenantSubscriptionStatus = 'active' | 'due' | 'suspended' | 'trial';
+export type TenantSubscriptionPlan = 'starter' | 'pro' | 'enterprise';
+
+export interface TenantSubscription {
+  id: string;
+  plan: TenantSubscriptionPlan;
+  planName: string;
+  monthlyFee: number; // e.g. 35,000 / 65,000 / 120,000 TZS
+  status: TenantSubscriptionStatus;
+  startDate: string;
+  nextBillingDate: string;
+  daysRemaining: number;
+  autoRenew: boolean;
+  maxRouters: number;
+  maxConcurrentUsers: number;
+  lastPaymentDate?: string;
+  lastPaymentRef?: string;
+}
+
+export interface HotspotTenant {
+  id: string; // e.g. "tenant-lema-hq", "tenant-glamour", "tenant-samaki"
+  subdomain: string; // e.g. "glamour", "samaki", "kijiji"
+  businessName: string; // e.g. "Glamour Touch Salon & Spa"
+  ownerName: string; // e.g. "Fatuma Juma"
+  ownerPhone: string; // e.g. "0754 123 456"
+  ownerEmail?: string;
+  locationCity: string; // e.g. "Arusha", "Dar es Salaam"
+  locationArea: string; // e.g. "Sinza Mori", "Kijenge"
+  brandColor?: string; // e.g. "#cca43b"
+  tagline?: string;
+  routerType: 'mikrotik' | 'omada' | 'ruijie' | 'generic';
+  routerIpOrHost?: string;
+  payoutAccount: string; // e.g. "5849201"
+  payoutMethod: 'lipa_namba' | 'bank' | 'mobile_phone';
+  accountOwnerName: string; // e.g. "Fatuma Juma"
+  subscription: TenantSubscription;
+  settings: HotspotSettings;
+  createdAt: string;
 }
