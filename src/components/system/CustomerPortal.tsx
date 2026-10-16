@@ -37,6 +37,7 @@ import {
 import { BandwidthVisualizationWidget } from './BandwidthVisualizationWidget';
 import { SpeedTestWidget } from './SpeedTestWidget';
 import { VoucherQrScannerModal } from './VoucherQrScannerModal';
+import { VoiceGuideModal } from './VoiceGuideModal';
 
 interface CustomerPortalProps {
   lang: Language;
@@ -154,6 +155,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const [simulatedDataLimitMb, setSimulatedDataLimitMb] = useState<number>(1000); // 1 GB allocation
   const [simulatedDataUsedMb, setSimulatedDataUsedMb] = useState<number>(0);
   const [isSpeakingVoice, setIsSpeakingVoice] = useState<boolean>(false);
+  const [showVoiceGuideModal, setShowVoiceGuideModal] = useState<boolean>(false);
   const [showAiPortalHelp, setShowAiPortalHelp] = useState<boolean>(false);
   const [showBandwidthVisualizer, setShowBandwidthVisualizer] = useState<boolean>(false);
   
@@ -364,32 +366,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   };
 
   const toggleVoiceGuide = () => {
-    if (isSpeakingVoice) {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      setIsSpeakingVoice(false);
-      return;
-    }
-
-    const narration =
-      lang === 'sw'
-        ? `Karibu kwenye mtandao wa Lema Fast WiFi. Kujihudumia ni rahisi: Chagua kifurushi chako hapo chini, kisha gusa kitufe cha Vodacom M-Pesa au Mixx by Yas, na weka namba yako ya simu. Baada ya kuweka namba yako ya siri ya mtandao, intaneti itawaka papo hapo bila kuhitaji nenosiri.`
-        : `Welcome to Lema Fast WiFi. Self-service is quick: Select your bundle, choose M-Pesa or Mixx by Yas, and enter your phone number to receive instant payment prompt.`;
-
-    if ('speechSynthesis' in window) {
-      setIsSpeakingVoice(true);
-      const utter = new SpeechSynthesisUtterance(narration);
-      utter.lang = lang === 'sw' ? 'sw-TZ' : 'en-US';
-      utter.rate = 0.92;
-      utter.pitch = 1.05;
-
-      utter.onend = () => setIsSpeakingVoice(false);
-      utter.onerror = () => setIsSpeakingVoice(false);
-
-      window.speechSynthesis.speak(utter);
-    } else {
-      setIsSpeakingVoice(true);
-      setTimeout(() => setIsSpeakingVoice(false), 5000);
-    }
+    setShowVoiceGuideModal(true);
   };
 
   // Live Expiry & Dynamic Data depletion thread
@@ -1937,6 +1914,15 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
           businessName={settings.hotspotName || 'LEMA FAST WiFi'}
         />
       )}
+
+      {/* Step-by-Step Interactive Voice Guide Modal */}
+      <VoiceGuideModal
+        isOpen={showVoiceGuideModal}
+        onClose={() => setShowVoiceGuideModal(false)}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        supportPhone={settings.supportPhone}
+        hotspotName={settings.hotspotName}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import jsQR from 'jsqr';
 import { Language } from '../types';
 import { LemaLogo } from './common/LemaLogo';
 import { VoucherQrScannerModal } from './system/VoucherQrScannerModal';
+import { VoiceGuideModal } from './system/VoiceGuideModal';
 import {
   Smartphone,
   Wifi,
@@ -44,6 +45,7 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
   const [simulateTrialCooldown, setSimulateTrialCooldown] = useState<boolean>(false);
   const [isScanningQr, setIsScanningQr] = useState<boolean>(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
+  const [isVoiceGuideOpen, setIsVoiceGuideOpen] = useState<boolean>(false);
 
   // 5. Ad Monetization States
   const [isWatchingAd, setIsWatchingAd] = useState<boolean>(false);
@@ -305,9 +307,14 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
                         Connecting You Faster
                       </span>
                     </div>
-                    <span className="text-[9px] text-stone-500 font-medium shrink-0">
-                      Fiber & Starlink
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsVoiceGuideOpen(true)}
+                      className="px-2 py-0.5 rounded-md bg-amber-400 hover:bg-amber-300 text-stone-950 text-[9px] font-black flex items-center gap-1 cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                    >
+                      <span>🎙️</span>
+                      <span>Mwongozo Sauti</span>
+                    </button>
                   </div>
 
                   {/* 1. AUTO-LOGIN BANNER (MAC BINDING) */}
@@ -749,6 +756,17 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
               : `🎉 QR Voucher #${code} scanned via camera and authenticated!`
           );
           setIsQrScannerOpen(false);
+        }}
+      />
+
+      {/* Step-by-Step Interactive Voice Guide Modal */}
+      <VoiceGuideModal
+        isOpen={isVoiceGuideOpen}
+        onClose={() => setIsVoiceGuideOpen(false)}
+        onSelectTab={(tab) => {
+          if (tab === 'mobile-stk') setActiveTab('mobile');
+          else if (tab === 'voucher') setActiveTab('voucher');
+          else if (tab === 'trial') setActiveTab('trial');
         }}
       />
     </section>
