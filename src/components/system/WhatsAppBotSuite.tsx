@@ -49,7 +49,7 @@ export interface WhatsAppLogEntry {
   isoTime: string;
   type: 'incoming_message' | 'delivery_status' | 'outgoing_api' | 'webhook_verification' | 'system_alert';
   direction: 'inbound' | 'outbound' | 'internal';
-  status: 'success' | 'delivered' | 'sent' | 'read' | 'failed' | 'warning' | 'info';
+  status: 'success' | 'delivered' | 'sent' | 'read' | 'failed' | 'warning' | 'info' | 'verified';
   summary: string;
   phone?: string;
   code?: number | string;
@@ -2480,3 +2480,4 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
     </div>
   );
 };
+

@@ -239,7 +239,7 @@ app.get('/api/v1/whatsapp/logs', (_req, res) => {
   });
 });
 
-app.post('/api/v1/whatsapp/clear-logs', (_req, res) => {
+const clearWhatsAppLogs = (_req: express.Request, res: express.Response) => {
   whatsAppLogs.length = 0;
   addWhatsAppLog({
     type: 'system_alert',
@@ -249,15 +249,19 @@ app.post('/api/v1/whatsapp/clear-logs', (_req, res) => {
     details: 'Log buffer imewekwa upya na iko tayari kupokea matukio mapya ya Webhook na API.'
   });
   return res.json({ success: true, count: whatsAppLogs.length });
-});
+};
+
+app.post('/api/v1/whatsapp/clear-logs', clearWhatsAppLogs);
+app.post('/api/v1/whatsapp/logs/clear', clearWhatsAppLogs);
 
 // Endpoint to simulate webhook actions directly from UI for testing
-app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
-  const { eventType, phone, textMessage, status, errorCode } = req.body || {};
-  const testPhone = (phone || '255653578184').replace(/[^0-9]/g, '');
+const simulateWebhookHandler = async (req: express.Request, res: express.Response) => {
+  const body = req.body || {};
+  const simType = body.eventType || body.type || 'incoming_message';
+  const testPhone = (body.phone || '255653578184').replace(/[^0-9]/g, '');
 
-  if (eventType === 'incoming_message') {
-    const incomingText = textMessage || 'Habari';
+  if (simType === 'incoming_message' || simType === 'incoming_text') {
+    const incomingText = body.textMessage || 'Habari, nahitaji bando la masaa 24';
     const fakePayload = {
       object: 'whatsapp_business_account',
       entry: [{
@@ -266,7 +270,7 @@ app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
           value: {
             messaging_product: 'whatsapp',
             metadata: { display_phone_number: whatsAppConfig.displayPhoneNumber, phone_number_id: whatsAppConfig.phoneNumberId },
-            contacts: [{ profile: { name: 'Jimmy Lema (Test)' }, wa_id: testPhone }],
+            contacts: [{ profile: { name: 'Jimmy Lema (Simulated)' }, wa_id: testPhone }],
             messages: [{
               from: testPhone,
               id: `wamid.HBgL${Date.now()}`,
@@ -286,7 +290,7 @@ app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
       status: 'info',
       phone: testPhone,
       summary: `Meta Webhook: Mteja ameandika "${incomingText}"`,
-      details: `Ujumbe toka +${testPhone} (Jimmy Lema). Bot atajibu mara moja.`,
+      details: `Ujumbe toka +${testPhone} (Mteja). Bot atajibu mara moja.`,
       payload: fakePayload
     });
 
@@ -321,9 +325,10 @@ app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
     return res.json({ success: true, reply, incomingText, phone: testPhone });
   }
 
-  if (eventType === 'delivery_status') {
-    const deliveryStatus = status || 'delivered';
-    const isFail = deliveryStatus === 'failed';
+  if (simType === 'delivery_status' || simType === 'delivered' || simType === 'error_24h' || simType === 'failed') {
+    const isError24h = simType === 'error_24h' || body.status === 'failed';
+    const deliveryStatus = isError24h ? 'failed' : (body.status || 'delivered');
+    const errorCode = body.errorCode || (isError24h ? 131047 : undefined);
     const fakePayload = {
       object: 'whatsapp_business_account',
       entry: [{
@@ -337,7 +342,7 @@ app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
               status: deliveryStatus,
               timestamp: Math.floor(Date.now() / 1000).toString(),
               recipient_id: testPhone,
-              ...(isFail ? {
+              ...(isError24h ? {
                 errors: [{
                   code: errorCode || 131047,
                   title: 'Message failed to deliver',
@@ -352,7 +357,7 @@ app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
       }]
     };
 
-    if (isFail) {
+    if (isError24h) {
       addWhatsAppLog({
         type: 'delivery_status',
         direction: 'inbound',
@@ -378,8 +383,23 @@ app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
     return res.json({ success: true, status: deliveryStatus, phone: testPhone });
   }
 
-  return res.json({ success: true, message: 'Simulated' });
-});
+  if (simType === 'webhook_verification' || simType === 'verify_challenge' || simType === 'challenge') {
+    addWhatsAppLog({
+      type: 'webhook_verification',
+      direction: 'inbound',
+      status: 'success',
+      summary: 'Meta Webhook Challenge: Imethibitishwa Kikamilifu ✅',
+      details: `Meta Developer Portal imethibitisha Webhook URL kwa kutumia Verify Token: "${whatsAppConfig.verifyToken}".`,
+      payload: { 'hub.mode': 'subscribe', 'hub.challenge': '1158201244', 'hub.verify_token': whatsAppConfig.verifyToken }
+    });
+    return res.json({ success: true, verified: true });
+  }
+
+  return res.json({ success: true, message: 'Simulated unknown type' });
+};
+
+app.post('/api/v1/whatsapp/simulate-webhook', simulateWebhookHandler);
+app.post('/api/v1/whatsapp/webhook/simulate', simulateWebhookHandler);
 
 // Helper: Send WhatsApp reply via Meta WhatsApp Cloud API safely
 async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string, templateName?: string) {
