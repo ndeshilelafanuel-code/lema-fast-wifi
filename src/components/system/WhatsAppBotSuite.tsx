@@ -148,6 +148,7 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   });
   const [metaDisplayPhone, setMetaDisplayPhone] = useState<string>(() => localStorage.getItem('lema_meta_display_phone') || '+255 621 311 137');
   const [metaAccessToken, setMetaAccessToken] = useState<string>(() => localStorage.getItem('lema_meta_access_token') || '');
+  const [metaAppSecret, setMetaAppSecret] = useState<string>(() => localStorage.getItem('lema_meta_app_secret') || '');
   const [metaVerifyToken, setMetaVerifyToken] = useState<string>(() => localStorage.getItem('lema_meta_verify_token') || 'lema_wifi_webhook_token');
   const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0621311137');
 
@@ -155,9 +156,10 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0621311137');
   const [isBotConnected, setIsBotConnected] = useState<boolean>(true);
   const [isTestingSend, setIsTestingSend] = useState<boolean>(false);
-  const [testSendResult, setTestSendResult] = useState<{ message: string; isError: boolean; isOAuth?: boolean; isNotRegistered?: boolean } | null>(null);
+  const [testSendResult, setTestSendResult] = useState<{ message: string; isError: boolean; isOAuth?: boolean; isNotRegistered?: boolean; isAppSecretProof?: boolean } | null>(null);
   const [showToken, setShowToken] = useState<boolean>(false);
-  const [metaLastError, setMetaLastError] = useState<{ type: string; code?: number; message: string; timestamp: string; isNotRegistered?: boolean } | null>(null);
+  const [showSecret, setShowSecret] = useState<boolean>(false);
+  const [metaLastError, setMetaLastError] = useState<{ type: string; code?: number; message: string; timestamp: string; isNotRegistered?: boolean; isAppSecretProof?: boolean } | null>(null);
   const [isRegisteringPhone, setIsRegisteringPhone] = useState<boolean>(false);
   const [registerPin, setRegisterPin] = useState<string>('123456');
   const [registerSuccessMessage, setRegisterSuccessMessage] = useState<string | null>(null);
@@ -384,6 +386,10 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
         if (cfg?.accessToken) {
           setMetaAccessToken(cfg.accessToken);
           localStorage.setItem('lema_meta_access_token', cfg.accessToken);
+        }
+        if (cfg?.appSecret) {
+          setMetaAppSecret(cfg.appSecret);
+          localStorage.setItem('lema_meta_app_secret', cfg.appSecret);
         }
         if (cfg?.verifyToken) {
           setMetaVerifyToken(cfg.verifyToken);
@@ -1455,7 +1461,45 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       </button>
                     </div>
 
-                    {(metaLastError.isNotRegistered || metaLastError.code === 133010 || metaLastError.message?.includes('133010')) ? (
+                    {(metaLastError.isAppSecretProof || metaLastError.message?.toLowerCase().includes('appsecret_proof')) ? (
+                      <div className="space-y-3 pt-1">
+                        <div className="p-3 bg-amber-100/70 rounded-xl border border-amber-300 text-amber-950 font-medium">
+                          <strong>Hitilafu ya Meta:</strong> <code>appsecret_proof is required but not provided</code>
+                          <p className="text-[11px] text-stone-700 mt-1 leading-relaxed">
+                            Kwenye dashibodi yako ya Meta App (<strong>LEMA</strong>), umewasha kipengele cha usalama kinacholazimisha <strong>App Secret Proof</strong> kwenye kila ombi la API. Una njia 2 rahisi sana za kulitatua:
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                          <div className="p-3.5 bg-white rounded-xl border-2 border-emerald-500/50 space-y-2 shadow-xs">
+                            <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                              <span>⚡ Njia 1 (Rahisi & Haraka Zaidi - Sekunde 20):</span>
+                            </div>
+                            <p className="text-[11px] text-stone-600">Zima ulinzi wa kulazimisha app secret kwenye Meta:</p>
+                            <ol className="list-decimal list-inside space-y-1 text-[11px] text-stone-700 leading-relaxed font-sans">
+                              <li>Fungua <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="text-emerald-700 font-bold underline">developers.facebook.com</a> kisha chagua App yako (<strong>LEMA</strong>).</li>
+                              <li>Kwenye menyu ya kushoto: <strong>App Settings ➔ Advanced</strong>.</li>
+                              <li>Tembeza chini kwenye kipengele cha <strong>Security</strong>.</li>
+                              <li>Kwenye <strong>"Require App Secret"</strong>, ibadili iwe <strong>NO (OFF)</strong>.</li>
+                              <li>Bonyeza kitufe cha bluu cha <strong>Save Changes</strong> chini kabisa!</li>
+                            </ol>
+                          </div>
+
+                          <div className="p-3.5 bg-white rounded-xl border border-stone-300 space-y-2 shadow-xs">
+                            <div className="flex items-center gap-1.5 text-stone-850 font-bold">
+                              <span>🔒 Njia 2 (Weka App Secret Hapa):</span>
+                            </div>
+                            <p className="text-[11px] text-stone-600">Mfumo utajihesabia appsecret_proof kiotomatiki:</p>
+                            <ol className="list-decimal list-inside space-y-1 text-[11px] text-stone-700 leading-relaxed font-sans">
+                              <li>Fungua Meta Developers ➔ <strong>App Settings ➔ Basic</strong>.</li>
+                              <li>Pembeni ya <strong>App Secret</strong>, bonyeza <em>"Show"</em> kisha uinakili.</li>
+                              <li>Bandika kwenye kisanduku cha <strong>Meta App Secret</strong> hapa chini.</li>
+                              <li>Bonyeza <strong>"Hifadhi Mipangilio ya Meta"</strong>.</li>
+                            </ol>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (metaLastError.isNotRegistered || metaLastError.code === 133010 || metaLastError.message?.includes('133010')) ? (
                       <div className="space-y-2.5 pt-1">
                         <p className="text-xs text-amber-900 leading-relaxed">
                           Namba ya simu ya Meta <strong>haijasajiliwa rasmi (Code 133010: Account not registered)</strong>.
@@ -1631,6 +1675,51 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       )}
                     </div>
                   </div>
+
+                  <div className="sm:col-span-2 space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-stone-700 font-bold block">
+                          Meta App Secret (Hiari - Hukokotoa appsecret_proof kiotomatiki):
+                        </label>
+                        <span className="text-[10px] text-stone-500">
+                          Kutoka Meta Developers ➔ App Settings ➔ Basic ➔ App Secret (au zima "Require App Secret" kwenye App Settings ➔ Advanced)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowSecret(!showSecret)}
+                        className="text-[11px] text-emerald-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span>{showSecret ? 'Ficha Secret' : 'Onyesha Secret'}</span>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showSecret ? 'text' : 'password'}
+                        value={metaAppSecret}
+                        onChange={(e) => {
+                          setMetaAppSecret(e.target.value);
+                          if (metaLastError) setMetaLastError(null);
+                        }}
+                        placeholder="Bandika App Secret hapa kutatua 'appsecret_proof is required'"
+                        className="w-full px-3 py-2 pr-20 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
+                      />
+                      {metaAppSecret && (
+                        <button
+                          type="button"
+                          onClick={() => setMetaAppSecret('')}
+                          className="absolute right-2 top-2 text-[10px] px-2 py-0.5 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded font-bold"
+                        >
+                          Futa
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-stone-500">
+                      💡 <em>Ukiweka hii, seva itaunda saini ya siri ya <code>appsecret_proof</code> kwa kila ujumbe unaotoka bila kuhitaji kubadili kitu Meta.</em>
+                    </p>
+                  </div>
                 </div>
 
                 {/* Permanent Token Tip Box */}
@@ -1755,7 +1844,9 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                             if (onShowToast) onShowToast('Mipangilio haijakamilika', warn, 'warning');
                           } else {
                             setTestSendResult({
-                              message: '✅ Ombi la jaribio limeenda kwenye mfumo.',
+                              message: data?.useTemplate
+                                ? '✅ Template rasmi ya "hello_world" imetumwa kikamilifu kupitia Meta WhatsApp Cloud API! Angalia WhatsApp yako sasa.'
+                                : '✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API! (Kumbuka: Kama simu haijaita, hakikisha umemtumia bot ujumbe kwanza wa.me/255621311137 au tumia kitufe cha "Tuma Template")',
                               isError: false
                             });
                           }
@@ -1769,8 +1860,61 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       }}
                       className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50"
                     >
-                      {isTestingSend ? 'Inatuma...' : 'Tuma Jaribio 📲'}
+                      {isTestingSend ? 'Inatuma...' : 'Tuma Jaribio (Text) 📲'}
                     </button>
+
+                    <button
+                      disabled={isTestingSend}
+                      onClick={async () => {
+                        setIsTestingSend(true);
+                        setTestSendResult(null);
+                        try {
+                          const res = await fetch('/api/v1/whatsapp/test-send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              phone: testRecipientPhone,
+                              useTemplate: true
+                            })
+                          });
+                          const data = await res.json();
+                          setIsTestingSend(false);
+
+                          if (data?.result?.error) {
+                            const metaErrMsg = data?.result?.message || data?.result?.error?.message || JSON.stringify(data?.result?.error);
+                            setTestSendResult({
+                              message: `⚠️ Hitilafu ya Meta: ${metaErrMsg}`,
+                              isError: true
+                            });
+                          } else {
+                            setTestSendResult({
+                              message: '✅ Template ya "hello_world" imetumwa kwa mafanikio! Hii inafika moja kwa moja hata bila namba kumtumia bot ujumbe hapo awali.',
+                              isError: false
+                            });
+                          }
+                        } catch (e: any) {
+                          setIsTestingSend(false);
+                          setTestSendResult({
+                            message: '⚠️ Hitilafu ya mawasiliano na seva ya mtandao.',
+                            isError: true
+                          });
+                        }
+                      }}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
+                      title="Hupita moja kwa moja hata kwa namba mpya ambayo haijawahi kumtumia bot ujumbe"
+                    >
+                      <span>Tuma Template (hello_world) 🌍</span>
+                    </button>
+
+                    <a
+                      href="https://wa.me/255621311137?text=Habari+Lema+Fast+WiFi"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold rounded-xl text-xs transition-colors flex items-center gap-1 border border-emerald-300"
+                      title="Mtumie bot ujumbe kwanza ili kufungua dirisha la saa 24"
+                    >
+                      <span>Fungua Bot WhatsApp 💬</span>
+                    </a>
                   </div>
 
                   <button
@@ -1780,6 +1924,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       localStorage.setItem('lema_meta_phone_number_id', metaPhoneNumberId);
                       localStorage.setItem('lema_meta_display_phone', metaDisplayPhone);
                       localStorage.setItem('lema_meta_access_token', metaAccessToken);
+                      localStorage.setItem('lema_meta_app_secret', metaAppSecret);
                       localStorage.setItem('lema_meta_verify_token', metaVerifyToken);
 
                       try {
@@ -1793,6 +1938,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                             displayPhoneNumber: metaDisplayPhone,
                             phoneNumberId: metaPhoneNumberId,
                             accessToken: metaAccessToken,
+                            appSecret: metaAppSecret,
                             verifyToken: metaVerifyToken
                           })
                         });

@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,7 @@ interface WhatsAppConfig {
   displayPhoneNumber?: string;
   verifiedName?: string;
   accessToken: string;
+  appSecret?: string;
   verifyToken: string;
   appId: string;
   lastError?: {
@@ -44,6 +46,7 @@ interface WhatsAppConfig {
     message: string;
     timestamp: string;
     isNotRegistered?: boolean;
+    isAppSecretProof?: boolean;
   } | null;
 }
 
@@ -54,18 +57,36 @@ let whatsAppConfig: WhatsAppConfig = {
   displayPhoneNumber: '+255 621 311 137',
   verifiedName: 'Lema Fast WiFi',
   accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  appSecret: process.env.WHATSAPP_APP_SECRET || '',
   verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'lema_wifi_webhook_token',
   appId: process.env.WHATSAPP_APP_ID || '1860632731565594',
   lastError: null
 };
 
+// Helper: Generate appsecret_proof for Meta API when "Require App Secret" is enabled in App Dashboard
+function getAppSecretProof(token: string, secret?: string): string | null {
+  const s = (secret || whatsAppConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '').trim();
+  if (!s || !token) return null;
+  return crypto.createHmac('sha256', s).update(token.trim()).digest('hex');
+}
+
+function buildMetaGraphUrl(baseUrl: string, token: string, secret?: string): string {
+  const proof = getAppSecretProof(token, secret);
+  if (proof) {
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${sep}appsecret_proof=${proof}`;
+  }
+  return baseUrl;
+}
+
 // WhatsApp Config endpoint
 app.post('/api/v1/whatsapp/config', (req, res) => {
-  const { provider, phoneNumberId, accessToken, verifyToken, appId, wabaId, displayPhoneNumber } = req.body;
+  const { provider, phoneNumberId, accessToken, appSecret, verifyToken, appId, wabaId, displayPhoneNumber } = req.body;
   if (provider) whatsAppConfig.provider = 'meta';
   if (phoneNumberId !== undefined) whatsAppConfig.phoneNumberId = String(phoneNumberId).trim();
   if (wabaId !== undefined) whatsAppConfig.wabaId = String(wabaId).trim();
   if (displayPhoneNumber !== undefined) whatsAppConfig.displayPhoneNumber = String(displayPhoneNumber).trim();
+  if (appSecret !== undefined) whatsAppConfig.appSecret = String(appSecret).trim();
   if (accessToken !== undefined) {
     whatsAppConfig.accessToken = String(accessToken).trim();
     whatsAppConfig.lastError = null;
@@ -78,6 +99,7 @@ app.post('/api/v1/whatsapp/config', (req, res) => {
     appId: whatsAppConfig.appId,
     phoneNumberId: whatsAppConfig.phoneNumberId,
     hasMetaToken: Boolean(whatsAppConfig.accessToken && whatsAppConfig.accessToken.length > 20),
+    hasAppSecret: Boolean(whatsAppConfig.appSecret && whatsAppConfig.appSecret.length > 5),
     verifyToken: whatsAppConfig.verifyToken
   });
   return res.json({ success: true, config: whatsAppConfig });
@@ -97,7 +119,8 @@ app.post('/api/v1/whatsapp/clear-error', (_req, res) => {
 async function registerMetaPhoneNumber(phoneId: string, token: string, pin: string = '123456') {
   try {
     console.log(`[Meta WhatsApp] 🔄 Registering phone ID ${phoneId} with Meta API (PIN: ${pin})...`);
-    const url = `https://graph.facebook.com/v21.0/${phoneId}/register`;
+    const rawUrl = `https://graph.facebook.com/v21.0/${phoneId}/register`;
+    const url = buildMetaGraphUrl(rawUrl, token);
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -157,7 +180,7 @@ app.get('/api/v1/whatsapp/messages', (_req, res) => {
 });
 
 // Helper: Send WhatsApp reply via Meta WhatsApp Cloud API safely
-async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string) {
+async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string, templateName?: string) {
   const digits = targetPhoneOrChatId.replace(/[^0-9]/g, '');
   const international = digits.startsWith('0')
     ? '255' + digits.slice(1)
@@ -174,21 +197,35 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
   // 1. Meta WhatsApp Cloud API (Official - Unlimited Numbers)
   if (phoneId && !isPlaceholderOrInvalid) {
     try {
-      console.log(`[Meta WhatsApp Cloud API] 📤 Sending to +${international}: "${message.slice(0, 50)}..."`);
-      const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+      console.log(`[Meta WhatsApp Cloud API] 📤 Sending to +${international} (mode: ${templateName ? 'template:' + templateName : 'text'}): "${message.slice(0, 50)}..."`);
+      const rawUrl = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+      const url = buildMetaGraphUrl(rawUrl, token);
+      const requestBody = templateName
+        ? {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: international,
+            type: 'template',
+            template: {
+              name: templateName,
+              language: { code: 'en_US' }
+            }
+          }
+        : {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: international,
+            type: 'text',
+            text: { preview_url: false, body: message }
+          };
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: international,
-          type: 'text',
-          text: { preview_url: false, body: message }
-        })
+        body: JSON.stringify(requestBody)
       });
       const data: any = await response.json();
 
@@ -228,17 +265,21 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
 
         const isNotRegistered = errorCode === 133010 || errorMessage.includes('133010');
         const isOAuth = errorType === 'OAuthException';
+        const isAppSecretProof = errorMessage.toLowerCase().includes('appsecret_proof');
 
         whatsAppConfig.lastError = {
           type: errorType,
           code: errorCode,
           message: errorMessage,
           isNotRegistered,
+          isAppSecretProof,
           timestamp: new Date().toLocaleTimeString()
         };
 
         let userTip = errorMessage;
-        if (isNotRegistered) {
+        if (isAppSecretProof) {
+          userTip = 'Kwenye Meta App Dashboard yako, mpangilio wa "Require App Secret" umewashwa. Chaguo 1 (Haraka): Zima kwenye developers.facebook.com ➔ App Settings ➔ Advanced ➔ Security ➔ "Require App Secret": Weka OFF ➔ Save Changes. Chaguo 2: Bandika App Secret yako hapa chini kwenye kisanduku cha App Secret.';
+        } else if (isNotRegistered) {
           userTip = 'Namba haijasajiliwa Meta (Code 133010: Account not registered). Mfumo unakuruhusu kubonyeza "Sajili Namba Meta" chini au hakikisha namba ya mpokeaji imeongezwa kwenye orodha ya "To" kwenye Meta Developers.';
         } else if (isOAuth) {
           userTip = 'Token ya Meta imekwisha muda au si sahihi. Bonyeza "Generate token" au "Copy" kutoka ukurasa wa Meta Developers ➔ WhatsApp ➔ API Setup.';
@@ -252,6 +293,7 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
           message: errorMessage,
           isAccountNotRegistered: isNotRegistered,
           isOAuthException: isOAuth,
+          isAppSecretProof,
           userTip
         };
       }
@@ -301,10 +343,14 @@ app.post('/api/v1/whatsapp/reply', async (req, res) => {
 
 // Test send endpoint
 app.post('/api/v1/whatsapp/test-send', async (req, res) => {
-  const { phone, message } = req.body;
+  const { phone, message, useTemplate } = req.body;
   const targetPhone = phone || '255653578184';
-  const result = await sendWhatsAppMessage(targetPhone, message || 'Jaribio la Lema Fast WiFi Bot 🤖: Mtandao unafanya kazi kikamilifu!');
-  return res.json({ success: true, targetPhone, result });
+  const result = await sendWhatsAppMessage(
+    targetPhone,
+    message || 'Jaribio la Lema Fast WiFi Bot 🤖: Mtandao unafanya kazi kikamilifu!',
+    useTemplate ? 'hello_world' : undefined
+  );
+  return res.json({ success: true, targetPhone, result, useTemplate: Boolean(useTemplate) });
 });
 
 // -------------------------------------------------------------
