@@ -29,6 +29,49 @@ interface StoredMessage {
 
 const recentMessages: StoredMessage[] = [];
 
+// Structured Live Logging for WhatsApp & Meta Webhook
+export interface WhatsAppLogEntry {
+  id: string;
+  timestamp: string;
+  isoTime: string;
+  type: 'incoming_message' | 'delivery_status' | 'outgoing_api' | 'webhook_verification' | 'system_alert';
+  direction: 'inbound' | 'outbound' | 'internal';
+  status: 'success' | 'delivered' | 'sent' | 'read' | 'failed' | 'warning' | 'info';
+  summary: string;
+  phone?: string;
+  code?: number | string;
+  details?: string;
+  payload?: any;
+}
+
+const whatsAppLogs: WhatsAppLogEntry[] = [
+  {
+    id: `log-init-1`,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    isoTime: new Date().toISOString(),
+    type: 'system_alert',
+    direction: 'internal',
+    status: 'info',
+    summary: 'Seva ya WhatsApp Webhook Ipo Tayari Hewani 🟢',
+    details: 'Seva inasikiliza Meta Webhooks kwenye /api/v1/whatsapp/webhook na iko tayari kuchakata ujumbe na ripoti za kufika (delivery reports).'
+  }
+];
+
+function addWhatsAppLog(entry: Omit<WhatsAppLogEntry, 'id' | 'timestamp' | 'isoTime'>): WhatsAppLogEntry {
+  const now = new Date();
+  const item: WhatsAppLogEntry = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    isoTime: now.toISOString(),
+    ...entry
+  };
+  whatsAppLogs.unshift(item);
+  if (whatsAppLogs.length > 250) {
+    whatsAppLogs.pop();
+  }
+  return item;
+}
+
 // WhatsApp Cloud API (Meta Official - Unlimited Numbers)
 interface WhatsAppConfig {
   provider: 'meta';
@@ -179,6 +222,165 @@ app.get('/api/v1/whatsapp/messages', (_req, res) => {
   return res.json({ messages: recentMessages, lastError: whatsAppConfig.lastError });
 });
 
+// WhatsApp Live Logs Endpoint for Webhook & API inspection
+app.get('/api/v1/whatsapp/logs', (_req, res) => {
+  return res.json({
+    success: true,
+    logs: whatsAppLogs,
+    count: whatsAppLogs.length,
+    lastError: whatsAppConfig.lastError,
+    webhookInfo: {
+      url: `${_req.protocol}://${_req.get('host')}/api/v1/whatsapp/webhook`,
+      verifyToken: whatsAppConfig.verifyToken,
+      phoneNumberId: whatsAppConfig.phoneNumberId,
+      displayPhoneNumber: whatsAppConfig.displayPhoneNumber,
+      hasToken: Boolean(whatsAppConfig.accessToken && whatsAppConfig.accessToken.length > 20)
+    }
+  });
+});
+
+app.post('/api/v1/whatsapp/clear-logs', (_req, res) => {
+  whatsAppLogs.length = 0;
+  addWhatsAppLog({
+    type: 'system_alert',
+    direction: 'internal',
+    status: 'info',
+    summary: 'Kumbukumbu (Logs) zimesafishwa 🧹',
+    details: 'Log buffer imewekwa upya na iko tayari kupokea matukio mapya ya Webhook na API.'
+  });
+  return res.json({ success: true, count: whatsAppLogs.length });
+});
+
+// Endpoint to simulate webhook actions directly from UI for testing
+app.post('/api/v1/whatsapp/simulate-webhook', async (req, res) => {
+  const { eventType, phone, textMessage, status, errorCode } = req.body || {};
+  const testPhone = (phone || '255653578184').replace(/[^0-9]/g, '');
+
+  if (eventType === 'incoming_message') {
+    const incomingText = textMessage || 'Habari';
+    const fakePayload = {
+      object: 'whatsapp_business_account',
+      entry: [{
+        id: whatsAppConfig.wabaId || '1578703743479175',
+        changes: [{
+          value: {
+            messaging_product: 'whatsapp',
+            metadata: { display_phone_number: whatsAppConfig.displayPhoneNumber, phone_number_id: whatsAppConfig.phoneNumberId },
+            contacts: [{ profile: { name: 'Jimmy Lema (Test)' }, wa_id: testPhone }],
+            messages: [{
+              from: testPhone,
+              id: `wamid.HBgL${Date.now()}`,
+              timestamp: Math.floor(Date.now() / 1000).toString(),
+              text: { body: incomingText },
+              type: 'text'
+            }]
+          },
+          field: 'messages'
+        }]
+      }]
+    };
+
+    addWhatsAppLog({
+      type: 'incoming_message',
+      direction: 'inbound',
+      status: 'info',
+      phone: testPhone,
+      summary: `Meta Webhook: Mteja ameandika "${incomingText}"`,
+      details: `Ujumbe toka +${testPhone} (Jimmy Lema). Bot atajibu mara moja.`,
+      payload: fakePayload
+    });
+
+    const reply = generateBotReply(incomingText, 'Jimmy Lema', testPhone);
+    recentMessages.push({
+      id: `sim-user-${Date.now()}`,
+      senderPhone: testPhone,
+      senderName: 'Jimmy Lema (Simulated)',
+      text: incomingText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      senderType: 'user'
+    });
+    recentMessages.push({
+      id: `sim-bot-${Date.now()}`,
+      senderPhone: 'bot',
+      senderName: 'Lema Fast WiFi Bot 🤖',
+      text: reply,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      senderType: 'bot'
+    });
+
+    addWhatsAppLog({
+      type: 'outgoing_api',
+      direction: 'outbound',
+      status: 'success',
+      phone: testPhone,
+      summary: `Bot amejibu kiotomatiki kwenda +${testPhone}`,
+      details: reply.slice(0, 150) + '...',
+      payload: { replyText: reply }
+    });
+
+    return res.json({ success: true, reply, incomingText, phone: testPhone });
+  }
+
+  if (eventType === 'delivery_status') {
+    const deliveryStatus = status || 'delivered';
+    const isFail = deliveryStatus === 'failed';
+    const fakePayload = {
+      object: 'whatsapp_business_account',
+      entry: [{
+        id: whatsAppConfig.wabaId || '1578703743479175',
+        changes: [{
+          value: {
+            messaging_product: 'whatsapp',
+            metadata: { display_phone_number: whatsAppConfig.displayPhoneNumber, phone_number_id: whatsAppConfig.phoneNumberId },
+            statuses: [{
+              id: `wamid.HBgL${Date.now()}`,
+              status: deliveryStatus,
+              timestamp: Math.floor(Date.now() / 1000).toString(),
+              recipient_id: testPhone,
+              ...(isFail ? {
+                errors: [{
+                  code: errorCode || 131047,
+                  title: 'Message failed to deliver',
+                  message: 'Re-engagement message: More than 24 hours have passed since the recipient last replied.',
+                  error_data: { details: 'Zaidi ya masaa 24 yamepita bila mteja kumwandikia bot (24h customer window).' }
+                }]
+              } : {})
+            }]
+          },
+          field: 'messages'
+        }]
+      }]
+    };
+
+    if (isFail) {
+      addWhatsAppLog({
+        type: 'delivery_status',
+        direction: 'inbound',
+        status: 'failed',
+        code: errorCode || 131047,
+        phone: testPhone,
+        summary: `⚠️ Meta Webhook: Ujumbe Haukufika Simuni (+${testPhone})`,
+        details: `Kosa #${errorCode || 131047}: Meta Customer Care Window (saa 24). Mteja anapaswa kumwandikia bot kwanza wa.me/255621311137.`,
+        payload: fakePayload
+      });
+    } else {
+      addWhatsAppLog({
+        type: 'delivery_status',
+        direction: 'inbound',
+        status: deliveryStatus as any,
+        phone: testPhone,
+        summary: `✅ Meta Webhook: Ujumbe umefika simuni (+${testPhone})`,
+        details: `Hali ya ujumbe: ${deliveryStatus.toUpperCase()} kwenye kifaa cha mteja.`,
+        payload: fakePayload
+      });
+    }
+
+    return res.json({ success: true, status: deliveryStatus, phone: testPhone });
+  }
+
+  return res.json({ success: true, message: 'Simulated' });
+});
+
 // Helper: Send WhatsApp reply via Meta WhatsApp Cloud API safely
 async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string, templateName?: string) {
   const digits = targetPhoneOrChatId.replace(/[^0-9]/g, '');
@@ -300,6 +502,17 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string,
           userTip = 'Token ya Meta imekwisha muda au si sahihi. Bonyeza "Generate token" au "Copy" kutoka ukurasa wa Meta Developers ➔ WhatsApp ➔ API Setup.';
         }
 
+        addWhatsAppLog({
+          type: 'outgoing_api',
+          direction: 'outbound',
+          status: 'failed',
+          code: errorCode,
+          phone: international,
+          summary: `Hitilafu ya Meta API (#${errorCode}): ${errorMessage}`,
+          details: userTip,
+          payload: data
+        });
+
         return {
           error: true,
           errorType,
@@ -315,9 +528,30 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string,
 
       console.log(`[Meta WhatsApp Cloud API Success] Ujumbe umetumwa kwa +${international}`);
       whatsAppConfig.lastError = null;
+
+      addWhatsAppLog({
+        type: 'outgoing_api',
+        direction: 'outbound',
+        status: 'success',
+        phone: international,
+        summary: `Meta API: Ujumbe Umetumwa kwa +${international}`,
+        details: `Meta Message ID: ${data?.messages?.[0]?.id || 'OK'}. Maudhui: "${message.slice(0, 70)}..."`,
+        payload: { response: data }
+      });
+
       return data;
     } catch (err: any) {
       console.log('[Meta WhatsApp Cloud API Handled Catch]:', err?.message || 'Network error');
+      addWhatsAppLog({
+        type: 'outgoing_api',
+        direction: 'outbound',
+        status: 'failed',
+        phone: international,
+        summary: `Hitilafu ya Mtandao ya Meta API`,
+        details: err?.message || 'Mawasiliano na seva ya Meta yameshindikana.',
+        payload: { error: err?.message }
+      });
+
       return { 
         error: true, 
         message: err?.message || 'Meta Cloud API Network Error',
@@ -327,6 +561,18 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string,
   }
 
   console.log(`[WhatsApp Bot Simulator / Meta Ready] Message to +${international}: "${message.slice(0, 60)}..."`);
+  addWhatsAppLog({
+    type: 'system_alert',
+    direction: 'internal',
+    status: 'warning',
+    phone: international,
+    summary: `Ujumbe Kwenye Simulator: +${international}`,
+    details: isPlaceholderOrInvalid
+      ? 'Access Token ya Meta haijawekwa au si sahihi. Ujumbe umeandikwa kwenye simulator ya mfumo.'
+      : 'Phone Number ID haijawekwa kwenye Mipangilio ya Meta.',
+    payload: { to: international, message }
+  });
+
   return {
     simulated: true,
     warning: isPlaceholderOrInvalid
@@ -800,8 +1046,25 @@ app.get('/api/v1/whatsapp/webhook', (req, res) => {
   const expectedTokens = [whatsAppConfig.verifyToken, 'lema_wifi_webhook_token', 'lema_fast_wifi'].filter(Boolean);
   if (mode === 'subscribe' && typeof token === 'string' && expectedTokens.includes(token)) {
     console.log('✅ [Meta WhatsApp Webhook Verified Successfully!] Challenge token sent back to Meta.');
+    addWhatsAppLog({
+      type: 'webhook_verification',
+      direction: 'inbound',
+      status: 'success',
+      summary: 'Meta Webhook Challenge: Imethibitishwa Kikamilifu ✅',
+      details: `Meta Developer Portal imethibitisha Webhook URL kwa kutumia Verify Token: "${token}".`,
+      payload: req.query
+    });
     return res.status(200).send(challenge);
   }
+
+  addWhatsAppLog({
+    type: 'webhook_verification',
+    direction: 'inbound',
+    status: 'info',
+    summary: 'Webhook Health Check (GET 200)',
+    details: 'Seva ya Webhook ipo hewani na inasikiliza requests kutoka Meta.',
+    payload: { query: req.query, ip: req.ip }
+  });
 
   return res.status(200).json({
     status: 'ok',
@@ -835,6 +1098,16 @@ app.post('/api/v1/whatsapp/webhook', async (req, res) => {
 
         if (textMessage && senderPhone) {
           console.log(`[Meta WhatsApp Bot] 📩 Incoming from ${senderPhone} (${senderName}): "${textMessage}"`);
+
+          addWhatsAppLog({
+            type: 'incoming_message',
+            direction: 'inbound',
+            status: 'info',
+            phone: senderPhone,
+            summary: `Ujumbe Mpya toka +${senderPhone} (${senderName})`,
+            details: `Mteja ameandika: "${textMessage}"`,
+            payload: message
+          });
 
           recentMessages.push({
             id: message.id || `msg-${Date.now()}`,
@@ -885,8 +1158,48 @@ app.post('/api/v1/whatsapp/webhook', async (req, res) => {
               message: `⚠️ Meta Delivery Status: Ujumbe kwa +${recipient} haukufika simuni: ${title} (#${code}) - ${tip}`,
               timestamp: new Date().toLocaleTimeString()
             };
+
+            addWhatsAppLog({
+              type: 'delivery_status',
+              direction: 'inbound',
+              status: 'failed',
+              code,
+              phone: recipient,
+              summary: `⚠️ Kufikisha Kumeshindikana (#${code}) kwa +${recipient}`,
+              details: tip,
+              payload: st
+            });
           } else if (status === 'delivered') {
             console.log(`[Meta WhatsApp] ✅ Ujumbe umefika kwenye simu ya +${recipient}`);
+            addWhatsAppLog({
+              type: 'delivery_status',
+              direction: 'inbound',
+              status: 'delivered',
+              phone: recipient,
+              summary: `✅ Ujumbe Umefika Simuni: +${recipient}`,
+              details: `Message ID: ${st.id} umefika kwenye simu ya mteja.`,
+              payload: st
+            });
+          } else if (status === 'sent') {
+            addWhatsAppLog({
+              type: 'delivery_status',
+              direction: 'inbound',
+              status: 'sent',
+              phone: recipient,
+              summary: `📤 Ujumbe Umetoka Meta: +${recipient}`,
+              details: `Message ID: ${st.id} umekubaliwa na mtandao wa Meta.`,
+              payload: st
+            });
+          } else if (status === 'read') {
+            addWhatsAppLog({
+              type: 'delivery_status',
+              direction: 'inbound',
+              status: 'read',
+              phone: recipient,
+              summary: `👀 Ujumbe Umesomwa (Blue Ticks): +${recipient}`,
+              details: `Message ID: ${st.id} umesomwa na mteja.`,
+              payload: st
+            });
           }
         }
       }
@@ -895,6 +1208,13 @@ app.post('/api/v1/whatsapp/webhook', async (req, res) => {
     }
   } catch (error) {
     console.error('[WhatsApp Webhook Error]:', error);
+    addWhatsAppLog({
+      type: 'system_alert',
+      direction: 'internal',
+      status: 'failed',
+      summary: 'Hitilafu ya Kuchakata Webhook',
+      details: String(error)
+    });
   }
 
   return res.status(200).json({ status: 'ok', received: true });

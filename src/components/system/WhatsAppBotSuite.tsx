@@ -30,10 +30,32 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  Info
+  Info,
+  Activity,
+  Pause,
+  Play,
+  Trash2,
+  Filter,
+  Server,
+  Code,
+  Cpu
 } from 'lucide-react';
 import { useHotspot } from '../../context/HotspotContext';
 import { HotspotPackage, Voucher } from '../../types';
+
+export interface WhatsAppLogEntry {
+  id: string;
+  timestamp: string;
+  isoTime: string;
+  type: 'incoming_message' | 'delivery_status' | 'outgoing_api' | 'webhook_verification' | 'system_alert';
+  direction: 'inbound' | 'outbound' | 'internal';
+  status: 'success' | 'delivered' | 'sent' | 'read' | 'failed' | 'warning' | 'info';
+  summary: string;
+  phone?: string;
+  code?: number | string;
+  details?: string;
+  payload?: any;
+}
 
 export interface WhatsAppIncomingMessage {
   id: string;
@@ -134,7 +156,7 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   const { settings, vouchers, generateVouchers, redeemVoucher } = useHotspot();
 
   // Active subtab inside WhatsApp module
-  const [activeSubTab, setActiveSubTab] = useState<'simulator' | 'inbox' | 'setup_guide' | 'ai_kb' | 'webhook_tester'>('simulator');
+  const [activeSubTab, setActiveSubTab] = useState<'simulator' | 'inbox' | 'setup_guide' | 'ai_kb' | 'webhook_tester' | 'live_logs'>('simulator');
 
   // WhatsApp Gateway Configuration states - Meta Cloud API (Official - Unlimited Numbers)
   const [gatewayType] = useState<'meta_cloud'>('meta_cloud');
@@ -166,6 +188,15 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   const [autoSellPackages, setAutoSellPackages] = useState<boolean>(true);
   const [autoResolveErrors, setAutoResolveErrors] = useState<boolean>(true);
   const [sendDashboardAlertOnEscalate, setSendDashboardAlertOnEscalate] = useState<boolean>(true);
+
+  // Live Logs States
+  const [liveLogs, setLiveLogs] = useState<WhatsAppLogEntry[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
+  const [autoRefreshLogs, setAutoRefreshLogs] = useState<boolean>(true);
+  const [logFilter, setLogFilter] = useState<'all' | 'webhook' | 'outgoing' | 'errors' | 'delivered'>('all');
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [isSimulatingWebhook, setIsSimulatingWebhook] = useState<boolean>(false);
+  const [showRenderComparison, setShowRenderComparison] = useState<boolean>(false);
 
   // Copied states
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -497,6 +528,77 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
 
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch live logs from server
+  const fetchLiveLogs = async () => {
+    try {
+      setIsLoadingLogs(true);
+      const res = await fetch('/api/v1/whatsapp/logs');
+      const data = await res.json();
+      if (data && Array.isArray(data.logs)) {
+        setLiveLogs(data.logs);
+      }
+    } catch (e) {
+      // quiet
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  // Poll logs when live logs tab is active and autoRefreshLogs is true
+  useEffect(() => {
+    if (activeSubTab !== 'live_logs') return;
+    fetchLiveLogs();
+    if (!autoRefreshLogs) return;
+
+    const logInterval = setInterval(() => {
+      fetchLiveLogs();
+    }, 2500);
+
+    return () => clearInterval(logInterval);
+  }, [activeSubTab, autoRefreshLogs]);
+
+  const handleClearLogs = async () => {
+    try {
+      await fetch('/api/v1/whatsapp/logs/clear', { method: 'POST' });
+      setLiveLogs([]);
+      if (onShowToast) {
+        onShowToast('Imefutwa', 'Kumbukumbu za Live Logs zimetiwa safi.', 'success');
+      }
+    } catch (e) {
+      if (onShowToast) {
+        onShowToast('Hitilafu', 'Imeshindwa kufuta kumbukumbu.', 'error');
+      }
+    }
+  };
+
+  const handleSimulateWebhook = async (simType: string) => {
+    try {
+      setIsSimulatingWebhook(true);
+      const res = await fetch('/api/v1/whatsapp/webhook/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: simType, phone: testRecipientPhone || '255653578184' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (onShowToast) {
+          onShowToast('Imeigizwa!', `Webhook (${simType}) imetumwa na kuingia kwenye logi.`, 'success');
+        }
+        fetchLiveLogs();
+      } else {
+        if (onShowToast) {
+          onShowToast('Hitilafu', data.error || 'Imeshindwa kuiga webhook.', 'error');
+        }
+      }
+    } catch (e) {
+      if (onShowToast) {
+        onShowToast('Hitilafu', 'Hitilafu ya mtandao wakati wa kuiga webhook.', 'error');
+      }
+    } finally {
+      setIsSimulatingWebhook(false);
+    }
+  };
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -834,8 +936,313 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
             <Settings className="w-4 h-4" />
             <span>Sanidi WhatsApp Gateway Yako (Kazi ya Dakika 3)</span>
           </button>
+
+          <button
+            onClick={() => setActiveSubTab('live_logs')}
+            className={`px-4 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeSubTab === 'live_logs'
+                ? 'bg-emerald-500 text-stone-950 shadow-md font-black'
+                : 'bg-white/10 text-stone-300 hover:bg-white/15'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <span>Kumbukumbu za Live (Terminal Logs) 🟢</span>
+          </button>
         </div>
       </div>
+
+      {/* 2B. SUBTAB CONTENT: LIVE LOGS & WEBHOOK INSPECTOR (Terminal View) */}
+      {activeSubTab === 'live_logs' && (
+        <div className="space-y-6">
+          {/* Header Card with Controls */}
+          <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 shadow-xl text-stone-100">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-stone-800">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-xl font-black text-white flex items-center gap-2">
+                    <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                    WhatsApp & Meta Webhook Live Terminal
+                  </h3>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    LIVE MONITOR (Hapa Hapa)
+                  </span>
+                </div>
+                <p className="text-stone-400 text-sm mt-1">
+                  Tazama matukio yote ya Meta Webhook, jumbe zinazoingia, majibu ya API, na hitilafu za 24hr window kwa wakati halisi bila haja ya kuhamia Render!
+                </p>
+              </div>
+
+              <div className="flex items-center flex-wrap gap-3">
+                <button
+                  onClick={() => setAutoRefreshLogs(!autoRefreshLogs)}
+                  className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all ${
+                    autoRefreshLogs 
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                      : 'bg-stone-800 text-stone-400 border border-stone-700'
+                  }`}
+                  title={autoRefreshLogs ? 'Auto-refresh imewashwa (kila sekunde 2.5)' : 'Auto-refresh imesitishwa'}
+                >
+                  {autoRefreshLogs ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{autoRefreshLogs ? 'Auto-Refresh (ON)' : 'Imesitishwa'}</span>
+                </button>
+
+                <button
+                  onClick={fetchLiveLogs}
+                  disabled={isLoadingLogs}
+                  className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-stone-700"
+                >
+                  <Activity className={`w-3.5 h-3.5 ${isLoadingLogs ? 'animate-spin text-emerald-400' : ''}`} />
+                  <span>Burudisha (Refresh)</span>
+                </button>
+
+                <button
+                  onClick={handleClearLogs}
+                  className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-500/30"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Futa Logi</span>
+                </button>
+
+                <button
+                  onClick={() => setShowRenderComparison(!showRenderComparison)}
+                  className="px-3.5 py-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-sky-500/30"
+                >
+                  <Server className="w-3.5 h-3.5" />
+                  <span>Google Cloud Run vs Render</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Cloud Run vs Render Comparison Banner */}
+            {showRenderComparison && (
+              <div className="mt-6 bg-sky-950/40 border border-sky-500/30 rounded-xl p-5 text-sky-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                    <Server className="w-4 h-4 text-sky-400" />
+                    Kwanini Google Cloud Run (Ambapo tupo sasa) ni Bora zaidi kuliko Render kwa WhatsApp Bot:
+                  </h4>
+                  <button 
+                    onClick={() => setShowRenderComparison(false)}
+                    className="text-xs text-sky-400 hover:underline cursor-pointer font-bold"
+                  >
+                    Ficha
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="bg-sky-900/30 p-3 rounded-lg border border-sky-500/20 space-y-1.5">
+                    <span className="font-bold text-emerald-400 block">✓ Google Cloud Run (Hapa Hapa)</span>
+                    <ul className="list-disc list-inside space-y-1 text-stone-300">
+                      <li>Hakuna "Spin-down" kutokana na kutotumika (Always On). Webhook za Meta hazitawahi kukosa (No 504 Gateway Timeout).</li>
+                      <li>Live terminal logs zote zinaonekana hapa hapa kwenye Dashboard yako papo hapo.</li>
+                      <li>Ina scalability ya kipekee ya Google bila kikomo cha CPU.</li>
+                    </ul>
+                  </div>
+                  <div className="bg-stone-900/80 p-3 rounded-lg border border-stone-700 space-y-1.5">
+                    <span className="font-bold text-amber-400 block">⚠️ Render Free Tier (Kama tulivyoshauriwa)</span>
+                    <ul className="list-disc list-inside space-y-1 text-stone-400">
+                      <li>Inasota/Inazima (Spin-down) baada ya dakika 15 za kutokuwa na HTTP request.</li>
+                      <li>Meta Webhook ikipiga simu wakati Render imezima, Meta inakata na kutoa hitilafu ya "Webhook Delivery Failed".</li>
+                      <li>Unahitaji kulipia $7+/mwezi ili iwe Always On.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Webhook Simulator Actions */}
+            <div className="mt-6 pt-6 border-t border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">Jaribu Kuiga Webhook (Simulator):</span>
+                <span className="text-[11px] text-stone-500">Iga ujumbe unaoingia kutoka kwa Meta moja kwa moja kwenye seva yako</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleSimulateWebhook('incoming_text')}
+                  disabled={isSimulatingWebhook}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-stone-950 font-bold text-xs rounded-lg cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Iga Ujumbe ("Habari")</span>
+                </button>
+
+                <button
+                  onClick={() => handleSimulateWebhook('verify_challenge')}
+                  disabled={isSimulatingWebhook}
+                  className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs rounded-lg cursor-pointer transition-all flex items-center gap-1.5 border border-stone-700 disabled:opacity-50"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Iga Webhook Verify (GET)</span>
+                </button>
+
+                <button
+                  onClick={() => handleSimulateWebhook('delivery_status')}
+                  disabled={isSimulatingWebhook}
+                  className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs rounded-lg cursor-pointer transition-all flex items-center gap-1.5 border border-stone-700 disabled:opacity-50"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>Iga Delivery (Delivered/Read)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="mt-6 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-stone-400" />
+                <span className="text-xs font-bold text-stone-300">Chuja Logi:</span>
+                <div className="flex items-center gap-1.5 bg-stone-950 p-1 rounded-xl border border-stone-800">
+                  {(['all', 'webhook', 'outgoing', 'errors', 'delivered'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setLogFilter(f)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        logFilter === f
+                          ? 'bg-emerald-500 text-stone-950 shadow'
+                          : 'text-stone-400 hover:text-white'
+                      }`}
+                    >
+                      {f === 'all' && 'Zote'}
+                      {f === 'webhook' && 'Webhooks'}
+                      {f === 'outgoing' && 'Outgoing API'}
+                      {f === 'errors' && 'Hitilafu (Errors)'}
+                      {f === 'delivered' && 'Uwasilishaji'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-xs text-stone-400 font-mono">
+                Jumla: <span className="font-bold text-white">{liveLogs.length}</span> matukio yamerekodiwa
+              </div>
+            </div>
+          </div>
+
+          {/* Terminal Logs Stream List */}
+          <div className="bg-stone-950 border border-stone-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="bg-stone-900 px-6 py-3 border-b border-stone-800 flex items-center justify-between text-xs text-stone-400 font-mono">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                </div>
+                <span className="ml-2 font-bold text-white">/api/v1/whatsapp/logs — Terminal Stream</span>
+              </div>
+              <span className="text-emerald-400">🟢 Real-time JSON Stream</span>
+            </div>
+
+            <div className="divide-y divide-stone-900 max-h-[600px] overflow-y-auto font-mono text-xs">
+              {liveLogs.length === 0 ? (
+                <div className="py-16 text-center text-stone-500 space-y-3">
+                  <Activity className="w-10 h-10 mx-auto text-stone-700 animate-pulse" />
+                  <p className="font-bold text-sm">Hakuna kumbukumbu za WhatsApp zilizorekodiwa bado.</p>
+                  <p className="text-xs text-stone-600 max-w-md mx-auto">
+                    Jaribu kutuma ujumbe kwenye Simulator au ubonyeze kitufe cha "Iga Ujumbe" hapo juu ili kuona jinsi Webhook na API zinavyoingia papo hapo.
+                  </p>
+                </div>
+              ) : (
+                liveLogs
+                  .filter((log) => {
+                    if (logFilter === 'all') return true;
+                    if (logFilter === 'webhook') return log.type === 'incoming_message' || log.type === 'webhook_verification';
+                    if (logFilter === 'outgoing') return log.type === 'outgoing_api';
+                    if (logFilter === 'errors') return log.status === 'failed' || !!log.code;
+                    if (logFilter === 'delivered') return log.status === 'delivered' || log.status === 'read';
+                    return true;
+                  })
+                  .map((log) => {
+                    const isExpanded = expandedLogId === log.id;
+                    const isErr = log.status === 'failed' || !!log.code;
+                    const isSucc = log.status === 'success' || log.status === 'verified' || log.status === 'delivered';
+
+                    return (
+                      <div 
+                        key={log.id} 
+                        className={`p-4 transition-all hover:bg-stone-900/80 cursor-pointer ${
+                          isErr ? 'bg-rose-950/20 border-l-4 border-rose-500' : 
+                          isSucc ? 'bg-emerald-950/10 border-l-4 border-emerald-500' : 'bg-stone-950 border-l-4 border-stone-700'
+                        }`}
+                        onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <span className="text-stone-500 text-[11px]">{log.isoTime || log.timestamp}</span>
+
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              log.type === 'incoming_message' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                              log.type === 'webhook_verification' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' :
+                              log.type === 'delivery_status' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                              'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}>
+                              {log.type}
+                            </span>
+
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              log.direction === 'inbound' ? 'bg-blue-500/10 text-blue-400' : 'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {log.direction}
+                            </span>
+
+                            {log.phone && (
+                              <span className="text-stone-300 font-bold">📱 {log.phone}</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {log.code && (
+                              <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 text-[10px] rounded font-bold">
+                                Error #{log.code}
+                              </span>
+                            )}
+
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              isSucc ? 'bg-emerald-500/20 text-emerald-400' :
+                              isErr ? 'bg-rose-500/20 text-rose-400' : 'bg-stone-800 text-stone-300'
+                            }`}>
+                              {log.status}
+                            </span>
+
+                            <span className="text-stone-500 text-[10px]">
+                              {isExpanded ? 'Ficha Payload ▲' : 'Onyesha JSON ▼'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Summary */}
+                        <div className="mt-2 text-stone-200 text-xs font-sans">
+                          {log.summary}
+                        </div>
+
+                        {/* Expanded Full JSON Payload */}
+                        {isExpanded && (
+                          <div className="mt-4 pt-4 border-t border-stone-800 space-y-3 font-mono">
+                            <div className="flex items-center justify-between text-[11px] text-stone-400">
+                              <span>Meta Webhook / API Payload (Full JSON):</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(JSON.stringify(log, null, 2));
+                                  if (onShowToast) onShowToast('Imenakiliwa', 'JSON payload imenakiliwa kwenye clipboard.', 'success');
+                                }}
+                                className="px-2 py-1 bg-stone-800 hover:bg-stone-700 text-white rounded text-[10px] cursor-pointer"
+                              >
+                                Nakili JSON
+                              </button>
+                            </div>
+                            <pre className="bg-stone-900 p-4 rounded-xl text-emerald-400 text-[11px] overflow-x-auto max-h-80">
+                              {JSON.stringify(log, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. SUBTAB CONTENT: SIMULATOR (Real Live WhatsApp UI Simulator) */}
       {activeSubTab === 'simulator' && (
