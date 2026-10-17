@@ -122,6 +122,35 @@ function buildMetaGraphUrl(baseUrl: string, token: string, secret?: string): str
   return baseUrl;
 }
 
+const CONFIG_FILE = path.resolve(__dirname, 'whatsapp-config.json');
+
+function loadSavedWhatsAppConfig() {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      if (data && typeof data === 'object') {
+        Object.assign(whatsAppConfig, data);
+        console.log('[WhatsApp Config] Loaded persisted config from disk:', {
+          phoneNumberId: whatsAppConfig.phoneNumberId,
+          hasToken: Boolean(whatsAppConfig.accessToken && whatsAppConfig.accessToken.length > 20)
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('[WhatsApp Config] Could not load saved config:', e);
+  }
+}
+
+function saveWhatsAppConfig() {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(whatsAppConfig, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[WhatsApp Config] Could not persist config to disk:', e);
+  }
+}
+
+loadSavedWhatsAppConfig();
+
 // WhatsApp Config endpoint
 app.post('/api/v1/whatsapp/config', (req, res) => {
   const { provider, phoneNumberId, accessToken, appSecret, verifyToken, appId, wabaId, displayPhoneNumber } = req.body;
@@ -137,7 +166,9 @@ app.post('/api/v1/whatsapp/config', (req, res) => {
   if (verifyToken !== undefined) whatsAppConfig.verifyToken = String(verifyToken).trim();
   if (appId !== undefined) whatsAppConfig.appId = String(appId).trim();
 
-  console.log('[WhatsApp Config] Updated config:', {
+  saveWhatsAppConfig();
+
+  console.log('[WhatsApp Config] Updated and saved config:', {
     provider: whatsAppConfig.provider,
     appId: whatsAppConfig.appId,
     phoneNumberId: whatsAppConfig.phoneNumberId,
