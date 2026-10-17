@@ -310,6 +310,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     resetDemoData,
     currentClientSession,
     activeTenant,
+    tenants,
+    switchTenant,
     renewTenantSubscription,
   } = useHotspot();
 
@@ -1268,18 +1270,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-center">
+            {/* Quick Tenant Switcher Dropdown */}
+            <div className="flex items-center gap-1.5 bg-white/90 border border-stone-300 rounded-xl px-2 py-1 shadow-2xs">
+              <span className="text-[10px] font-bold text-stone-500 uppercase">Tazama Kama:</span>
+              <select
+                value={activeTenant?.id || 'tenant-lema-hq'}
+                onChange={(e) => {
+                  switchTenant(e.target.value);
+                  showToast(
+                    'Umebadili Dashibodi',
+                    `Sasa unaona dashibodi ya: ${tenants.find(t => t.id === e.target.value)?.businessName || 'Hotspot'}`,
+                    'info'
+                  );
+                }}
+                className="bg-transparent text-stone-900 text-xs font-bold focus:outline-none cursor-pointer"
+              >
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.id === 'tenant-lema-hq' ? `👑 ${t.businessName} (Super Admin)` : `🏢 ${t.businessName} (${t.ownerName})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Return to Super Admin Button if viewing as tenant */}
+            {activeTenant?.id !== 'tenant-lema-hq' && (
+              <button
+                type="button"
+                onClick={() => {
+                  switchTenant('tenant-lema-hq');
+                  showToast('Super Admin HQ', 'Umerudi kwenye Jopo Kuu la Jimmy Lema HQ', 'success');
+                }}
+                className="px-2.5 py-1 text-xs font-black bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl transition-all cursor-pointer shadow-xs flex items-center gap-1 active:scale-95"
+                title="Rudi kwenye akaunti kuu ya Super Admin"
+              >
+                <Crown className="w-3.5 h-3.5 text-stone-950" />
+                <span>Rudi Super Admin</span>
+              </button>
+            )}
+
             {activeTenant?.id !== 'tenant-lema-hq' && activeTenant?.subscription && (
-              <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-blue-900 shadow-2xs">
-                Leseni: {activeTenant.subscription.daysRemaining} Siku Zimebaki
+              <span className="text-[11px] font-mono font-bold px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 shadow-2xs">
+                Leseni: {activeTenant.subscription.daysRemaining}d
               </span>
             )}
+
             {onLogout && (
               <button
                 onClick={onLogout}
                 className="px-2.5 py-1 text-xs font-bold text-stone-600 hover:text-rose-600 hover:bg-rose-50 border border-stone-300 rounded-lg transition-colors cursor-pointer"
               >
-                Toka (Logout)
+                Toka
               </button>
             )}
           </div>
