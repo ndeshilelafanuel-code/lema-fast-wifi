@@ -1094,7 +1094,7 @@ app.get('/api/v1/whatsapp/webhook', (req, res) => {
   const challenge = req.query['hub.challenge'];
 
   // Meta Webhook Verification Challenge
-  const expectedTokens = [whatsAppConfig.verifyToken, 'lema_wifi_webhook_token', 'lema_fast_wifi'].filter(Boolean);
+  const expectedTokens = [whatsAppConfig.verifyToken, 'lema_wifi_webhook_token', 'lema_wifi_webhook_toke', 'lema_fast_wifi'].filter(Boolean);
   if (mode === 'subscribe' && typeof token === 'string' && expectedTokens.includes(token)) {
     console.log('✅ [Meta WhatsApp Webhook Verified Successfully!] Challenge token sent back to Meta.');
     addWhatsAppLog({

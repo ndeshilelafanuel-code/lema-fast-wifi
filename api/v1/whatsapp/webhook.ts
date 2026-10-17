@@ -49,6 +49,7 @@ export default async function handler(req: any, res: any) {
     const expectedTokens = [
       process.env.WHATSAPP_VERIFY_TOKEN,
       'lema_wifi_webhook_token',
+      'lema_wifi_webhook_toke',
       'lema_fast_wifi'
     ].filter(Boolean);
 
