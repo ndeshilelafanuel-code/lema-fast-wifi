@@ -141,13 +141,18 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   
   // Meta WhatsApp Cloud API credentials
   const [metaAppId, setMetaAppId] = useState<string>(() => localStorage.getItem('lema_meta_app_id') || '1860632731565594');
-  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState<string>(() => localStorage.getItem('lema_meta_phone_number_id') || '1424208230767782');
+  const [metaWabaId, setMetaWabaId] = useState<string>(() => localStorage.getItem('lema_meta_waba_id') || '1578703743479175');
+  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState<string>(() => {
+    const saved = localStorage.getItem('lema_meta_phone_number_id');
+    return (!saved || saved === '1424208230767782') ? '1348304901706270' : saved;
+  });
+  const [metaDisplayPhone, setMetaDisplayPhone] = useState<string>(() => localStorage.getItem('lema_meta_display_phone') || '+255 621 311 137');
   const [metaAccessToken, setMetaAccessToken] = useState<string>(() => localStorage.getItem('lema_meta_access_token') || '');
   const [metaVerifyToken, setMetaVerifyToken] = useState<string>(() => localStorage.getItem('lema_meta_verify_token') || 'lema_wifi_webhook_token');
-  const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0653578184');
+  const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0621311137');
 
-  const [botPhoneNumber, setBotPhoneNumber] = useState<string>('0653 578 184');
-  const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0653578184');
+  const [botPhoneNumber, setBotPhoneNumber] = useState<string>('0621 311 137');
+  const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0621311137');
   const [isBotConnected, setIsBotConnected] = useState<boolean>(true);
   const [isTestingSend, setIsTestingSend] = useState<boolean>(false);
   const [testSendResult, setTestSendResult] = useState<{ message: string; isError: boolean; isOAuth?: boolean; isNotRegistered?: boolean } | null>(null);
@@ -364,9 +369,17 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
           setMetaAppId(cfg.appId);
           localStorage.setItem('lema_meta_app_id', cfg.appId);
         }
+        if (cfg?.wabaId) {
+          setMetaWabaId(cfg.wabaId);
+          localStorage.setItem('lema_meta_waba_id', cfg.wabaId);
+        }
         if (cfg?.phoneNumberId) {
           setMetaPhoneNumberId(cfg.phoneNumberId);
           localStorage.setItem('lema_meta_phone_number_id', cfg.phoneNumberId);
+        }
+        if (cfg?.displayPhoneNumber) {
+          setMetaDisplayPhone(cfg.displayPhoneNumber);
+          localStorage.setItem('lema_meta_display_phone', cfg.displayPhoneNumber);
         }
         if (cfg?.accessToken) {
           setMetaAccessToken(cfg.accessToken);
@@ -1487,14 +1500,50 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                   </div>
                 )}
 
+                {/* Official Meta Verified Phone Number Badge */}
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                      ✓
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-stone-900 text-sm">{metaDisplayPhone || '+255 621 311 137'}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white tracking-wide uppercase">
+                          VERIFIED CLOUD API
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-600 mt-0.5">
+                        Jina Lililothibitishwa: <strong className="text-emerald-950">Lema Fast WiFi</strong> • WhatsApp Business Account: <strong className="font-mono text-stone-800">{metaWabaId || '1578703743479175'}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto font-mono text-[11px] bg-white px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-800 font-bold">
+                    <span>Phone ID: {metaPhoneNumberId}</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-stone-700 font-bold block mb-1">Meta App ID (Kutoka developers.facebook.com):</label>
+                    <label className="text-stone-700 font-bold block mb-1">Meta App ID (developers.facebook.com):</label>
                     <input
                       type="text"
                       value={metaAppId}
                       onChange={(e) => setMetaAppId(e.target.value)}
                       placeholder="1860632731565594"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-stone-700 font-bold block mb-1">
+                      WABA Account ID (WhatsApp Business Account):
+                    </label>
+                    <input
+                      type="text"
+                      value={metaWabaId}
+                      onChange={(e) => setMetaWabaId(e.target.value)}
+                      placeholder="1578703743479175"
                       className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -1507,7 +1556,20 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       type="text"
                       value={metaPhoneNumberId}
                       onChange={(e) => setMetaPhoneNumberId(e.target.value)}
-                      placeholder="1424208230767782"
+                      placeholder="1348304901706270"
+                      className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-stone-700 font-bold block mb-1">
+                      Namba ya Simu Iliyothibitishwa (Display Phone Number):
+                    </label>
+                    <input
+                      type="text"
+                      value={metaDisplayPhone}
+                      onChange={(e) => setMetaDisplayPhone(e.target.value)}
+                      placeholder="+255 621 311 137"
                       className="w-full px-3 py-2 border border-stone-300 rounded-xl bg-white font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -1714,7 +1776,9 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                   <button
                     onClick={async () => {
                       localStorage.setItem('lema_meta_app_id', metaAppId);
+                      localStorage.setItem('lema_meta_waba_id', metaWabaId);
                       localStorage.setItem('lema_meta_phone_number_id', metaPhoneNumberId);
+                      localStorage.setItem('lema_meta_display_phone', metaDisplayPhone);
                       localStorage.setItem('lema_meta_access_token', metaAccessToken);
                       localStorage.setItem('lema_meta_verify_token', metaVerifyToken);
 
@@ -1725,6 +1789,8 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                           body: JSON.stringify({
                             provider: 'meta',
                             appId: metaAppId,
+                            wabaId: metaWabaId,
+                            displayPhoneNumber: metaDisplayPhone,
                             phoneNumberId: metaPhoneNumberId,
                             accessToken: metaAccessToken,
                             verifyToken: metaVerifyToken

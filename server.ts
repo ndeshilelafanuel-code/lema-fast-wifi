@@ -32,6 +32,9 @@ const recentMessages: StoredMessage[] = [];
 interface WhatsAppConfig {
   provider: 'meta';
   phoneNumberId: string;
+  wabaId?: string;
+  displayPhoneNumber?: string;
+  verifiedName?: string;
   accessToken: string;
   verifyToken: string;
   appId: string;
@@ -46,7 +49,10 @@ interface WhatsAppConfig {
 
 let whatsAppConfig: WhatsAppConfig = {
   provider: 'meta',
-  phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782',
+  phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270',
+  wabaId: process.env.WHATSAPP_WABA_ID || '1578703743479175',
+  displayPhoneNumber: '+255 621 311 137',
+  verifiedName: 'Lema Fast WiFi',
   accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
   verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'lema_wifi_webhook_token',
   appId: process.env.WHATSAPP_APP_ID || '1860632731565594',
@@ -55,9 +61,11 @@ let whatsAppConfig: WhatsAppConfig = {
 
 // WhatsApp Config endpoint
 app.post('/api/v1/whatsapp/config', (req, res) => {
-  const { provider, phoneNumberId, accessToken, verifyToken, appId } = req.body;
+  const { provider, phoneNumberId, accessToken, verifyToken, appId, wabaId, displayPhoneNumber } = req.body;
   if (provider) whatsAppConfig.provider = 'meta';
   if (phoneNumberId !== undefined) whatsAppConfig.phoneNumberId = String(phoneNumberId).trim();
+  if (wabaId !== undefined) whatsAppConfig.wabaId = String(wabaId).trim();
+  if (displayPhoneNumber !== undefined) whatsAppConfig.displayPhoneNumber = String(displayPhoneNumber).trim();
   if (accessToken !== undefined) {
     whatsAppConfig.accessToken = String(accessToken).trim();
     whatsAppConfig.lastError = null;
@@ -118,7 +126,7 @@ async function registerMetaPhoneNumber(phoneId: string, token: string, pin: stri
 app.post('/api/v1/whatsapp/register-phone', async (req, res) => {
   const { pin } = req.body || {};
   const token = (whatsAppConfig.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
-  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782').trim();
+  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270').trim();
 
   if (!token || token.length < 25) {
     return res.status(400).json({
@@ -158,7 +166,7 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string)
     : '255' + digits;
 
   const token = (whatsAppConfig.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
-  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782').trim();
+  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270').trim();
 
   // Validate if token is real Meta token (must not be empty, placeholder or too short)
   const isPlaceholderOrInvalid = !token || token.toLowerCase().includes('token string') || token.length < 25;

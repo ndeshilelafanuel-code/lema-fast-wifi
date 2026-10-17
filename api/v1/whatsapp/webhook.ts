@@ -68,7 +68,7 @@ export default async function handler(req: any, res: any) {
               replyText = `Habari ${senderName}! 👋\nKaribu *Lema Fast WiFi* Smart Assistant.\n\n📶 *VIFURUSHI VYA INTANETI:*\n1️⃣ Saa 2 (TZS 500) ➔ Jibu: *1*\n2️⃣ Siku 1 (TZS 1,000) ➔ Jibu: *2*\n3️⃣ Wiki 1 (TZS 5,000) ➔ Jibu: *3*\n4️⃣ Mwezi 1 (TZS 25,000) ➔ Jibu: *4*\n\nAndika namba kupata vocha mara moja au andika *ADMIN* kuwasiliana na Jimmy Lema (0653 578 184).`;
             }
 
-            const phoneNumberId = (process.env.WHATSAPP_PHONE_NUMBER_ID || '1424208230767782').trim();
+            const phoneNumberId = (process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270').trim();
             const accessToken = (process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 
             if (phoneNumberId && accessToken && accessToken.length > 25 && !accessToken.toLowerCase().includes('token string')) {
