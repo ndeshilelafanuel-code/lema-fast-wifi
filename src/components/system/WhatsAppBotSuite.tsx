@@ -2271,7 +2271,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                         setIsTestingSend(true);
                         setTestSendResult(null);
                         try {
-                          const res = await fetch('/api/v1/whatsapp/test-send', {
+                          let res = await fetch('/api/v1/whatsapp/test-send', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -2297,12 +2297,34 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                             data = null;
                           }
 
+                          // Auto-retry once after 1s if server was momentarily restarting (502/503 or HTML response)
+                          if (!data && (rawText.includes('<!DOCTYPE') || rawText.includes('<html') || res.status === 502 || res.status === 503)) {
+                            await new Promise((resolve) => setTimeout(resolve, 1000));
+                            try {
+                              res = await fetch('/api/v1/whatsapp/test-send', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  phone: testRecipientPhone,
+                                  accessToken: metaAccessToken,
+                                  appSecret: metaAppSecret,
+                                  phoneNumberId: metaPhoneNumberId,
+                                  message: `🤖 *LEMA FAST WIFI BOT (META CLOUD API)*\n\nHabari! Ujumbe huu umetumwa kutoka Meta WhatsApp Cloud API ya Lema Fast WiFi.\nMfumo wako wa kugawa vocha na kupokea maswali uko tayari kwa 100% bila kikomo cha namba!`
+                                })
+                              });
+                              rawText = await res.text();
+                              data = rawText ? JSON.parse(rawText) : null;
+                            } catch {
+                              data = null;
+                            }
+                          }
+
                           setIsTestingSend(false);
 
                           if (!data) {
                             if (rawText.includes('<!DOCTYPE') || rawText.includes('<html') || res.status === 502 || res.status === 503) {
                               setTestSendResult({
-                                message: '🔄 Seva ilikuwa inawaka upya. Tafadhali bonyeza tena "Tuma Jaribio (Text)" sasa, itafanya kazi.',
+                                message: '🔄 Seva imekamilisha kuwaka. Bonyeza tena "Tuma Jaribio (Text)" sasa.',
                                 isError: true
                               });
                             } else {
