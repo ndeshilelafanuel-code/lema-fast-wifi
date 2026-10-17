@@ -2279,6 +2279,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                               accessToken: metaAccessToken,
                               appSecret: metaAppSecret,
                               phoneNumberId: metaPhoneNumberId,
+                              useTemplate: false,
                               message: `🤖 *LEMA FAST WIFI BOT (META CLOUD API)*\n\nHabari! Ujumbe huu umetumwa kutoka Meta WhatsApp Cloud API ya Lema Fast WiFi.\nMfumo wako wa kugawa vocha na kupokea maswali uko tayari kwa 100% bila kikomo cha namba!`
                             })
                           });
@@ -2309,6 +2310,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                                   accessToken: metaAccessToken,
                                   appSecret: metaAppSecret,
                                   phoneNumberId: metaPhoneNumberId,
+                                  useTemplate: false,
                                   message: `🤖 *LEMA FAST WIFI BOT (META CLOUD API)*\n\nHabari! Ujumbe huu umetumwa kutoka Meta WhatsApp Cloud API ya Lema Fast WiFi.\nMfumo wako wa kugawa vocha na kupokea maswali uko tayari kwa 100% bila kikomo cha namba!`
                                 })
                               });
@@ -2322,24 +2324,17 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                           setIsTestingSend(false);
 
                           if (!data) {
-                            if (rawText.includes('<!DOCTYPE') || rawText.includes('<html') || res.status === 502 || res.status === 503) {
-                              setTestSendResult({
-                                message: '🔄 Seva imekamilisha kuwaka. Bonyeza tena "Tuma Jaribio (Text)" sasa.',
-                                isError: true
-                              });
-                            } else {
-                              setTestSendResult({
-                                message: `⚠️ Seva (${res.status}): Tafadhali hakikisha umebofya "Hifadhi Mipangilio ya Meta" kisha bonyeza tena jaribio.`,
-                                isError: true
-                              });
-                            }
+                            setTestSendResult({
+                              message: `⚠️ Seva (${res.status}): Tafadhali hakikisha umebofya "Hifadhi Mipangilio ya Meta" kisha bonyeza tena jaribio.`,
+                              isError: true
+                            });
                             return;
                           }
 
                           if (data?.result?.messages || (data?.success && data?.result?.messages)) {
                             const msgId = data?.result?.messages?.[0]?.id || '';
                             setTestSendResult({
-                              message: `✅ Ujumbe umekubaliwa na Meta Cloud API (ID: ${msgId.slice(0, 16)}...)! Kumbuka: Ikiwa haujatokea simuni, fungua WhatsApp na umtumie bot ujumbe "Habari" kupitia kitufe cha juu ili kufungua dirisha la masaa 24.`,
+                              message: `✅ Ujumbe umekubaliwa na Meta Cloud API (ID: ${msgId.slice(0, 16)}...)! Kumbuka: Kwenye ujumbe wa maandishi ya bure (Text), mteja anapaswa kuwa amewahi kumwandikia bot (wa.me/255621311137) ndani ya masaa 24 yaliyopita ili ufike simuni.`,
                               isError: false
                             });
                             if (onShowToast) onShowToast('Jaribio Limetumwa!', `Meta imekubali ujumbe kwenda ${testRecipientPhone}`, 'success');
@@ -2396,6 +2391,69 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                       className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50"
                     >
                       {isTestingSend ? 'Inatuma...' : 'Tuma Jaribio (Text) 📲'}
+                    </button>
+
+                    <button
+                      disabled={isTestingSend}
+                      onClick={async () => {
+                        const cleanPhone = testRecipientPhone.replace(/[^0-9]/g, '');
+                        if (!cleanPhone || cleanPhone.length < 9) {
+                          if (onShowToast) onShowToast('Weka Namba ya Simu', 'Tafadhali andika namba yako ya WhatsApp kupokea jaribio', 'warning');
+                          return;
+                        }
+                        if (cleanPhone === '0621311137' || cleanPhone === '255621311137') {
+                          if (onShowToast) onShowToast('Namba ya Bot', 'Huwezi kutuma kwenda namba ile ile ya Bot! Weka namba yako binafsi.', 'warning');
+                          setTestSendResult({
+                            message: '⚠️ Huwezi kutuma ujumbe kwenda namba ile ile ya Bot (+255 621 311 137). Tafadhali weka namba yako binafsi ya simu.',
+                            isError: true
+                          });
+                          return;
+                        }
+
+                        setIsTestingSend(true);
+                        setTestSendResult(null);
+                        try {
+                          const res = await fetch('/api/v1/whatsapp/test-send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              phone: testRecipientPhone,
+                              accessToken: metaAccessToken,
+                              appSecret: metaAppSecret,
+                              phoneNumberId: metaPhoneNumberId,
+                              useTemplate: true
+                            })
+                          });
+
+                          const data: any = await res.json().catch(() => null);
+                          setIsTestingSend(false);
+
+                          if (data?.result?.messages || (data?.success && data?.result?.messages)) {
+                            const msgId = data?.result?.messages?.[0]?.id || '';
+                            setTestSendResult({
+                              message: `✅ Template ya "hello_world" imekubaliwa na Meta (ID: ${msgId.slice(0, 16)}...)! Template hupita mara moja simuni bila kusubiri mteja amwandikie bot.`,
+                              isError: false
+                            });
+                            if (onShowToast) onShowToast('Template Imetumwa!', `Meta imekubali template kwenda ${testRecipientPhone}`, 'success');
+                          } else if (data?.result?.error || data?.error) {
+                            const metaErrMsg = data?.message || data?.result?.userTip || data?.result?.message || data?.result?.error?.message || JSON.stringify(data?.result?.error);
+                            setTestSendResult({
+                              message: `⚠️ Hitilafu kutoka Meta: ${metaErrMsg}`,
+                              isError: true
+                            });
+                          }
+                        } catch (err: any) {
+                          setIsTestingSend(false);
+                          setTestSendResult({
+                            message: `⚠️ Hitilafu: ${err?.message || 'Mawasiliano na seva yameshindikana'}.`,
+                            isError: true
+                          });
+                        }
+                      }}
+                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50"
+                      title="Template ya Meta (hello_world) inafika simuni mara moja bila kizuizi cha masaa 24"
+                    >
+                      {isTestingSend ? 'Inatuma...' : 'Tuma Template (Bila Masaa 24) ⭐️'}
                     </button>
                   </div>
 
