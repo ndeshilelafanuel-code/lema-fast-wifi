@@ -1252,6 +1252,9 @@ async function startServer() {
 
     app.use('*', async (req, res, next) => {
       const url = req.originalUrl;
+      if (url.startsWith('/api/')) {
+        return res.status(404).json({ success: false, error: true, message: `API endpoint haijapatikana: ${url}` });
+      }
       try {
         let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
         template = await vite.transformIndexHtml(url, template);
@@ -1263,7 +1266,10 @@ async function startServer() {
     });
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.use('*', (_req, res) => {
+    app.use('*', (req, res) => {
+      if (req.originalUrl.startsWith('/api/')) {
+        return res.status(404).json({ success: false, error: true, message: `API endpoint haijapatikana: ${req.originalUrl}` });
+      }
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   }

@@ -341,14 +341,19 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: pinToUse || registerPin || '123456' })
       });
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
       setIsRegisteringPhone(false);
-      if (data.success) {
+      if (data?.success) {
         setMetaLastError(null);
         setRegisterSuccessMessage('✅ Namba imesajiliwa kikamilifu kwenye Meta WhatsApp Cloud API! Sasa ujumbe unaweza kutoka.');
         if (onShowToast) onShowToast('Usajili Umefaulu! 🎉', 'Namba ya simu imesajiliwa Meta Cloud API', 'success');
       } else {
-        const errMsg = data?.error?.message || data?.message || 'Hitilafu ya kusajili namba Meta';
+        const errMsg = data?.error?.message || data?.message || 'Hitilafu ya kusajili namba Meta au seva inawaka.';
         if (onShowToast) onShowToast('Hitilafu ya Usajili', errMsg, 'error');
       }
     } catch (err: any) {
@@ -1870,13 +1875,38 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                               message: `🤖 *LEMA FAST WIFI BOT (META CLOUD API)*\n\nHabari! Ujumbe huu umetumwa kutoka Meta WhatsApp Cloud API ya Lema Fast WiFi.\nMfumo wako wa kugawa vocha na kupokea maswali uko tayari kwa 100% bila kikomo cha namba!`
                             })
                           });
-                          let data: any;
+
+                          let rawText = '';
                           try {
-                            data = await res.json();
-                          } catch (parseErr) {
-                            throw new Error(`Seva (${res.status}): Hitilafu ya jibu toka seva.`);
+                            rawText = await res.text();
+                          } catch {
+                            rawText = '';
                           }
+
+                          let data: any = null;
+                          try {
+                            data = rawText ? JSON.parse(rawText) : null;
+                          } catch {
+                            data = null;
+                          }
+
                           setIsTestingSend(false);
+
+                          if (!data) {
+                            if (rawText.includes('<!DOCTYPE') || rawText.includes('<html') || res.status === 502 || res.status === 503) {
+                              setTestSendResult({
+                                message: '🔄 Seva ilikuwa inawaka upya. Tafadhali bonyeza tena "Tuma Jaribio (Text)" sasa, itafanya kazi.',
+                                isError: true
+                              });
+                            } else {
+                              setTestSendResult({
+                                message: `⚠️ Seva (${res.status}): Tafadhali hakikisha umebofya "Hifadhi Mipangilio ya Meta" kisha bonyeza tena jaribio.`,
+                                isError: true
+                              });
+                            }
+                            return;
+                          }
+
                           if (data?.result?.messages || (data?.success && data?.result?.messages)) {
                             const msgId = data?.result?.messages?.[0]?.id || '';
                             setTestSendResult({
@@ -1929,7 +1959,7 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                         } catch (err: any) {
                           setIsTestingSend(false);
                           setTestSendResult({
-                            message: `⚠️ Hitilafu: ${err?.message || 'Mawasiliano na seva yameshindikana'}. Hakikisha seva ipo hewani na umebofya "Hifadhi Mipangilio ya Meta".`,
+                            message: `⚠️ Hitilafu: ${err?.message || 'Mawasiliano na seva yameshindikana'}. Bonyeza tena "Tuma Jaribio" sasa.`,
                             isError: true
                           });
                         }
