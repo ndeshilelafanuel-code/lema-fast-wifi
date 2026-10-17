@@ -227,7 +227,18 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string,
         },
         body: JSON.stringify(requestBody)
       });
-      const data: any = await response.json();
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch (jsonErr: any) {
+        const text = await response.text().catch(() => '');
+        console.error('[Meta WhatsApp Cloud API] Response not JSON:', response.status, text);
+        return {
+          error: true,
+          message: `Meta API returned HTTP ${response.status}: ${text.slice(0, 100)}`
+        };
+      }
 
       if (data?.error) {
         const errorType = data.error.type || 'MetaAPIError';
@@ -277,7 +288,11 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string,
         };
 
         let userTip = errorMessage;
-        if (isAppSecretProof) {
+        if (errorCode === 131058 || errorMessage.includes('131058')) {
+          userTip = 'Kwenye namba halisi ya uzalishaji (Meta Verified kama +255 621 311 137), template ya majaribio ya "hello_world" haitumiki (ni ya Test Numbers pekee). Tumia "Tuma Jaribio (Text)" au mwandikie bot kwanza wa.me/255621311137.';
+        } else if (errorCode === 100 && errorMessage.includes('Invalid parameter')) {
+          userTip = 'Vigezo visivyo sahihi. Hakikisha namba ya mpokeaji ni namba yako binafsi na si namba ile ile ya Bot (+255 621 311 137).';
+        } else if (isAppSecretProof) {
           userTip = 'Kwenye Meta App Dashboard yako, mpangilio wa "Require App Secret" umewashwa. Chaguo 1 (Haraka): Zima kwenye developers.facebook.com ➔ App Settings ➔ Advanced ➔ Security ➔ "Require App Secret": Weka OFF ➔ Save Changes. Chaguo 2: Bandika App Secret yako hapa chini kwenye kisanduku cha App Secret.';
         } else if (isNotRegistered) {
           userTip = 'Namba haijasajiliwa Meta (Code 133010: Account not registered). Mfumo unakuruhusu kubonyeza "Sajili Namba Meta" chini au hakikisha namba ya mpokeaji imeongezwa kwenye orodha ya "To" kwenye Meta Developers.';
@@ -343,14 +358,64 @@ app.post('/api/v1/whatsapp/reply', async (req, res) => {
 
 // Test send endpoint
 app.post('/api/v1/whatsapp/test-send', async (req, res) => {
-  const { phone, message, useTemplate } = req.body;
-  const targetPhone = phone || '255653578184';
-  const result = await sendWhatsAppMessage(
-    targetPhone,
-    message || 'Jaribio la Lema Fast WiFi Bot 🤖: Mtandao unafanya kazi kikamilifu!',
-    useTemplate ? 'hello_world' : undefined
-  );
-  return res.json({ success: true, targetPhone, result, useTemplate: Boolean(useTemplate) });
+  try {
+    const { phone, message, useTemplate, accessToken, appSecret, phoneNumberId } = req.body;
+    if (accessToken && typeof accessToken === 'string' && accessToken.length > 20) {
+      whatsAppConfig.accessToken = accessToken.trim();
+    }
+    if (appSecret !== undefined && typeof appSecret === 'string') {
+      whatsAppConfig.appSecret = appSecret.trim();
+    }
+    if (phoneNumberId && typeof phoneNumberId === 'string') {
+      whatsAppConfig.phoneNumberId = phoneNumberId.trim();
+    }
+
+    const rawTarget = (phone || '').trim();
+    const digits = rawTarget.replace(/[^0-9]/g, '');
+    const normalizedTarget = digits.startsWith('0') ? '255' + digits.slice(1) : digits;
+    const botDigits = (whatsAppConfig.displayPhoneNumber || '255621311137').replace(/[^0-9]/g, '');
+
+    if (!rawTarget) {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: 'Tafadhali weka namba ya simu ya mpokeaji (mfano: 0755123456 au 0653578184).'
+      });
+    }
+
+    if (normalizedTarget === botDigits || normalizedTarget === '255621311137') {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: 'Huwezi kutuma ujumbe kwenda namba ile ile ya Bot (+255 621 311 137). Tafadhali weka namba yako binafsi ya WhatsApp (mfano: 07... au 0653...).'
+      });
+    }
+
+    const result = await sendWhatsAppMessage(
+      rawTarget,
+      message || 'Jaribio la Lema Fast WiFi Bot 🤖: Mtandao unafanya kazi kikamilifu!',
+      useTemplate ? 'hello_world' : undefined
+    );
+
+    if (result?.error) {
+      return res.json({
+        success: false,
+        error: true,
+        targetPhone: rawTarget,
+        result,
+        useTemplate: Boolean(useTemplate)
+      });
+    }
+
+    return res.json({ success: true, targetPhone: rawTarget, result, useTemplate: Boolean(useTemplate) });
+  } catch (err: any) {
+    console.error('[Test Send Route Error]:', err);
+    return res.status(500).json({
+      success: false,
+      error: true,
+      message: err?.message || 'Server error during test send'
+    });
+  }
 });
 
 // -------------------------------------------------------------
@@ -793,6 +858,39 @@ app.post('/api/v1/whatsapp/webhook', async (req, res) => {
           await sendWhatsAppMessage(senderPhone, replyText);
         }
       }
+
+      // Meta WhatsApp Delivery Status Updates & Error Tracking
+      const statuses = value?.statuses;
+      if (Array.isArray(statuses) && statuses.length > 0) {
+        for (const st of statuses) {
+          const status = st.status; // 'sent' | 'delivered' | 'read' | 'failed'
+          const recipient = st.recipient_id;
+          console.log(`[Meta WhatsApp Webhook Status] Message ${st.id} to ${recipient}: ${status}`);
+
+          if (status === 'failed' && st.errors?.length) {
+            const err = st.errors[0];
+            const code = err.code;
+            const title = err.title || 'Ujumbe haukufikishwa';
+            const details = err.error_data?.details || err.message || '';
+            console.error(`[Meta WhatsApp Delivery Failure] Recipient: ${recipient}, Code: ${code}, Details: ${details}`);
+
+            let tip = details;
+            if (code === 131047) {
+              tip = `Zaidi ya masaa 24 yamepita tangu ${recipient} awasiliane na bot (Meta 24-Hour Customer Care Window). Meta inazuia ujumbe wa maandishi ya bure hadi mwenye namba hii afungue WhatsApp na kumwandikia bot kwanza wa.me/255621311137.`;
+            }
+
+            whatsAppConfig.lastError = {
+              type: 'DeliveryFailed',
+              code,
+              message: `⚠️ Meta Delivery Status: Ujumbe kwa +${recipient} haukufika simuni: ${title} (#${code}) - ${tip}`,
+              timestamp: new Date().toLocaleTimeString()
+            };
+          } else if (status === 'delivered') {
+            console.log(`[Meta WhatsApp] ✅ Ujumbe umefika kwenye simu ya +${recipient}`);
+          }
+        }
+      }
+
       return res.status(200).send('EVENT_RECEIVED');
     }
   } catch (error) {

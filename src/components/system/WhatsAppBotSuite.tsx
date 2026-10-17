@@ -150,10 +150,10 @@ export const WhatsAppBotSuite: React.FC<WhatsAppBotSuiteProps> = ({
   const [metaAccessToken, setMetaAccessToken] = useState<string>(() => localStorage.getItem('lema_meta_access_token') || '');
   const [metaAppSecret, setMetaAppSecret] = useState<string>(() => localStorage.getItem('lema_meta_app_secret') || '');
   const [metaVerifyToken, setMetaVerifyToken] = useState<string>(() => localStorage.getItem('lema_meta_verify_token') || 'lema_wifi_webhook_token');
-  const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0621311137');
+  const [testRecipientPhone, setTestRecipientPhone] = useState<string>('0653578184');
 
   const [botPhoneNumber, setBotPhoneNumber] = useState<string>('0621 311 137');
-  const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0621311137');
+  const [adminNotificationPhone, setAdminNotificationPhone] = useState<string>('0653578184');
   const [isBotConnected, setIsBotConnected] = useState<boolean>(true);
   const [isTestingSend, setIsTestingSend] = useState<boolean>(false);
   const [testSendResult, setTestSendResult] = useState<{ message: string; isError: boolean; isOAuth?: boolean; isNotRegistered?: boolean; isAppSecretProof?: boolean } | null>(null);
@@ -386,6 +386,30 @@ Nimekutumia tahadhari kwa Msimamizi wetu na nimeweka suala lako kwenye Dashboard
         if (cfg?.accessToken) {
           setMetaAccessToken(cfg.accessToken);
           localStorage.setItem('lema_meta_access_token', cfg.accessToken);
+        } else {
+          // If server was restarted and has empty token, re-hydrate server with browser's saved token
+          const localToken = localStorage.getItem('lema_meta_access_token');
+          const localSecret = localStorage.getItem('lema_meta_app_secret');
+          const localPhoneId = localStorage.getItem('lema_meta_phone_number_id');
+          const localAppId = localStorage.getItem('lema_meta_app_id');
+          const localWabaId = localStorage.getItem('lema_meta_waba_id');
+          const localDisplayPhone = localStorage.getItem('lema_meta_display_phone');
+          if (localToken && localToken.length > 20) {
+            fetch('/api/v1/whatsapp/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                provider: 'meta',
+                appId: localAppId || '1860632731565594',
+                wabaId: localWabaId || '1578703743479175',
+                displayPhoneNumber: localDisplayPhone || '+255 621 311 137',
+                phoneNumberId: localPhoneId || '1348304901706270',
+                accessToken: localToken,
+                appSecret: localSecret || '',
+                verifyToken: 'lema_wifi_webhook_token'
+              })
+            }).catch(() => {});
+          }
         }
         if (cfg?.appSecret) {
           setMetaAppSecret(cfg.appSecret);
@@ -1780,19 +1804,58 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                   </p>
                 </div>
 
+                {/* Meta 24h Window Guide & Direct Chat */}
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <strong className="text-xs text-emerald-950">Namba ya Bot: +255 621 311 137 (Lema Fast WiFi)</strong>
+                    </div>
+                    <a
+                      href="https://wa.me/255621311137?text=Habari%20Lema%20Fast%20WiFi"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-xs"
+                      title="Mtumie bot ujumbe sasa hivi ili kufungua dirisha la masaa 24"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Fungua WhatsApp & Anza Chat 💬</span>
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed font-sans">
+                    💡 <strong>Kanuni ya Meta Cloud API:</strong> Ili ujumbe wa maandishi (Text) ufike kwenye simu yako, <strong>mteja lazima amwandikie bot ujumbe ndani ya masaa 24 yaliyopita</strong> (24-Hour Customer Care Window). Ikiwa hujaandika kwa bot bado, bofya kitufe cha kijani hapo juu kutuma "Habari", na bot itakujibu papo hapo!
+                  </p>
+                </div>
+
                 {/* Save & Test Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-stone-200">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={testRecipientPhone}
-                      onChange={(e) => setTestRecipientPhone(e.target.value)}
-                      placeholder="0653578184"
-                      className="px-3 py-1.5 border border-stone-300 rounded-xl bg-white font-mono text-xs w-36"
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={testRecipientPhone}
+                        onChange={(e) => setTestRecipientPhone(e.target.value)}
+                        placeholder="Namba yako (07... au 06...)"
+                        className="px-3 py-1.5 border border-stone-300 rounded-xl bg-white font-mono text-xs w-48 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
                     <button
                       disabled={isTestingSend}
                       onClick={async () => {
+                        const cleanPhone = testRecipientPhone.replace(/[^0-9]/g, '');
+                        if (!cleanPhone || cleanPhone.length < 9) {
+                          if (onShowToast) onShowToast('Weka Namba ya Simu', 'Tafadhali andika namba yako ya WhatsApp kupokea jaribio', 'warning');
+                          return;
+                        }
+                        if (cleanPhone === '0621311137' || cleanPhone === '255621311137') {
+                          if (onShowToast) onShowToast('Namba ya Bot', 'Huwezi kutuma kwenda namba ile ile ya Bot! Weka namba yako binafsi.', 'warning');
+                          setTestSendResult({
+                            message: '⚠️ Huwezi kutuma ujumbe kwenda namba ile ile ya Bot (+255 621 311 137). Tafadhali weka namba yako binafsi ya simu (mfano: 07... au 0653...).',
+                            isError: true
+                          });
+                          return;
+                        }
+
                         setIsTestingSend(true);
                         setTestSendResult(null);
                         try {
@@ -1801,17 +1864,26 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               phone: testRecipientPhone,
+                              accessToken: metaAccessToken,
+                              appSecret: metaAppSecret,
+                              phoneNumberId: metaPhoneNumberId,
                               message: `🤖 *LEMA FAST WIFI BOT (META CLOUD API)*\n\nHabari! Ujumbe huu umetumwa kutoka Meta WhatsApp Cloud API ya Lema Fast WiFi.\nMfumo wako wa kugawa vocha na kupokea maswali uko tayari kwa 100% bila kikomo cha namba!`
                             })
                           });
-                          const data = await res.json();
+                          let data: any;
+                          try {
+                            data = await res.json();
+                          } catch (parseErr) {
+                            throw new Error(`Seva (${res.status}): Hitilafu ya jibu toka seva.`);
+                          }
                           setIsTestingSend(false);
-                          if (data?.result?.messages) {
+                          if (data?.result?.messages || (data?.success && data?.result?.messages)) {
+                            const msgId = data?.result?.messages?.[0]?.id || '';
                             setTestSendResult({
-                              message: '✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API!',
+                              message: `✅ Ujumbe umekubaliwa na Meta Cloud API (ID: ${msgId.slice(0, 16)}...)! Kumbuka: Ikiwa haujatokea simuni, fungua WhatsApp na umtumie bot ujumbe "Habari" kupitia kitufe cha juu ili kufungua dirisha la masaa 24.`,
                               isError: false
                             });
-                            if (onShowToast) onShowToast('Jaribio Limetumwa!', `Ujumbe umetumwa kwa ${testRecipientPhone}`, 'success');
+                            if (onShowToast) onShowToast('Jaribio Limetumwa!', `Meta imekubali ujumbe kwenda ${testRecipientPhone}`, 'success');
                           } else if (data?.result?.isAccountNotRegistered || data?.result?.code === 133010 || data?.result?.message?.includes('133010')) {
                             const tip = data?.result?.userTip || 'Namba ya Meta inatakiwa kusajiliwa mara moja kwa kuweka PIN (123456). Tumia kitufe cha "Sajili Namba Meta Sasa" hapo juu.';
                             setTestSendResult({
@@ -1820,6 +1892,12 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                               isNotRegistered: true
                             });
                             if (onShowToast) onShowToast('Namba Haijasajiliwa Meta', 'Bonyeza Sajili Namba Meta', 'warning');
+                          } else if (data?.result?.isAppSecretProof || data?.result?.message?.toLowerCase().includes('appsecret_proof')) {
+                            setTestSendResult({
+                              message: `⚠️ Hitilafu ya appsecret_proof: Kwenye Meta Developers (App Settings ➔ Advanced), zima "Require App Secret" iwe OFF, au weka App Secret kwenye kisanduku hapo juu.`,
+                              isError: true,
+                              isAppSecretProof: true
+                            });
                           } else if (data?.result?.isOAuthException || data?.result?.errorType === 'OAuthException' || data?.result?.error?.type === 'OAuthException') {
                             const userTip = data?.result?.userTip || 'Token ya Meta imekwisha muda wake (Session expired). Tafadhali bonyeza "Generate token" kwenye Meta ukurasa wa API Setup na ubandike hapa.';
                             setTestSendResult({
@@ -1828,8 +1906,8 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                               isOAuth: true
                             });
                             if (onShowToast) onShowToast('Token ya Meta Imekwisha Muda', 'Tafadhali nakili token mpya kutoka Meta', 'error');
-                          } else if (data?.result?.error) {
-                            const metaErrMsg = data?.result?.message || data?.result?.error?.message || JSON.stringify(data?.result?.error);
+                          } else if (data?.result?.error || data?.error) {
+                            const metaErrMsg = data?.message || data?.result?.userTip || data?.result?.message || data?.result?.error?.message || JSON.stringify(data?.result?.error);
                             setTestSendResult({
                               message: `⚠️ Hitilafu kutoka Meta: ${metaErrMsg}`,
                               isError: true
@@ -1844,16 +1922,14 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                             if (onShowToast) onShowToast('Mipangilio haijakamilika', warn, 'warning');
                           } else {
                             setTestSendResult({
-                              message: data?.useTemplate
-                                ? '✅ Template rasmi ya "hello_world" imetumwa kikamilifu kupitia Meta WhatsApp Cloud API! Angalia WhatsApp yako sasa.'
-                                : '✅ Ujumbe umetumwa kikamilifu kupitia Meta WhatsApp Cloud API! (Kumbuka: Kama simu haijaita, hakikisha umemtumia bot ujumbe kwanza wa.me/255621311137 au tumia kitufe cha "Tuma Template")',
+                              message: '✅ Ujumbe umetumwa Meta WhatsApp Cloud API! Kama haujafika simuni, mtumie bot ujumbe "Habari" kupitia kitufe cha kijani hapo juu.',
                               isError: false
                             });
                           }
                         } catch (err: any) {
                           setIsTestingSend(false);
                           setTestSendResult({
-                            message: '⚠️ Hitilafu ya mawasiliano na seva ya mtandao.',
+                            message: `⚠️ Hitilafu: ${err?.message || 'Mawasiliano na seva yameshindikana'}. Hakikisha seva ipo hewani na umebofya "Hifadhi Mipangilio ya Meta".`,
                             isError: true
                           });
                         }
@@ -1862,59 +1938,6 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                     >
                       {isTestingSend ? 'Inatuma...' : 'Tuma Jaribio (Text) 📲'}
                     </button>
-
-                    <button
-                      disabled={isTestingSend}
-                      onClick={async () => {
-                        setIsTestingSend(true);
-                        setTestSendResult(null);
-                        try {
-                          const res = await fetch('/api/v1/whatsapp/test-send', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              phone: testRecipientPhone,
-                              useTemplate: true
-                            })
-                          });
-                          const data = await res.json();
-                          setIsTestingSend(false);
-
-                          if (data?.result?.error) {
-                            const metaErrMsg = data?.result?.message || data?.result?.error?.message || JSON.stringify(data?.result?.error);
-                            setTestSendResult({
-                              message: `⚠️ Hitilafu ya Meta: ${metaErrMsg}`,
-                              isError: true
-                            });
-                          } else {
-                            setTestSendResult({
-                              message: '✅ Template ya "hello_world" imetumwa kwa mafanikio! Hii inafika moja kwa moja hata bila namba kumtumia bot ujumbe hapo awali.',
-                              isError: false
-                            });
-                          }
-                        } catch (e: any) {
-                          setIsTestingSend(false);
-                          setTestSendResult({
-                            message: '⚠️ Hitilafu ya mawasiliano na seva ya mtandao.',
-                            isError: true
-                          });
-                        }
-                      }}
-                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
-                      title="Hupita moja kwa moja hata kwa namba mpya ambayo haijawahi kumtumia bot ujumbe"
-                    >
-                      <span>Tuma Template (hello_world) 🌍</span>
-                    </button>
-
-                    <a
-                      href="https://wa.me/255621311137?text=Habari+Lema+Fast+WiFi"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold rounded-xl text-xs transition-colors flex items-center gap-1 border border-emerald-300"
-                      title="Mtumie bot ujumbe kwanza ili kufungua dirisha la saa 24"
-                    >
-                      <span>Fungua Bot WhatsApp 💬</span>
-                    </a>
                   </div>
 
                   <button
