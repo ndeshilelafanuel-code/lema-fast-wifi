@@ -1,0 +1,12 @@
+{
+  "provider": "meta",
+  "phoneNumberId": "1483764411477759",
+  "wabaId": "2277166236436412",
+  "displayPhoneNumber": "+255 621 311 137",
+  "verifiedName": "Lema Fast WiFi",
+  "accessToken": "EAANvTj6tXzwBS7L5M6YFuoHUrVUeSk1YnfzEWTyfTOCOXhnhyEwbDXfhkIhrbZAFzV8ceq3Ocz2gKnMwRIZBYekKJnSVK9JAmnXEmyWhMTNGzaGgLCNPD27rVOY2ZA86KpnYIUFZA7ZB8uZCZClhz2fuAyXTXZAwAy5uTYlc2awJEOwFhaJfbIrgZATEGKMZBXG4gxrgZDZD",
+  "appSecret": "",
+  "verifyToken": "lema_wifi_webhook_token",
+  "appId": "966806779813692",
+  "lastError": null
+}
