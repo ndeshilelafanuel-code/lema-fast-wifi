@@ -95,8 +95,8 @@ interface WhatsAppConfig {
 
 let whatsAppConfig: WhatsAppConfig = {
   provider: 'meta',
-  phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270',
-  wabaId: process.env.WHATSAPP_WABA_ID || '1578703743479175',
+  phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '1483764411477759',
+  wabaId: process.env.WHATSAPP_WABA_ID || '2277166236436412',
   displayPhoneNumber: '+255 621 311 137',
   verifiedName: 'Lema Fast WiFi',
   accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
@@ -223,7 +223,7 @@ async function registerMetaPhoneNumber(phoneId: string, token: string, pin: stri
 app.post('/api/v1/whatsapp/register-phone', async (req, res) => {
   const { pin } = req.body || {};
   const token = (whatsAppConfig.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
-  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270').trim();
+  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1483764411477759').trim();
 
   if (!token || token.length < 25) {
     return res.status(400).json({
@@ -442,7 +442,7 @@ async function sendWhatsAppMessage(targetPhoneOrChatId: string, message: string,
     : '255' + digits;
 
   const token = (whatsAppConfig.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
-  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1348304901706270').trim();
+  const phoneId = (whatsAppConfig.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '1483764411477759').trim();
 
   // Validate if token is real Meta token (must not be empty, placeholder or too short)
   const isPlaceholderOrInvalid = !token || token.toLowerCase().includes('token string') || token.length < 25;
@@ -1136,6 +1136,19 @@ app.post('/api/v1/whatsapp/webhook', async (req, res) => {
       const changes = entry?.changes?.[0];
       const value = changes?.value;
       const message = value?.messages?.[0];
+      const incomingPhoneId = value?.metadata?.phone_number_id;
+      const incomingWabaId = entry?.id;
+
+      // Auto-sync active phone_number_id and wabaId from incoming webhook metadata
+      if (incomingPhoneId && incomingPhoneId !== whatsAppConfig.phoneNumberId) {
+        console.log(`[Meta WhatsApp] 🔄 Updating active phoneNumberId: ${whatsAppConfig.phoneNumberId} -> ${incomingPhoneId}`);
+        whatsAppConfig.phoneNumberId = incomingPhoneId;
+        saveWhatsAppConfig();
+      }
+      if (incomingWabaId && incomingWabaId !== whatsAppConfig.wabaId) {
+        whatsAppConfig.wabaId = incomingWabaId;
+        saveWhatsAppConfig();
+      }
 
       if (message) {
         const senderPhone = message.from;
