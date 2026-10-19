@@ -14,19 +14,68 @@ import {
   Terminal, 
   ArrowRight,
   Database,
-  Cpu
+  Cpu,
+  Wifi,
+  Smartphone,
+  Users
 } from 'lucide-react';
 
 export const BillingModule: React.FC = () => {
   const { activeSessions, disconnectSession, settings } = useHotspot();
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const [simulatedSessions, setSimulatedSessions] = useState<any[]>([]);
+  const [omadaClients, setOmadaClients] = useState<any[]>([]);
+  const [isAuthorizing, setIsAuthorizing] = useState<string | null>(null);
 
   const [billingLogs, setBillingLogs] = useState<string[]>([
     `[INFO] Billing engine initialized for ${settings.hotspotName}.`,
-    `[INFO] Listening to RADIUS Accounting ports 1812/1813...`,
-    `[OK] Connected to Controller API. Ready for active sessions.`
+    `[INFO] Listening to Omada SSID "Omada_5Ghz" and RADIUS ports 1812/1813...`,
+    `[OK] Connected to AP Smart WiFi Node (192.168.88.115). Monitoring active clients.`
   ]);
+
+  // Fetch Wi-Fi associated clients (devices on Omada_5Ghz)
+  useEffect(() => {
+    const fetchOmadaClients = () => {
+      fetch('/api/v1/omada/clients')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && Array.isArray(data.clients)) {
+            setOmadaClients(data.clients);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchOmadaClients();
+    const interval = setInterval(fetchOmadaClients, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAuthorizeClient = async (mac: string) => {
+    setIsAuthorizing(mac);
+    try {
+      const res = await fetch('/api/v1/omada/client/authorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac, hours: 2, planName: 'Idhini ya Msimamizi (Saa 2)' })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setBillingLogs((prev) => [
+          `[${new Date().toLocaleTimeString()}] [ADMIN-GRANT] ✅ Mteja (${mac}) ameruhusiwa intaneti (ACTIVE)! Vocha iliyotengenezwa: ${data.session?.voucherCode || '9412'}`,
+          ...prev
+        ].slice(-50));
+        const cRes = await fetch('/api/v1/omada/clients');
+        const cData = await cRes.json();
+        if (cData && Array.isArray(cData.clients)) {
+          setOmadaClients(cData.clients);
+        }
+      }
+    } catch (e) {
+    } finally {
+      setIsAuthorizing(null);
+    }
+  };
 
   // Expiry check interval simulation
   useEffect(() => {
@@ -171,6 +220,96 @@ export const BillingModule: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side: Sessions under monitor */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Omada_5Ghz Connected Wi-Fi Clients Section */}
+          <div className="bg-stone-950 border border-stone-800 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-sky-400 animate-pulse" />
+                <span className="text-xs font-black text-white uppercase tracking-wider">
+                  Vifaa Kwenye Wi-Fi ya Omada_5Ghz ({omadaClients.length})
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                  SSID: Omada_5Ghz
+                </span>
+              </div>
+              <span className="text-[10px] text-stone-400">
+                Wanaounganishwa na AP ya Sokoni
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {omadaClients.length > 0 ? (
+                omadaClients.map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-3 bg-stone-900 border border-stone-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 shrink-0 mt-0.5">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <strong className="text-white font-bold">{c.deviceModel || 'Simu ya Mteja'}</strong>
+                          <span className="text-[10px] text-stone-400 font-mono">({c.mac})</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                              c.status === 'active_authorized'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                            }`}
+                          >
+                            {c.status === 'active_authorized'
+                              ? '🟢 ACTIVE (INA INTANETI)'
+                              : '🟡 INASUBIRI VOCHA (CAPTIVE PORTAL)'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-stone-400 flex items-center gap-2">
+                          <span>IP: <strong className="font-mono text-stone-300">{c.ip}</strong></span>
+                          <span>•</span>
+                          <span>Muda: {c.connectedAt}</span>
+                          {c.voucherCode && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-400 font-mono font-bold">Vocha: #{c.voucherCode}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-2">
+                      {c.status === 'active_authorized' ? (
+                        <span className="text-emerald-400 text-xs font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Ipo Active Hewani</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleAuthorizeClient(c.mac)}
+                          disabled={isAuthorizing === c.mac}
+                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black rounded-lg text-xs transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
+                          title="Mruhusu mteja huyu kutumia intaneti mara moja bila vocha (Admin Free Grant)"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>{isAuthorizing === c.mac ? 'Inafungua...' : 'Ruhusu Intaneti Bure'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-3 text-center text-stone-500 text-xs">
+                  Hakuna kifaa kilichounganishwa na Omada_5Ghz kwa sasa.
+                </div>
+              )}
+            </div>
+
+            <div className="p-2.5 bg-stone-900/60 rounded-xl text-[11px] text-stone-400 leading-relaxed border border-stone-850">
+              💡 <strong>Kumbuka:</strong> Mteja akiunganisha simu na <strong>Omada_5Ghz</strong>, simu yake inafungua ukurasa wa vocha kwanza. Kabla hajaingiza vocha, anaonekana kama <em>&quot;Inasubiri Vocha&quot;</em>. Mara tu akiweka vocha (au ukimruhusu kwa kitufe cha hapo juu), anakuwa <strong>ACTIVE</strong> na kuanza kupata intaneti kamili!
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-stone-400 uppercase tracking-wider block">Wateja Wanaofuatiliwa (Active Monitor)</span>
             <button

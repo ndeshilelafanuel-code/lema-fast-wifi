@@ -319,6 +319,7 @@ loadSavedHardware();
 
 // API: Get Hardware Inventory (synchronized across phone, PC, and all browsers)
 app.get('/api/v1/hardware/inventory', (_req, res) => {
+  loadSavedHardware();
   res.json({
     success: true,
     count: savedHardware.length,
@@ -387,6 +388,171 @@ app.delete('/api/v1/hardware/equipment/:id', (req, res) => {
 });
 
 // =========================================================================
+// AP OUTAGE WATCHDOG & INSTANT ALERTS (WHATSAPP + SMS NOTIFICATIONS)
+// =========================================================================
+interface OutageAlert {
+  id: string;
+  timestamp: string;
+  apName: string;
+  site: string;
+  ip: string;
+  mac?: string;
+  status: 'down' | 'up';
+  adminPhone: string;
+  waStatus?: any;
+  smsStatus?: any;
+}
+
+const outageAlertsLog: OutageAlert[] = [];
+
+async function processApOutageAlert(params: {
+  apName?: string;
+  apIp?: string;
+  apMac?: string;
+  site?: string;
+  status: 'down' | 'up';
+  adminPhone?: string;
+}) {
+  const status = params.status === 'up' ? 'up' : 'down';
+  const targetIp = params.apIp || '192.168.88.115';
+  const adminPhone = params.adminPhone || '0653578184';
+  
+  // Find AP in inventory
+  loadSavedHardware();
+  const foundDevice = savedHardware.find(
+    (h) => (h.ipAddress && h.ipAddress.includes(targetIp)) || (params.apMac && h.macAddress.toUpperCase() === params.apMac.toUpperCase())
+  );
+  
+  const apName = params.apName || foundDevice?.name || 'Smart WiFi Node (Sokoni Node)';
+  const site = params.site || foundDevice?.site || 'Sokoni Ghorofani';
+  const apMac = params.apMac || foundDevice?.macAddress || '74:83:C2:55:1A:E9';
+
+  // Update device status in memory and disk
+  if (foundDevice) {
+    foundDevice.status = status === 'down' ? 'offline' : 'online';
+    foundDevice.lastSeen = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    saveHardwareToDisk();
+  }
+
+  // Update towers-data.json
+  const towers = loadSavedTowers();
+  const tower = towers.find((t: any) => t.ipAddress === targetIp || t.macAddress === apMac);
+  if (tower) {
+    tower.status = status === 'down' ? 'offline' : 'online';
+    saveTowersToFile(towers);
+  }
+
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dateStr = new Date().toLocaleDateString('sw-TZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  let waText = '';
+  let smsText = '';
+
+  if (status === 'down') {
+    waText = `🚨 *TAHADHARI YA DHARURA: AP IMEZIMA!* 🚨
+
+Habari Msimamizi Jimmy Lema,
+Kifaa chako cha kurushia mawimbi ya Wi-Fi kimeacha kufanya kazi (OFFLINE):
+
+📡 *Kifaa:* ${apName}
+📍 *Eneo:* ${site}
+🌐 *IP Address:* ${targetIp}
+🏷️ *MAC Address:* ${apMac}
+⏱️ *Muda:* ${timeStr} (${dateStr})
+
+⚠️ *Hatua za Haraka za Kuchukua:*
+1. Kagua kama umeme wa TANESCO umekatika au chaji ya sola/betri imeisha.
+2. Kagua taa za PoE Injector / PoE Switch kama zinawaka.
+3. Kagua kama waya wa LAN (Cat6) haujachomoka au kuharibika na panya.
+
+_Mfumo wa Lema Fast WiFi Watchdog Monitoring_`;
+
+    smsText = `TAHADHARI: Kifaa cha AP (${apName} - ${site}, IP: ${targetIp}) kimezima saa ${timeStr}! Kagua umeme au waya wa PoE. - LEMA FAST WIFI`;
+  } else {
+    waText = `✅ *TAARIFA NJEMA: AP IMERUDI HEWANI!* 🟢
+
+Habari Msimamizi Jimmy Lema,
+Kifaa chako cha Wi-Fi kimerudi hewani na kinafanya kazi kikamilifu (ONLINE):
+
+📡 *Kifaa:* ${apName}
+📍 *Eneo:* ${site}
+🌐 *IP Address:* ${targetIp}
+⏱️ *Muda:* ${timeStr}
+
+Mtandao umerejea kawaida na wateja wameanza kuunganishwa tena.
+_Mfumo wa Lema Fast WiFi Watchdog Monitoring_`;
+
+    smsText = `TAARIFA: Kifaa cha AP (${apName} - ${site}) kimerudi hewani saa ${timeStr}! Wateja wameunganishwa tena. - LEMA FAST WIFI`;
+  }
+
+  // Send WhatsApp alert to Admin
+  const waResult = await sendWhatsAppMessage(adminPhone, waText).catch((e: any) => ({ error: e?.message }));
+  
+  // Send SMS alert to Admin
+  const smsResult = await sendSmsMessage(adminPhone, smsText).catch((e: any) => ({ error: e?.message }));
+
+  const logEntry: OutageAlert = {
+    id: `outage-${Date.now()}`,
+    timestamp: `${dateStr} ${timeStr}`,
+    apName,
+    site,
+    ip: targetIp,
+    mac: apMac,
+    status,
+    adminPhone,
+    waStatus: waResult,
+    smsStatus: smsResult
+  };
+
+  outageAlertsLog.unshift(logEntry);
+  if (outageAlertsLog.length > 50) outageAlertsLog.pop();
+
+  addWhatsAppLog({
+    type: 'system_alert',
+    direction: 'internal',
+    status: status === 'down' ? 'failed' : 'success',
+    phone: adminPhone,
+    summary: status === 'down' ? `🚨 Kengele ya Dharura: AP "${apName}" Imezima!` : `✅ AP "${apName}" Imerudi Hewani`,
+    details: `Arifa imetumwa kwa Msimamizi (+${adminPhone}) kupitia WhatsApp na SMS.`,
+    payload: logEntry
+  });
+
+  console.log(`[AP Watchdog] Alert sent for ${apName} (${targetIp}) -> status: ${status.toUpperCase()}`);
+  return logEntry;
+}
+
+// Webhook endpoint called by MikroTik Netwatch or Dashboard Watchdog
+app.all('/api/v1/hardware/alert/outage', async (req, res) => {
+  const query = req.query as any;
+  const body = (req.body || {}) as any;
+  const status = ((query.status || body.status || 'down') as string).toLowerCase() === 'up' ? 'up' : 'down';
+  const apIp = (query.ip || body.ip || body.apIp || '192.168.88.115') as string;
+  const apName = (query.name || body.name || body.apName) as string;
+  const site = (query.site || body.site) as string;
+  const apMac = (query.mac || body.mac || body.apMac) as string;
+  const adminPhone = (query.phone || body.phone || '0653578184') as string;
+
+  const result = await processApOutageAlert({
+    status,
+    apIp,
+    apName,
+    site,
+    apMac,
+    adminPhone
+  });
+
+  return res.json({
+    success: true,
+    message: status === 'down' ? 'Arifa ya dharura ya kuzima kwa AP imetumwa kwa Msimamizi' : 'Arifa ya kuwaka kwa AP imetumwa kwa Msimamizi',
+    alert: result
+  });
+});
+
+app.get('/api/v1/hardware/outage-alerts', (_req, res) => {
+  return res.json({ success: true, count: outageAlertsLog.length, alerts: outageAlertsLog });
+});
+
+// =========================================================================
 // ACTIVE SESSIONS & CONNECTED USERS PERSISTENCE (Synced across PC & Mobile)
 // =========================================================================
 const SESSIONS_FILE = path.resolve(__dirname, 'active-sessions.json');
@@ -450,6 +616,131 @@ app.delete('/api/v1/sessions/active/:id', (req, res) => {
   savedActiveSessions = savedActiveSessions.filter((s) => s.id !== id);
   saveSessionsToDisk();
   res.json({ success: true, sessions: savedActiveSessions });
+});
+
+// =========================================================================
+// OMADA & WI-FI ASSOCIATED CLIENTS (Devices Connected to Omada_5Ghz SSID)
+// =========================================================================
+interface AssociatedWifiClient {
+  id: string;
+  ip: string;
+  mac: string;
+  ssid: string;
+  apName: string;
+  deviceModel?: string;
+  connectedAt: string;
+  status: 'pending_login' | 'active_authorized' | 'free_trial';
+  voucherCode?: string;
+}
+
+const WIFI_CLIENTS_FILE = path.resolve(__dirname, 'wifi-clients.json');
+let wifiClients: AssociatedWifiClient[] = [
+  {
+    id: 'cli-omada-1',
+    ip: '192.168.88.142',
+    mac: 'DA:A1:19:4F:92:B1',
+    ssid: 'Omada_5Ghz',
+    apName: 'Smart WiFi Node (Sokoni Node)',
+    deviceModel: 'Android Mobile (Connected)',
+    connectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    status: 'pending_login'
+  }
+];
+
+function loadSavedWifiClients() {
+  try {
+    if (fs.existsSync(WIFI_CLIENTS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(WIFI_CLIENTS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        wifiClients = data;
+      }
+    }
+  } catch (e) {
+    console.warn('[Wifi Clients] Could not load:', e);
+  }
+}
+
+function saveWifiClients() {
+  try {
+    fs.writeFileSync(WIFI_CLIENTS_FILE, JSON.stringify(wifiClients, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Wifi Clients] Could not save:', e);
+  }
+}
+
+loadSavedWifiClients();
+
+// GET all Wi-Fi associated clients
+app.get('/api/v1/omada/clients', (_req, res) => {
+  loadSavedWifiClients();
+  return res.json({ success: true, count: wifiClients.length, clients: wifiClients });
+});
+
+// POST register/connect client on Wi-Fi (called by Omada Controller or MikroTik DHCP)
+app.all('/api/v1/omada/client/connect', (req, res) => {
+  const query = req.query as any;
+  const body = (req.body || {}) as any;
+  const ip = query.ip || body.ip || '192.168.88.142';
+  const mac = (query.mac || body.mac || 'DA:A1:19:4F:92:B1').toUpperCase();
+  const ssid = query.ssid || body.ssid || 'Omada_5Ghz';
+  const apName = query.ap || body.ap || 'Smart WiFi Node (Sokoni Node)';
+  const model = query.model || body.model || 'Wireless Device';
+
+  const existingIdx = wifiClients.findIndex((c) => c.mac === mac);
+  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (existingIdx >= 0) {
+    wifiClients[existingIdx].ip = ip;
+    wifiClients[existingIdx].ssid = ssid;
+    wifiClients[existingIdx].connectedAt = nowStr;
+  } else {
+    wifiClients.unshift({
+      id: `cli-${Date.now()}`,
+      ip,
+      mac,
+      ssid,
+      apName,
+      deviceModel: model,
+      connectedAt: nowStr,
+      status: 'pending_login'
+    });
+  }
+  saveWifiClients();
+  return res.json({ success: true, client: wifiClients[0], total: wifiClients.length });
+});
+
+// POST Authorize client (Grant free access or voucher from Dashboard)
+app.post('/api/v1/omada/client/authorize', (req, res) => {
+  const { mac, hours, planName } = req.body;
+  const target = wifiClients.find((c) => c.mac.toUpperCase() === String(mac).toUpperCase());
+  if (!target) {
+    return res.status(404).json({ error: 'Client not found' });
+  }
+
+  target.status = 'active_authorized';
+  target.voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+  // Also push to activeSessions
+  const newSession = {
+    id: `sess-${Date.now()}`,
+    voucherCode: target.voucherCode,
+    phoneNumber: '0653578184',
+    ipAddress: target.ip,
+    macAddress: target.mac,
+    connectedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + (hours || 2) * 3600 * 1000).toISOString(),
+    packageId: 'pkg-grant',
+    packageName: planName || 'Idhini ya Msimamizi (Admin Authorization)',
+    speedLimit: '3.0M/1.5M',
+    bytesDown: 1048576,
+    bytesUp: 524288
+  };
+
+  savedActiveSessions.unshift(newSession);
+  saveSessionsToDisk();
+  saveWifiClients();
+
+  return res.json({ success: true, message: 'Mteja ameruhusiwa intaneti kikamilifu!', session: newSession });
 });
 
 const clearWhatsAppLogs = (_req: express.Request, res: express.Response) => {
@@ -1800,6 +2091,55 @@ Ingiza tarakimu hizi: *${voucherCode}* kwenye mtandao wa *Lema Fast WiFi* kuanza
   });
 });
 
+// 5. TOWERS & ACCESS POINTS SYNC API
+const TOWERS_FILE = path.resolve(__dirname, 'towers-data.json');
+
+function loadSavedTowers(): any[] {
+  try {
+    if (fs.existsSync(TOWERS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TOWERS_FILE, 'utf-8'));
+      if (Array.isArray(data)) return data;
+    }
+  } catch (e) {
+    console.warn('[Towers] Error reading towers-data.json:', e);
+  }
+  return [];
+}
+
+function saveTowersToFile(towers: any[]) {
+  try {
+    fs.writeFileSync(TOWERS_FILE, JSON.stringify(towers, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Towers] Error saving towers-data.json:', e);
+  }
+}
+
+app.get('/api/v1/towers', (_req, res) => {
+  return res.json({ success: true, towers: loadSavedTowers() });
+});
+
+app.post('/api/v1/towers', (req, res) => {
+  const { towers } = req.body;
+  if (Array.isArray(towers)) {
+    saveTowersToFile(towers);
+    return res.json({ success: true, count: towers.length });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid format: towers must be an array' });
+});
+
+// 6. ACTIVE SESSIONS SYNC API
+let liveServerSessions: any[] = [];
+
+app.get('/api/v1/sessions/sync', (_req, res) => {
+  return res.json({ success: true, sessions: liveServerSessions });
+});
+
+app.post('/api/v1/sessions/sync', (req, res) => {
+  if (Array.isArray(req.body.sessions)) {
+    liveServerSessions = req.body.sessions;
+  }
+  return res.json({ success: true, count: liveServerSessions.length });
+});
 
 // Start Express server and mount Vite in middleware mode
 async function startServer() {

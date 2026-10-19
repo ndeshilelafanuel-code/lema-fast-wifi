@@ -1,0 +1,20 @@
+[
+  {
+    "id": "eq-1792428548655",
+    "name": "Smart WiFi Node (Network Hardware) - Sokoni Node",
+    "category": "ap",
+    "manufacturer": "Network Hardware",
+    "model": "Smart WiFi Node",
+    "serialNumber": "1DF999CBE7FD30",
+    "macAddress": "74:83:C2:55:1A:E9",
+    "deviceKey": "772A-EAP7-7200-WIFI7",
+    "site": "Sokoni Ghorofani",
+    "ipAddress": "192.168.88.115",
+    "poeVoltage": "24V/48V PoE",
+    "status": "online",
+    "registeredAt": "19/10/2026, 19:49",
+    "autoProvisioned": true,
+    "scannedAt": "2026-10-19T17:06:03.799Z",
+    "lastSeen": "05:54 PM"
+  }
+]

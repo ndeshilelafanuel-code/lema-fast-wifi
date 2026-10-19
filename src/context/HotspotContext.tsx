@@ -21,6 +21,7 @@ interface HotspotContextType {
   addTower: (tower: Omit<NetworkTower, 'id' | 'installedAt'>) => NetworkTower;
   updateTower: (id: string, updates: Partial<NetworkTower>) => void;
   deleteTower: (id: string) => void;
+  importTowers: (newTowers: NetworkTower[]) => void;
   addAd: (ad: Omit<HotspotAdvertisement, 'id' | 'impressions' | 'clicks'>) => void;
   updateAd: (id: string, updates: Partial<HotspotAdvertisement>) => void;
   deleteAd: (id: string) => void;
@@ -126,7 +127,29 @@ const SEED_TRANSACTIONS: PaymentTransaction[] = [];
 
 const SEED_ACTIVE_SESSIONS: ActiveSession[] = [];
 
-const DEFAULT_TOWERS: NetworkTower[] = [];
+const DEFAULT_TOWERS: NetworkTower[] = [
+  {
+    id: 'tower-sokoni-1',
+    name: 'Smart WiFi Node - Sokoni Ghorofani',
+    location: 'Sokoni Ghorofani',
+    ipAddress: '192.168.88.115',
+    macAddress: '74:83:C2:55:1A:E9',
+    model: 'Smart WiFi Node (Network Hardware)',
+    coverageRadiusMeters: 200,
+    status: 'online',
+    frequencyBand: 'Dual-Band 2.4/5GHz (Wi-Fi 7 Ready)',
+    txPowerDbm: 28,
+    antennaType: 'Omni-directional 360°',
+    heightMeters: 18,
+    notes: 'Serial: 1DF999CBE7FD30 • PoE: 24V/48V • Imesawazishwa toka lemawifi.online',
+    coordinates: {
+      lat: -6.7924,
+      lng: 39.2083,
+    },
+    installedAt: '2026-10-19T17:06:03.799Z',
+    lastPingMs: 4,
+  },
+];
 
 const DEFAULT_ADS: HotspotAdvertisement[] = [];
 
@@ -368,12 +391,36 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem('wifi_hotspot_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
+  // Load saved towers from backend server if available
+  useEffect(() => {
+    fetch('/api/v1/towers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.towers) && data.towers.length > 0) {
+          setTowers((current) => {
+            if (current.length === 0) return data.towers;
+            const currentIds = new Set(current.map((t) => t.id));
+            const newOnes = data.towers.filter((t: NetworkTower) => !currentIds.has(t.id));
+            return newOnes.length > 0 ? [...newOnes, ...current] : current;
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(activeSessions));
   }, [activeSessions]);
 
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_towers', JSON.stringify(towers));
+    if (towers.length > 0) {
+      fetch('/api/v1/towers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ towers }),
+      }).catch(() => {});
+    }
   }, [towers]);
 
   useEffect(() => {
@@ -692,6 +739,21 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTowers((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const importTowers = (newTowers: NetworkTower[]) => {
+    if (!Array.isArray(newTowers) || newTowers.length === 0) return;
+    setTowers((prev) => {
+      const existingIds = new Set(prev.map((t) => t.id));
+      const filteredNew = newTowers.filter((t) => !existingIds.has(t.id));
+      const merged = [...filteredNew, ...prev];
+      fetch('/api/v1/towers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ towers: merged }),
+      }).catch(() => {});
+      return merged;
+    });
+  };
+
   const addAd = (adData: Omit<HotspotAdvertisement, 'id' | 'impressions' | 'clicks'>) => {
     const newAd: HotspotAdvertisement = {
       ...adData,
@@ -814,6 +876,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addTower,
         updateTower,
         deleteTower,
+        importTowers,
         addAd,
         updateAd,
         deleteAd,

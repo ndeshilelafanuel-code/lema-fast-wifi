@@ -29,7 +29,14 @@ import {
   QrCode,
   Sparkles,
   Camera,
-  Scan
+  Scan,
+  Download,
+  Upload,
+  Copy,
+  Database,
+  Bell,
+  MessageSquare,
+  Terminal
 } from 'lucide-react';
 
 interface TowerManagementModuleProps {
@@ -41,7 +48,7 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   onOpenGisMap,
   onOpenScanner 
 }) => {
-  const { towers, addTower, updateTower, deleteTower, activeSessions } = useHotspot();
+  const { towers, addTower, updateTower, deleteTower, importTowers, activeSessions } = useHotspot();
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +57,13 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDiscoveryModal, setShowDiscoveryModal] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showNetwatchModal, setShowNetwatchModal] = useState(false);
+  const [isSendingAlertTest, setIsSendingAlertTest] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
+  const [isSyncingServer, setIsSyncingServer] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isCopiedNetwatch, setIsCopiedNetwatch] = useState(false);
   const [isScanningNetwork, setIsScanningNetwork] = useState(false);
   const [scanStepLog, setScanStepLog] = useState<string[]>([]);
   const [discoveredAps, setDiscoveredAps] = useState<Array<{
@@ -136,6 +150,33 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
+  };
+
+  const handleSimulateAlert = async (status: 'down' | 'up') => {
+    setIsSendingAlertTest(true);
+    try {
+      const res = await fetch(`/api/v1/hardware/alert/outage?ip=192.168.88.115&status=${status}`);
+      const data = await res.json();
+      if (data && data.success) {
+        showToast(
+          status === 'down'
+            ? '🚨 Kengele imetuma WhatsApp & SMS: "AP IMEZIMA (OFFLINE)"!'
+            : '✅ Kengele imetuma WhatsApp & SMS: "AP IMERUDI HEWANI (ONLINE)"!'
+        );
+        // Refresh towers list
+        const towerRes = await fetch('/api/v1/towers');
+        const towerData = await towerRes.json();
+        if (towerData?.success && Array.isArray(towerData.towers)) {
+          importTowers(towerData.towers);
+        }
+      } else {
+        showToast('Kengele haijakamilika.');
+      }
+    } catch (e) {
+      showToast('Hitilafu wakati wa kutuma kengele ya dharura.');
+    } finally {
+      setIsSendingAlertTest(false);
+    }
   };
 
   // Add Tower form state
@@ -342,6 +383,15 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
             <span>Scan Mtandao (Auto-Discovery)</span>
           </button>
 
+          <button
+            onClick={() => setShowSyncModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-stone-800 hover:bg-stone-700 border border-amber-500/40 text-amber-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+            title="Sawazisha taarifa za APs kati ya Website na AI Studio au Ingiza/Hamisha JSON"
+          >
+            <RefreshCw className="w-4 h-4 text-amber-400" />
+            <span>Sawazisha / Ingiza APs</span>
+          </button>
+
           {onOpenGisMap && (
             <button
               onClick={onOpenGisMap}
@@ -395,6 +445,64 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
           </div>
           <div className="text-2xl font-black text-sky-800 mt-1">{activeSessions.length}</div>
           <div className="text-[10px] text-sky-600 mt-0.5">Wanaotumia intaneti moja kwa moja</div>
+        </div>
+      </div>
+
+      {/* AP Outage Watchdog & Instant Alerts (WhatsApp + SMS) */}
+      <div className="bg-gradient-to-r from-stone-900 via-rose-950/20 to-stone-900 border border-rose-500/30 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5 animate-pulse">
+                <Bell className="w-3.5 h-3.5 text-rose-400" />
+                <span>AP OUTAGE WATCHDOG • ULINZI WA UMEME NA MAWASILIANO</span>
+              </span>
+              <span className="text-emerald-400 text-xs font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>Alerts Zipo Hewani (Active)</span>
+              </span>
+            </div>
+
+            <h3 className="text-base font-black text-white flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-400" />
+              <span>AP Ikizima, Mfumo Unakutumia Ujumbe wa Dharura Papo Hapo!</span>
+            </h3>
+
+            <p className="text-stone-300 text-xs leading-relaxed">
+              Kifaa cha <strong>Smart WiFi Node (Sokoni Ghorofani, IP: 192.168.88.115)</strong> kikizima kwa kukatika kwa umeme wa TANESCO au waya kuchomoka, mfumo unatambua ndani ya sekunde 15 na kutuma arifa ya WhatsApp na SMS moja kwa moja kwa Msimamizi (<strong>0653 578 184</strong>).
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => handleSimulateAlert('down')}
+              disabled={isSendingAlertTest}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
+              title="Jaribu kengele: Tuma taarifa kuwa AP Imezima (Simulate DOWN)"
+            >
+              <Bell className="w-4 h-4 text-yellow-300" />
+              <span>{isSendingAlertTest ? 'Inatuma...' : 'Jaribu Kengele: AP Imezima'}</span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateAlert('up')}
+              disabled={isSendingAlertTest}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
+              title="Jaribu kengele: Tuma taarifa kuwa AP Imerudi Hewani (Simulate UP)"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+              <span>Jaribu: AP Imerejea</span>
+            </button>
+
+            <button
+              onClick={() => setShowNetwatchModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-stone-800 hover:bg-stone-700 border border-stone-600 text-stone-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+              title="Tazama Script ya MikroTik Netwatch ili ifanye kazi 100% kiotomatiki"
+            >
+              <Terminal className="w-4 h-4 text-amber-400" />
+              <span>Script ya MikroTik</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1296,6 +1404,295 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                 className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
               >
                 Funga Dirisha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sync & Backup / Import-Export Modal */}
+      {showSyncModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-stone-900 border border-stone-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Sawazisha Taarifa za APs & Minara (Sync & Backup)</h3>
+                  <p className="text-xs text-stone-400">Linganisha data kati ya website yako ya moja kwa moja na hapa AI Studio</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Explanation Banner */}
+              <div className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-2xl text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-400">
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>Kwanini AP uliyoongeza kwenye website haikuonekana hapa moja kwa moja?</span>
+                </div>
+                <p className="text-stone-300 leading-relaxed">
+                  Vivinjari vya mtandao (Browsers) hutenganisha data (localStorage) kwa kila anwani ya tovuti (domain). AP uliyoongeza kwenye website yako ya kibiashara imehifadhiwa salama kwenye tovuti hiyo. Unaweza kuileta hapa mara moja kwa njia zifuatazo:
+                </p>
+              </div>
+
+              {/* Action 1: Server Sync */}
+              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <RefreshCw className={`w-4 h-4 text-emerald-400 ${isSyncingServer ? 'animate-spin' : ''}`} />
+                      <span>1. Sawazisha na Seva (Server Sync)</span>
+                    </h4>
+                    <p className="text-xs text-stone-400 mt-0.5">Kagua kama kuna data ya APs iliyohifadhiwa kwenye seva kupitia <code>/api/v1/towers</code></p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setIsSyncingServer(true);
+                      try {
+                        const res = await fetch('/api/v1/towers');
+                        const data = await res.json();
+                        if (data && data.success && Array.isArray(data.towers) && data.towers.length > 0) {
+                          importTowers(data.towers);
+                          showToast(`✅ Imefanikiwa! Minara/APs ${data.towers.length} imesawazishwa toka seva.`);
+                        } else {
+                          showToast('Taarifa: Hakuna minara ya ziada kwenye seva kwa sasa.');
+                        }
+                      } catch (e) {
+                        showToast('Hitilafu wakati wa kusawazisha na seva.');
+                      } finally {
+                        setIsSyncingServer(false);
+                      }
+                    }}
+                    disabled={isSyncingServer}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-1.5 shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingServer ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingServer ? 'Inasawazisha...' : 'Vuta toka Seva'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action 2: Import JSON */}
+              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-amber-400" />
+                    <span>2. Ingiza Taarifa za AP (Import JSON au Maandishi)</span>
+                  </h4>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Bandika data ya AP au nakili kutoka ukurasa wa website kisha bonyeza &quot;Ingiza Sasa&quot;:
+                  </p>
+                </div>
+                <textarea
+                  value={importJsonText}
+                  onChange={(e) => setImportJsonText(e.target.value)}
+                  placeholder={`Mfano wa JSON:\n[\n  {\n    "name": "Mnara wa Mlimani - AP 1",\n    "location": "Mlimani City Area",\n    "ipAddress": "192.168.88.10",\n    "model": "Ruijie Reyee RG-RAP62-OD",\n    "status": "online"\n  }\n]`}
+                  className="w-full h-28 bg-stone-900 border border-stone-700 rounded-xl p-3 text-xs text-stone-200 font-mono focus:outline-none focus:border-amber-500"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      if (!importJsonText.trim()) {
+                        showToast('Tafadhali bandika JSON ya AP kwanza.');
+                        return;
+                      }
+                      try {
+                        const parsed = JSON.parse(importJsonText);
+                        const list = Array.isArray(parsed) ? parsed : [parsed];
+                        const formatted = list.map((item: any, idx: number) => ({
+                          id: item.id || `tower-imported-${Date.now()}-${idx}`,
+                          name: item.name || `AP ${idx + 1}`,
+                          location: item.location || 'Eneo Lisilojulikana',
+                          ipAddress: item.ipAddress || '192.168.88.10',
+                          macAddress: item.macAddress,
+                          model: item.model || 'Access Point',
+                          coverageRadiusMeters: item.coverageRadiusMeters || 200,
+                          status: item.status || 'online',
+                          frequencyBand: item.frequencyBand || 'Dual-Band 2.4/5GHz',
+                          txPowerDbm: item.txPowerDbm || 26,
+                          antennaType: item.antennaType || 'Omni-directional 360°',
+                          heightMeters: item.heightMeters || 16,
+                          notes: item.notes || 'Imeingizwa kupitia Sync Module',
+                          coordinates: item.coordinates || { lat: -6.7924, lng: 39.2083 },
+                          installedAt: item.installedAt || new Date().toISOString()
+                        }));
+                        importTowers(formatted);
+                        showToast(`✅ Minara/APs ${formatted.length} imeingizwa kikamilifu!`);
+                        setImportJsonText('');
+                        setShowSyncModal(false);
+                      } catch (e) {
+                        showToast('⚠️ Muundo wa JSON hauko sahihi. Hakikisha JSON imefungwa na [] au {}.');
+                      }
+                    }}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Ingiza Sasa (Import)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action 3: Export current APs */}
+              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Download className="w-4 h-4 text-sky-400" />
+                      <span>3. Nakili Data ya APs za Hapa (Export JSON)</span>
+                    </h4>
+                    <p className="text-xs text-stone-400 mt-0.5">Nakili orodha ya APs zilizopo hapa ili uweze kuziweka au kuzihifadhi popote</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const dataStr = JSON.stringify(towers, null, 2);
+                      navigator.clipboard.writeText(dataStr);
+                      setIsCopied(true);
+                      showToast('📋 Data ya APs imenakiliwa kwenye clipboard!');
+                      setTimeout(() => setIsCopied(false), 3000);
+                    }}
+                    className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold rounded-xl text-xs transition-all cursor-pointer border border-stone-700 flex items-center gap-1.5 shrink-0"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'Imenakiliwa!' : 'Nakili JSON'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-stone-800 flex items-center justify-between bg-stone-950/40">
+              <button
+                onClick={() => {
+                  setShowSyncModal(false);
+                  setShowAddModal(true);
+                }}
+                className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-bold cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Au bofya hapa kuongeza AP kwa mkono (Fomu)</span>
+              </button>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Funga
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Netwatch MikroTik Script Modal */}
+      {showNetwatchModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-stone-900 border border-stone-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Terminal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">MikroTik Netwatch Script (Kengele ya Sekunde 15)</h3>
+                  <p className="text-xs text-stone-400">Router inatuma WhatsApp & SMS yenyewe bila wewe kufanya kitu</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNetwatchModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Jinsi Inavyofanya Kazi:</span>
+                </div>
+                <p className="text-stone-300 leading-relaxed">
+                  Router ya MikroTik hupima (ping) IP ya AP yako (<code>192.168.88.115</code>) kila baada ya <strong>sekunde 15</strong>. Umeme ukikatika au waya ukichomoka, inatuma kengele ya mtandao moja kwa moja kupitia webhook ya <code>/api/v1/hardware/alert/outage</code>, na mfumo unakuletea WhatsApp na SMS papo hapo kwenye <strong>0653 578 184</strong>!
+                </p>
+              </div>
+
+              {/* Instructions */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-300">Hatua za Kuweka Kwenye MikroTik (WinBox au Terminal):</label>
+                <ol className="text-xs text-stone-400 space-y-1 list-decimal list-inside bg-stone-950 p-3 rounded-xl border border-stone-800">
+                  <li>Fungua programu ya <strong>WinBox</strong> kisha ingia kwenye Router yako ya MikroTik.</li>
+                  <li>Bofya menyu ya <strong>New Terminal</strong> (au nenda <em>Tools ➔ Netwatch</em>).</li>
+                  <li>Nakili script iliyo hapa chini kisha ibandike (Paste) kwenye Terminal na ubofye <strong>Enter</strong>:</li>
+                </ol>
+              </div>
+
+              {/* Code Box */}
+              <div className="relative">
+                <pre className="p-4 bg-stone-950 border border-stone-800 rounded-2xl text-xs font-mono text-amber-300/90 overflow-x-auto leading-relaxed select-all">
+{`/tool netwatch
+add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Sokoni Ghorofani" \\
+    down-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=down\\" mode=https keep-result=no; :log error \\"AP SOKONI IMEZIMA! Ujumbe wa dharura umetumwa WhatsApp na SMS.\\"" \\
+    up-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=up\\" mode=https keep-result=no; :log warning \\"AP SOKONI IMERUDI HEWANI!\\""`}
+                </pre>
+                <button
+                  onClick={() => {
+                    const script = `/tool netwatch\nadd host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Sokoni Ghorofani" \\\n    down-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=down\\" mode=https keep-result=no; :log error \\"AP SOKONI IMEZIMA! Ujumbe wa dharura umetumwa WhatsApp na SMS.\\"" \\\n    up-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=up\\" mode=https keep-result=no; :log warning \\"AP SOKONI IMERUDI HEWANI!\\""`;
+                    navigator.clipboard.writeText(script);
+                    setIsCopiedNetwatch(true);
+                    showToast('📋 Script ya MikroTik imenakiliwa!');
+                    setTimeout(() => setIsCopiedNetwatch(false), 3000);
+                  }}
+                  className="absolute top-3 right-3 px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
+                >
+                  {isCopiedNetwatch ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{isCopiedNetwatch ? 'Imenakiliwa!' : 'Nakili Script'}</span>
+                </button>
+              </div>
+
+              {/* Live Test Controls inside Modal */}
+              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl flex items-center justify-between gap-3">
+                <div className="text-xs">
+                  <div className="font-bold text-white">Unataka kujaribu kuona jinsi ujumbe unavyofika simuni?</div>
+                  <div className="text-stone-400 text-[11px]">Bofya kujaribu bila kusubiri umeme ukatike:</div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => handleSimulateAlert('down')}
+                    disabled={isSendingAlertTest}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+                  >
+                    Tuma Alert ya DOWN
+                  </button>
+                  <button
+                    onClick={() => handleSimulateAlert('up')}
+                    disabled={isSendingAlertTest}
+                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+                  >
+                    Tuma Alert ya UP
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-stone-800 flex justify-end bg-stone-950/40">
+              <button
+                onClick={() => setShowNetwatchModal(false)}
+                className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Funga
               </button>
             </div>
           </div>
