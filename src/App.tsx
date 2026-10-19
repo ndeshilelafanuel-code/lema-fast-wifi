@@ -31,8 +31,65 @@ import { ClientSelfOnboarding } from './components/system/ClientSelfOnboarding';
 export default function App() {
   const [lang, setLang] = useState<Language>('sw');
   const [systemMode, setSystemMode] = useState<SystemMode>('ap-only');
-  // Default to 'landing' so users arrive at the high-converting landing page
-  const [appView, setAppView] = useState<AppView>('landing');
+  const getViewFromUrl = (): AppView => {
+    if (typeof window === 'undefined') return 'landing';
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    
+    if (
+      path.includes('portal') ||
+      path.includes('login') ||
+      path.includes('captive') ||
+      path.includes('hotspot') ||
+      path.includes('wateja') ||
+      hash.includes('portal') ||
+      search.includes('portal')
+    ) {
+      return 'customer-portal';
+    }
+    if (path.includes('admin') || hash.includes('admin')) {
+      return 'admin-dashboard';
+    }
+    if (path.includes('super') || path.includes('saas') || hash.includes('saas')) {
+      return 'super-admin';
+    }
+    if (path.includes('onboarding') || hash.includes('onboarding')) {
+      return 'saas-onboarding';
+    }
+    if (path.includes('guide') || hash.includes('guide')) {
+      return 'guide';
+    }
+    return 'landing';
+  };
+
+  const [appView, setAppViewState] = useState<AppView>(getViewFromUrl);
+
+  const setAppView = (view: AppView) => {
+    setAppViewState(view);
+    try {
+      const urlMap: Record<AppView, string> = {
+        'landing': '/',
+        'customer-portal': '/portal',
+        'admin-dashboard': '/admin',
+        'super-admin': '/saas',
+        'saas-onboarding': '/onboarding',
+        'guide': '/guide',
+      };
+      const newPath = urlMap[view] || '/';
+      if (window.location.pathname !== newPath && !window.location.pathname.includes('/api/')) {
+        window.history.pushState({ view }, '', newPath);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setAppViewState(getViewFromUrl());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Admin authentication state
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
