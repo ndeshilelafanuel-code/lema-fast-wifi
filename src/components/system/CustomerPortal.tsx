@@ -773,86 +773,118 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
           </div>
         </div>
 
-        {/* 1. SEHEMU YA MATANGAZO NA SLIDESHOW (Kama Kiho & Chino Wifi) */}
+        {/* 1. SEHEMU YA TAARIFA / BANNER */}
         <div className="pt-3 pb-1">
-          <div className={`relative rounded-2xl overflow-hidden border p-3.5 shadow-xs transition-all duration-300 bg-gradient-to-r ${adBanners[currentAdIndex].bgGradient}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1 flex-1 pr-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${adBanners[currentAdIndex].badgeColor}`}>
-                    {adBanners[currentAdIndex].tag}
-                  </span>
-                  <span className="text-[10px] text-stone-300 font-mono">
-                    Tangazo {currentAdIndex + 1}/{adBanners.length}
-                  </span>
+          {adBanners && adBanners.length > 0 && adBanners[currentAdIndex] ? (
+            <div className={`relative rounded-2xl overflow-hidden border p-3.5 shadow-xs transition-all duration-300 bg-gradient-to-r ${adBanners[currentAdIndex].bgGradient}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 flex-1 pr-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${adBanners[currentAdIndex].badgeColor}`}>
+                      {adBanners[currentAdIndex].tag}
+                    </span>
+                    <span className="text-[10px] text-stone-300 font-mono">
+                      Tangazo {currentAdIndex + 1}/{adBanners.length}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black tracking-tight text-white line-clamp-1">
+                    {adBanners[currentAdIndex].title}
+                  </h4>
+                  <p className="text-[11px] text-stone-200 leading-snug line-clamp-2 font-normal">
+                    {adBanners[currentAdIndex].desc}
+                  </p>
                 </div>
-                <h4 className="text-xs font-black tracking-tight text-white line-clamp-1">
-                  {adBanners[currentAdIndex].title}
-                </h4>
-                <p className="text-[11px] text-stone-200 leading-snug line-clamp-2 font-normal">
-                  {adBanners[currentAdIndex].desc}
-                </p>
+
+                {/* Action Link / Call */}
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <a
+                    href={`https://wa.me/${adBanners[currentAdIndex].phone.replace(/[^0-9]/g, '')}?text=Habari!+Nimeona+tangazo+lako+kwenye+LEMA+FAST+WiFi`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => recordAdClick(adBanners[currentAdIndex].id)}
+                    className="px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[10px] font-black border border-white/20 transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <Phone className="w-3 h-3 text-emerald-400" />
+                    <span>{adBanners[currentAdIndex].action}</span>
+                  </a>
+                </div>
               </div>
 
-              {/* Action Link / Call */}
-              <div className="flex flex-col items-end gap-1.5 shrink-0">
+              {/* Carousel Navigation Dots & Controls */}
+              <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-white/10 text-[10px]">
                 <a
-                  href={`https://wa.me/${adBanners[currentAdIndex].phone.replace(/[^0-9]/g, '')}?text=Habari!+Nimeona+tangazo+lako+kwenye+LEMA+FAST+WiFi`}
+                  href={`https://wa.me/${(settings.supportPhone || '255653578184').replace(/[^0-9]/g, '')}?text=Habari!+Ninahitaji+kutangaza+biashara+yangu+kwenye+LEMA+FAST+WiFi`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => recordAdClick(adBanners[currentAdIndex].id)}
-                  className="px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[10px] font-black border border-white/20 transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                  className="text-[10px] text-amber-300 hover:text-amber-200 font-bold underline flex items-center gap-1"
                 >
-                  <Phone className="w-3 h-3 text-emerald-400" />
-                  <span>{adBanners[currentAdIndex].action}</span>
+                  <Megaphone className="w-3 h-3 text-amber-400" />
+                  <span>Tangaza Biashara Yako Hapa</span>
                 </a>
-              </div>
-            </div>
 
-            {/* Carousel Navigation Dots & Controls */}
-            <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-white/10 text-[10px]">
-              <a
-                href={`https://wa.me/${(settings.supportPhone || '255653578184').replace(/[^0-9]/g, '')}?text=Habari!+Ninahitaji+kutangaza+biashara+yangu+kwenye+LEMA+FAST+WiFi`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-amber-300 hover:text-amber-200 font-bold underline flex items-center gap-1"
-              >
-                <Megaphone className="w-3 h-3 text-amber-400" />
-                <span>Tangaza Biashara Yako Hapa</span>
-              </a>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCurrentAdIndex((prev) => (prev - 1 + adBanners.length) % adBanners.length)}
-                  className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
-                  title="Tangazo Lililopita"
-                >
-                  <ChevronLeft className="w-3 h-3" />
-                </button>
-                <div className="flex gap-1">
-                  {adBanners.map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setCurrentAdIndex(i)}
-                      className={`h-1.5 rounded-full transition-all ${
-                        currentAdIndex === i ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/30'
-                      }`}
-                    />
-                  ))}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentAdIndex((prev) => (prev - 1 + adBanners.length) % adBanners.length)}
+                    className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+                    title="Tangazo Lililopita"
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </button>
+                  <div className="flex gap-1">
+                    {adBanners.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setCurrentAdIndex(i)}
+                        className={`h-1.5 rounded-full transition-all ${
+                          currentAdIndex === i ? 'w-4 bg-amber-400' : 'w-1.5 bg-white/30'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentAdIndex((prev) => (prev + 1) % adBanners.length)}
+                    className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+                    title="Tangazo Lijalo"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCurrentAdIndex((prev) => (prev + 1) % adBanners.length)}
-                  className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
-                  title="Tangazo Lijalo"
-                >
-                  <ChevronRight className="w-3 h-3" />
-                </button>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative rounded-2xl overflow-hidden border border-amber-500/30 p-3.5 shadow-xs bg-linear-to-r from-stone-900 via-stone-850 to-stone-900 text-stone-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                      Mtandao Uko Hewani
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-black text-white">
+                    Karibu {settings.hotspotName || 'Lema Fast WiFi'}
+                  </h4>
+                  <p className="text-[11px] text-stone-300">
+                    {settings.tagline || 'Intaneti ya Kasi ya Fiber & Starlink'}. Chagua kifurushi hapa chini kuanza kuvinjari!
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="text-[10px] text-stone-400 font-mono block">Msaada / WhatsApp:</span>
+                  <a
+                    href={`https://wa.me/${(settings.supportPhone || '255653578184').replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold text-emerald-400 hover:underline"
+                  >
+                    {settings.supportPhone || '0653 578 184'}
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ACTIVE SESSION DASHBOARD (If User Is Connected) */}
@@ -1838,20 +1870,20 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
             </div>
 
             {/* Featured Ad card inside modal */}
-            <div className={`p-4 rounded-2xl border text-left space-y-2.5 bg-gradient-to-r ${adBanners[currentAdIndex]?.bgGradient || 'from-fuchsia-950 via-purple-900 to-stone-900 border-fuchsia-500/40 text-fuchsia-200'}`}>
+            <div className={`p-4 rounded-2xl border text-left space-y-2.5 bg-gradient-to-r ${adBanners[currentAdIndex]?.bgGradient || 'from-stone-900 via-stone-850 to-stone-900 border-amber-500/40 text-stone-200'}`}>
               <div className="flex items-center justify-between">
-                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${adBanners[currentAdIndex]?.badgeColor || 'bg-fuchsia-500 text-white'}`}>
-                  {adBanners[currentAdIndex]?.tag || '🔥 Mfadhili Mtaani'}
+                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${adBanners[currentAdIndex]?.badgeColor || 'bg-amber-500 text-stone-950'}`}>
+                  {adBanners[currentAdIndex]?.tag || '⚡ Lema Fast WiFi'}
                 </span>
                 <span className="text-[10px] text-stone-300 font-mono">
-                  {adBanners[currentAdIndex]?.sponsor || 'Sponsor'}
+                  {adBanners[currentAdIndex]?.sponsor || 'Lema Fast WiFi'}
                 </span>
               </div>
               <h4 className="text-sm font-black text-white">
-                {adBanners[currentAdIndex]?.title || 'GLAMOUR TOUCH SALON & SPA'}
+                {adBanners[currentAdIndex]?.title || 'Lema Fast WiFi - Intaneti ya Kasi'}
               </h4>
               <p className="text-xs text-stone-200 leading-relaxed font-normal">
-                {adBanners[currentAdIndex]?.desc || 'Huduma bora mtaani kwako! Tembelea leo au wasiliana kupitia WhatsApp.'}
+                {adBanners[currentAdIndex]?.desc || 'Furahia intaneti ya kasi ya Fiber & Starlink mtaani kwako kwa bei nafuu sana.'}
               </p>
               <div className="pt-2">
                 <a
