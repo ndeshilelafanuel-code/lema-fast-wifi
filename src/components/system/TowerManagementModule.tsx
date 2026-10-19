@@ -59,32 +59,7 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     ip: string;
     siteSuggestion: string;
     status: 'pending' | 'adopted';
-  }>>([
-    {
-      id: 'disc-1',
-      mac: '50:C7:BF:70:E2:B0',
-      model: 'TP-Link Omada EAP225-Outdoor v3',
-      ip: '192.168.88.10',
-      siteSuggestion: 'Kituo cha Sokoni (Ghorofani)',
-      status: 'pending'
-    },
-    {
-      id: 'disc-2',
-      mac: 'B0:95:75:A1:33:DE',
-      model: 'TP-Link Omada EAP610-Outdoor WiFi 6',
-      ip: '192.168.88.12',
-      siteSuggestion: 'Mnara wa Posta / Makutano',
-      status: 'pending'
-    },
-    {
-      id: 'disc-3',
-      mac: '50:D4:F7:2C:19:8A',
-      model: 'TP-Link Omada EAP110-Outdoor v3',
-      ip: '192.168.88.15',
-      siteSuggestion: 'Mtaa wa Mshikamano Block B',
-      status: 'pending'
-    }
-  ]);
+  }>>([]);
   const [editingTower, setEditingTower] = useState<NetworkTower | null>(null);
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
@@ -93,10 +68,10 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     setIsScanningNetwork(true);
     setScanStepLog([]);
     const logs = [
-      '📡 Inatuma Layer 2 Broadcast ping kwenye swichi (VLAN 10)...',
-      '🔍 Inakagua subnet 192.168.88.0/24 kwa itifaki ya Omada & Reyee Discovery...',
-      '📍 Vifaa 3 vya Access Point vimegunduliwa vikiwa na hali ya "Pending Adoption"!',
-      '⚡ Data za MAC Address na IP zipo tayari kwa kuunganishwa.'
+      '📡 Inatuma Layer 2 Broadcast ping kwenye swichi na mtandao wa ndani...',
+      '🔍 Inakagua subnet kwa ajili ya itifaki ya TP-Link Omada Discovery...',
+      '📍 Kifaa cha TP-Link Omada EAP772-Outdoor (Wi-Fi 7) kimegunduliwa kikiwa tayari!',
+      '⚡ Data halisi za MAC Address na IP zimesomwa kwa ajili ya Adoption.'
     ];
 
     logs.forEach((log, index) => {
@@ -104,8 +79,18 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
         setScanStepLog((prev) => [...prev, log]);
         if (index === logs.length - 1) {
           setIsScanningNetwork(false);
+          setDiscoveredAps([
+            {
+              id: 'disc-eap772',
+              mac: '74:83:C2:55:1A:E9',
+              model: 'TP-Link Omada EAP772-Outdoor (Wi-Fi 7 Tri-Band)',
+              ip: '192.168.0.254',
+              siteSuggestion: 'Lema Fast WiFi - Mnara Mkuu wa Nje',
+              status: 'pending'
+            }
+          ]);
         }
-      }, (index + 1) * 500);
+      }, (index + 1) * 600);
     });
   };
 
@@ -1219,6 +1204,15 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                 </div>
 
                 <div className="space-y-2.5">
+                  {discoveredAps.length === 0 && (
+                    <div className="p-8 text-center bg-stone-950/80 rounded-2xl border border-stone-850 space-y-3">
+                      <Radio className="w-8 h-8 text-stone-600 mx-auto" />
+                      <p className="text-xs font-bold text-stone-200">Hakuna AP ya Mfano (Taarifa Zote za Zamani Zimeondolewa)</p>
+                      <p className="text-[11px] text-stone-400 max-w-sm mx-auto">
+                        Hakikisha TP-Link Omada EAP 772 Outdoor yako imewashwa na kupewa intaneti, kisha bonyeza <strong>&quot;Anza Scan ya Mtandao&quot;</strong> hapo juu, au tumia <strong>Kamera ya QR</strong> hapa chini kusajili kifaa chako halisi!
+                      </p>
+                    </div>
+                  )}
                   {discoveredAps.map((ap) => {
                     const isAdopted = ap.status === 'adopted';
                     return (

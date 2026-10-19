@@ -468,7 +468,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Equipment Inventory & QR Scanner States
   const [showQrEquipmentModal, setShowQrEquipmentModal] = useState<boolean>(false);
-  const [equipmentInventory, setEquipmentInventory] = useState<ScannedEquipment[]>([]);
+  const [equipmentInventory, setEquipmentInventory] = useState<ScannedEquipment[]>(() => {
+    try {
+      const saved = localStorage.getItem('lema_wifi_equipment_inventory');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(equipmentInventory));
+  }, [equipmentInventory]);
 
   // Wizard States
   const [showAddRouterForm, setShowAddRouterForm] = useState<boolean>(false);
@@ -4262,6 +4272,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* APs List */}
               <div className="space-y-3">
+                {accessPoints.length === 0 && (
+                  <div className="p-8 text-center bg-stone-950 border border-stone-850 rounded-2xl space-y-3">
+                    <Radio className="w-8 h-8 text-stone-600 mx-auto" />
+                    <p className="text-sm font-bold text-white">Hakuna AP Iliyosajiliwa Bado (Mifano Yote Imefutwa)</p>
+                    <p className="text-xs text-stone-400 max-w-md mx-auto">
+                      Taarifa zote za mfano zimeondolewa kwenye mfumo. Sasa unaweza kusajili kifaa chako halisi cha <strong>TP-Link Omada EAP 772 Outdoor</strong> kwa kutumia kamera ya simu au kuingiza taarifa zake moja kwa moja.
+                    </p>
+                    <button
+                      onClick={() => setShowQrEquipmentModal(true)}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer shadow-lg"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span>Skani au Sajili TP-Link EAP 772 Yako</span>
+                    </button>
+                  </div>
+                )}
                 {accessPoints.map((ap) => (
                   <div
                     key={ap.mac}

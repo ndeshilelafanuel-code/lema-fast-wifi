@@ -50,7 +50,7 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
   onEquipmentRegistered,
   showToast,
 }) => {
-  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'samples'>('camera');
+  const [activeTab, setActiveTab] = useState<'camera' | 'upload' | 'manual'>('camera');
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -59,6 +59,12 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
   const [isScanning, setIsScanning] = useState<boolean>(true);
   const [scannedRawData, setScannedRawData] = useState<string | null>(null);
   
+  // Manual input state (Real hardware registration)
+  const [manualModel, setManualModel] = useState<string>('TP-Link Omada EAP772-Outdoor (Wi-Fi 7)');
+  const [manualMac, setManualMac] = useState<string>('');
+  const [manualSerial, setManualSerial] = useState<string>('');
+  const [manualSite, setManualSite] = useState<string>('Mnara Mkuu wa Nje');
+
   // Parsed Equipment Form State
   const [parsedData, setParsedData] = useState<Partial<ScannedEquipment> | null>(null);
   const [assignedName, setAssignedName] = useState<string>('');
@@ -204,10 +210,10 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
       }
     });
 
-    const model = fields['MODEL'] || fields['M'] || (data.includes('EAP225') ? 'EAP225-Outdoor' : data.includes('RAP') ? 'RG-RAP6202G' : data.includes('HEX') ? 'RB750Gr3 hEX' : 'Smart WiFi Node');
-    const serial = fields['SERIAL'] || fields['SN'] || fields['S/N'] || fields['S'] || (data.match(/[A-Z0-9]{10,14}/)?.[0] || '22611SK004068');
-    const mac = fields['MAC'] || fields['M'] || (data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/)?.[0] || '20:E1:5D:44:16:D2');
-    const deviceKey = fields['KEY'] || fields['DEVICEKEY'] || fields['PIN'] || '12BA-E1EF-7DAA-19DE-9000';
+    const model = fields['MODEL'] || fields['M'] || (data.includes('EAP772') ? 'EAP772-Outdoor' : data.includes('EAP225') ? 'EAP225-Outdoor' : data.includes('RAP') ? 'RG-RAP6202G' : data.includes('HEX') ? 'RB750Gr3 hEX' : 'Smart WiFi Node');
+    const serial = fields['SERIAL'] || fields['SN'] || fields['S/N'] || fields['S'] || (data.match(/[A-Z0-9]{10,14}/)?.[0] || '22771SK007720');
+    const mac = fields['MAC'] || fields['M'] || (data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/)?.[0] || '74:83:C2:55:1A:E9');
+    const deviceKey = fields['KEY'] || fields['DEVICEKEY'] || fields['PIN'] || '772A-EAP7-7200-WIFI7';
     const mfr = fields['MFR'] || fields['BRAND'] || (model.includes('EAP') ? 'TP-Link' : model.includes('RAP') ? 'Ruijie' : model.includes('RB') ? 'MikroTik' : 'Network Hardware');
 
     let category: 'ap' | 'router' | 'switch' | 'starlink' | 'power' = 'ap';
@@ -327,6 +333,14 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
   // Sample Preset Equipment Labels for 1-click testing
   const sampleLabels = [
     {
+      title: 'TP-Link Omada EAP772-Outdoor (Wi-Fi 7 Tri-Band)',
+      category: 'ap',
+      code: 'MFR:TP-Link;MODEL:EAP772-Outdoor;SN:22771SK007720;MAC:74:83:C2:55:1A:E9;KEY:772A-EAP7-7200-WIFI7;POE:802.3at;',
+      desc: 'Antenna ya nje ya kizazi cha kisasa cha Wi-Fi 7 (Tri-Band 2.4/5/6GHz) yenye spidi na uwezo mkubwa wa wateja.',
+      icon: '🚀',
+      brand: 'TP-Link',
+    },
+    {
       title: 'TP-Link EAP225-Outdoor Access Point',
       category: 'ap',
       code: 'MFR:TP-Link;MODEL:EAP225-Outdoor;SN:22611SK004068;MAC:20:E1:5D:44:16:D2;KEY:12BA-E1EF-7DAA-19DE-9000;POE:24V/48V;',
@@ -443,15 +457,15 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveTab('samples');
+                    setActiveTab('manual');
                     stopCamera();
                   }}
                   className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                    activeTab === 'samples' ? 'bg-indigo-600 text-white shadow-xs' : 'text-stone-400 hover:text-white'
+                    activeTab === 'manual' ? 'bg-indigo-600 text-white shadow-xs' : 'text-stone-400 hover:text-white'
                   }`}
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                  <span>Sampuli za Majaribio (6)</span>
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Ingiza kwa Mkono (Manual)</span>
                 </button>
               </div>
 
@@ -553,34 +567,85 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
                 </div>
               )}
 
-              {/* View 3: 1-Click Sample Testing */}
-              {activeTab === 'samples' && (
-                <div className="space-y-3">
-                  <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-xs text-indigo-300 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 shrink-0 text-yellow-300" />
-                    <span>Chagua mojawapo ya lebo hizi halisi kufanya majaribio ya haraka ya skana ya QR:</span>
+              {/* View 3: Manual Direct Entry (Real Hardware) */}
+              {activeTab === 'manual' && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!manualMac.trim()) {
+                      showToast('Kosa', 'Tafadhali weka MAC Address ya kifaa chako halisi.', 'warning');
+                      return;
+                    }
+                    const cleanMac = manualMac.trim().toUpperCase();
+                    const cleanSerial = (manualSerial.trim() || 'SN' + Math.floor(Math.random() * 900000 + 100000)).toUpperCase();
+                    const payload = `MFR:TP-Link;MODEL:${manualModel};SN:${cleanSerial};MAC:${cleanMac};KEY:EAP772-PASS;SITE:${manualSite};`;
+                    handleCodeDetected(payload);
+                  }}
+                  className="space-y-4 bg-stone-950 p-5 rounded-2xl border border-stone-850 text-xs"
+                >
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    <span>Sajili TP-Link EAP 772 yako halisi moja kwa moja kwa kuandika taarifa zake kutoka kwenye stika:</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {sampleLabels.map((sample, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleCodeDetected(sample.code)}
-                        className="p-3 rounded-xl border border-stone-800 hover:border-indigo-500/50 bg-stone-950 text-left space-y-1 transition-all cursor-pointer group hover:bg-indigo-950/20"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg">{sample.icon}</span>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-stone-800 text-stone-300 group-hover:bg-indigo-600 group-hover:text-white">
-                            Skani Hii ➔
-                          </span>
-                        </div>
-                        <strong className="text-xs font-bold text-white block truncate">{sample.title}</strong>
-                        <p className="text-[10px] text-stone-400 line-clamp-2 leading-relaxed">{sample.desc}</p>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-stone-300">Modeli ya Kifaa</label>
+                      <input
+                        type="text"
+                        value={manualModel}
+                        onChange={(e) => setManualModel(e.target.value)}
+                        className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-white font-sans text-xs focus:outline-hidden focus:border-indigo-500"
+                        placeholder="TP-Link Omada EAP772-Outdoor"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-stone-300">MAC Address (Kwenye Stika / Boksi) *</label>
+                      <input
+                        type="text"
+                        value={manualMac}
+                        onChange={(e) => setManualMac(e.target.value)}
+                        className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-hidden focus:border-indigo-500"
+                        placeholder="mf. 74:83:C2:55:1A:E9"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-stone-300">Serial Number (S/N)</label>
+                      <input
+                        type="text"
+                        value={manualSerial}
+                        onChange={(e) => setManualSerial(e.target.value)}
+                        className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-hidden focus:border-indigo-500"
+                        placeholder="mf. 22771SK007720"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-stone-300">Eneo / Site Inapofungwa</label>
+                      <input
+                        type="text"
+                        value={manualSite}
+                        onChange={(e) => setManualSite(e.target.value)}
+                        className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-white font-sans text-xs focus:outline-hidden focus:border-indigo-500"
+                        placeholder="Mnara Mkuu wa Nje"
+                      />
+                    </div>
                   </div>
-                </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                      <span>Thibitisha na Sajili EAP 772 Yako Halisi</span>
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           ) : (
