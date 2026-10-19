@@ -480,6 +480,69 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(equipmentInventory));
   }, [equipmentInventory]);
 
+  // Sync Hardware Inventory with backend server disk (so PC, Phone, and all devices share the exact same APs)
+  useEffect(() => {
+    let isMounted = true;
+    const syncServerHardware = async () => {
+      try {
+        const res = await fetch('/api/v1/hardware/inventory');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.inventory)) {
+            if (data.inventory.length > 0) {
+              if (isMounted) {
+                setEquipmentInventory(data.inventory);
+                const serverAps = data.inventory
+                  .filter((item: ScannedEquipment) => item.category === 'ap')
+                  .map((item: ScannedEquipment) => ({
+                    mac: item.macAddress,
+                    model: item.model,
+                    site: item.site,
+                    status: 'connected',
+                    uptime: 'Online (Imeunganishwa)',
+                  }));
+                if (serverAps.length > 0) {
+                  setAccessPoints((prev) => {
+                    const combined = [...serverAps];
+                    prev.forEach((p) => {
+                      if (!combined.some((c) => c.mac.toUpperCase() === p.mac.toUpperCase())) {
+                        combined.push(p);
+                      }
+                    });
+                    return combined;
+                  });
+                }
+              }
+            } else {
+              // If server is empty but this device (phone) has local scanned items, push them to server!
+              const saved = localStorage.getItem('lema_wifi_equipment_inventory');
+              if (saved) {
+                const localItems = JSON.parse(saved);
+                if (Array.isArray(localItems) && localItems.length > 0) {
+                  for (const item of localItems) {
+                    await fetch('/api/v1/hardware/register', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(item),
+                    });
+                  }
+                  console.log('[Hardware Sync] Pushed local phone APs to server database.');
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not sync hardware from server:', e);
+      }
+    };
+
+    syncServerHardware();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Wizard States
   const [showAddRouterForm, setShowAddRouterForm] = useState<boolean>(false);
   const [newRouterType, setNewRouterType] = useState<'omada' | 'mikrotik' | 'openwrt'>('omada');
@@ -4314,7 +4377,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
 
                     <button
-                      onClick={() => setAccessPoints(accessPoints.filter((item) => item.mac !== ap.mac))}
+                      onClick={() => {
+                        setAccessPoints(accessPoints.filter((item) => item.mac !== ap.mac));
+                        setEquipmentInventory((prev) => prev.filter((item) => item.macAddress !== ap.mac));
+                        fetch(`/api/v1/hardware/equipment/${encodeURIComponent(ap.mac)}`, { method: 'DELETE' }).catch(() => {});
+                      }}
                       className="p-1.5 rounded-lg text-stone-500 hover:text-rose-400 hover:bg-stone-900 transition-colors"
                       title="Ondoa AP"
                     >
@@ -4438,10 +4505,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onOpenScanner={() => setShowQrEquipmentModal(true)}
               onRemoveEquipment={(id) => {
                 setEquipmentInventory((prev) => prev.filter((i) => i.id !== id));
+                fetch(`/api/v1/hardware/equipment/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
                 showToast('Kifaa Kimeondolewa', 'Kifaa kimefutwa kwenye stoo ya vifaa.', 'info');
               }}
               onAddManual={(item) => {
                 setEquipmentInventory((prev) => [item, ...prev]);
+                fetch('/api/v1/hardware/register', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(item),
+                }).catch(() => {});
                 showToast('Kifaa Kimesajiliwa', `${item.name} kimesajiliwa kwenye stoo.`, 'success');
               }}
               showToast={showToast}
@@ -5650,6 +5723,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onEquipmentRegistered={(newEq) => {
             // 1. Add to equipment inventory
             setEquipmentInventory((prev) => [newEq, ...prev]);
+
+            // Sync to backend server disk so PC, Phone, and all devices see it immediately!
+            fetch('/api/v1/hardware/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newEq),
+            }).catch((err) => console.warn('Could not save to server:', err));
 
             // 2. If it's an AP, automatically add to accessPoints list and HotspotContext towers
             if (newEq.category === 'ap') {

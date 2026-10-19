@@ -227,13 +227,56 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('wifi_hotspot_sessions');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Filter out specific legacy mock active sessions
         const cleaned = parsed.filter((s: ActiveSession) => !['sess-1', 'sess-2', 'sess-3', 'sess-4'].includes(s.id));
         return cleaned;
       }
     } catch (e) {}
     return [];
   });
+
+  // Sync active sessions with backend server so PC and Phone show connected users in real-time
+  useEffect(() => {
+    let isMounted = true;
+    const fetchServerSessions = async () => {
+      try {
+        const res = await fetch('/api/v1/sessions/active');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.sessions)) {
+            if (data.sessions.length > 0 && isMounted) {
+              setActiveSessions(data.sessions);
+            } else if (activeSessions.length > 0) {
+              // Push local sessions to server if server is empty
+              fetch('/api/v1/sessions/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessions: activeSessions }),
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not sync sessions from server:', e);
+      }
+    };
+
+    fetchServerSessions();
+    const interval = setInterval(fetchServerSessions, 5000); // Poll every 5s for live connected users sync
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(activeSessions));
+    // Also sync to server
+    fetch('/api/v1/sessions/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessions: activeSessions }),
+    }).catch(() => {});
+  }, [activeSessions]);
 
   // Client's currently active session in this browser
   const [currentClientSession, setCurrentClientSession] = useState<ActiveSession | null>(() => {

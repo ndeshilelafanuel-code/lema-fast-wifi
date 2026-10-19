@@ -270,6 +270,188 @@ app.get('/api/v1/whatsapp/logs', (_req, res) => {
   });
 });
 
+// =========================================================================
+// HARDWARE INVENTORY & ACCESS POINTS PERSISTENCE (Synced across PC & Mobile)
+// =========================================================================
+const HARDWARE_FILE = path.resolve(__dirname, 'hardware-inventory.json');
+
+interface HardwareItem {
+  id: string;
+  name: string;
+  category: 'ap' | 'router' | 'switch' | 'starlink' | 'power';
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+  macAddress: string;
+  ipAddress?: string;
+  site: string;
+  status: 'online' | 'offline' | 'pending';
+  lastSeen?: string;
+  notes?: string;
+  scannedAt: string;
+}
+
+let savedHardware: HardwareItem[] = [];
+
+function loadSavedHardware() {
+  try {
+    if (fs.existsSync(HARDWARE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(HARDWARE_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        savedHardware = data;
+        console.log(`[Hardware Inventory] Imepakua vifaa ${savedHardware.length} kutoka kwenye diski.`);
+      }
+    }
+  } catch (e) {
+    console.warn('[Hardware Inventory] Hitilafu wakati wa kusoma vifaa:', e);
+  }
+}
+
+function saveHardwareToDisk() {
+  try {
+    fs.writeFileSync(HARDWARE_FILE, JSON.stringify(savedHardware, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Hardware Inventory] Hitilafu wakati wa kuhifadhi vifaa:', e);
+  }
+}
+
+loadSavedHardware();
+
+// API: Get Hardware Inventory (synchronized across phone, PC, and all browsers)
+app.get('/api/v1/hardware/inventory', (_req, res) => {
+  res.json({
+    success: true,
+    count: savedHardware.length,
+    inventory: savedHardware,
+  });
+});
+
+// API: Register or update hardware equipment
+app.post('/api/v1/hardware/register', (req, res) => {
+  const item: HardwareItem = req.body;
+  if (!item || !item.macAddress) {
+    return res.status(400).json({ success: false, error: 'MAC address inahitajika' });
+  }
+
+  const cleanMac = item.macAddress.trim().toUpperCase();
+  const existingIdx = savedHardware.findIndex(
+    (h) => h.id === item.id || h.macAddress.toUpperCase() === cleanMac
+  );
+
+  const cleanItem: HardwareItem = {
+    ...item,
+    id: item.id || `eq-${Date.now()}`,
+    macAddress: cleanMac,
+    serialNumber: (item.serialNumber || '').trim().toUpperCase(),
+    scannedAt: item.scannedAt || new Date().toISOString(),
+    status: item.status || 'online',
+    lastSeen: item.lastSeen || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+
+  if (existingIdx >= 0) {
+    savedHardware[existingIdx] = { ...savedHardware[existingIdx], ...cleanItem };
+  } else {
+    savedHardware.unshift(cleanItem);
+  }
+
+  saveHardwareToDisk();
+  console.log(`[Hardware Inventory] 📡 Kifaa kimesajiliwa kwenye seva: ${cleanItem.model} (${cleanItem.macAddress})`);
+
+  res.json({
+    success: true,
+    message: 'Kifaa kimehifadhiwa kwenye seva kikamilifu!',
+    device: cleanItem,
+    inventory: savedHardware,
+  });
+});
+
+// API: Replace entire inventory
+app.post('/api/v1/hardware/inventory', (req, res) => {
+  const { inventory } = req.body;
+  if (Array.isArray(inventory)) {
+    savedHardware = inventory;
+    saveHardwareToDisk();
+    return res.json({ success: true, count: savedHardware.length, inventory: savedHardware });
+  }
+  res.status(400).json({ success: false, error: 'Invalid inventory array' });
+});
+
+// API: Delete hardware equipment
+app.delete('/api/v1/hardware/equipment/:id', (req, res) => {
+  const { id } = req.params;
+  const targetId = id.toUpperCase();
+  savedHardware = savedHardware.filter((h) => h.id !== id && h.macAddress.toUpperCase() !== targetId);
+  saveHardwareToDisk();
+  console.log(`[Hardware Inventory] 🗑️ Kifaa kimeondolewa kwenye seva: ${id}`);
+  res.json({ success: true, message: 'Kifaa kimeondolewa kwenye seva', inventory: savedHardware });
+});
+
+// =========================================================================
+// ACTIVE SESSIONS & CONNECTED USERS PERSISTENCE (Synced across PC & Mobile)
+// =========================================================================
+const SESSIONS_FILE = path.resolve(__dirname, 'active-sessions.json');
+let savedActiveSessions: any[] = [];
+
+function loadSavedSessions() {
+  try {
+    if (fs.existsSync(SESSIONS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        savedActiveSessions = data;
+        console.log(`[Active Sessions] Imepakua vikao ${savedActiveSessions.length} kutoka kwenye diski.`);
+      }
+    }
+  } catch (e) {
+    console.warn('[Active Sessions] Hitilafu wakati wa kusoma vikao:', e);
+  }
+}
+
+function saveSessionsToDisk() {
+  try {
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(savedActiveSessions, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Active Sessions] Hitilafu wakati wa kuhifadhi vikao:', e);
+  }
+}
+
+loadSavedSessions();
+
+app.get('/api/v1/sessions/active', (_req, res) => {
+  res.json({ success: true, count: savedActiveSessions.length, sessions: savedActiveSessions });
+});
+
+app.post('/api/v1/sessions/active', (req, res) => {
+  const session = req.body;
+  if (!session || !session.id) {
+    return res.status(400).json({ success: false, error: 'Session ID inahitajika' });
+  }
+  const existingIdx = savedActiveSessions.findIndex((s) => s.id === session.id);
+  if (existingIdx >= 0) {
+    savedActiveSessions[existingIdx] = { ...savedActiveSessions[existingIdx], ...session };
+  } else {
+    savedActiveSessions.unshift(session);
+  }
+  saveSessionsToDisk();
+  res.json({ success: true, sessions: savedActiveSessions });
+});
+
+app.post('/api/v1/sessions/sync', (req, res) => {
+  const { sessions } = req.body;
+  if (Array.isArray(sessions)) {
+    savedActiveSessions = sessions;
+    saveSessionsToDisk();
+    return res.json({ success: true, count: savedActiveSessions.length, sessions: savedActiveSessions });
+  }
+  res.status(400).json({ success: false, error: 'Invalid sessions array' });
+});
+
+app.delete('/api/v1/sessions/active/:id', (req, res) => {
+  const { id } = req.params;
+  savedActiveSessions = savedActiveSessions.filter((s) => s.id !== id);
+  saveSessionsToDisk();
+  res.json({ success: true, sessions: savedActiveSessions });
+});
+
 const clearWhatsAppLogs = (_req: express.Request, res: express.Response) => {
   whatsAppLogs.length = 0;
   addWhatsAppLog({
