@@ -229,141 +229,41 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </button>
         </form>
 
-        {/* Multi-Tenant Credentials Helper Card */}
+        {/* Real Admin Quick-Fill (Lema Fast WiFi Owner) */}
         <div className="p-4 rounded-2xl bg-stone-950/90 border border-stone-800 text-xs text-stone-400 space-y-3">
           <div className="flex items-center justify-between text-[11px] border-b border-stone-800/80 pb-2">
             <span className="font-semibold text-stone-200 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>{lang === 'sw' ? 'Jaribu Akaunti za Mfano (Chagua Kuingia):' : 'Test Demo Client Accounts:'}</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>{lang === 'sw' ? 'Akaunti Rasmi ya Msimamizi Mkuu:' : 'Official Admin Credentials:'}</span>
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 font-mono font-medium">
-              Multi-Tenant SaaS
+              Lema Fast WiFi
             </span>
           </div>
 
-          <p className="text-[11px] text-stone-300 leading-relaxed">
-            {lang === 'sw'
-              ? 'Ndio! Kila mteja anayeuziwa mfumo anakuwa na Username na Password yake binafsi inayomfungulia dashibodi ya router zake na mapato yake pekee.'
-              : 'Yes! Every hotspot client you sell to gets their dedicated Username & Password to access only their router, vouchers and revenue.'}
-          </p>
-
-          {/* Quick Select Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-            {/* 1. Super Admin (Jimmy Lema HQ) */}
-            <div
-              onClick={() => fillAccount('admin', 'admin123', 'tenant-lema-hq')}
-              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
-                selectedDemoAccount === 'admin'
-                  ? 'bg-amber-400/15 border-amber-400/60 text-white shadow-sm shadow-amber-400/10'
-                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
-              }`}
-            >
-              <div className="flex items-center justify-between text-[11px] font-bold">
-                <span className="text-amber-400 flex items-center gap-1">
-                  <span>👑 Jimmy Lema (Mkuu)</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    loginDirectlyAs('admin', 'admin123', 'tenant-lema-hq');
-                  }}
-                  className="text-[9px] px-1.5 py-0.5 rounded bg-amber-400 text-stone-950 font-bold hover:bg-amber-300 transition-colors"
-                >
-                  Ingia ➔
-                </button>
-              </div>
-              <div className="text-[10px] font-mono text-stone-400 mt-1">
-                User: <span className="text-amber-300 font-semibold">admin</span> • Pass: <span className="text-amber-300 font-semibold">admin123</span>
+          <div
+            onClick={() => fillAccount('admin', 'admin123', 'tenant-lema-hq')}
+            className="p-3 rounded-xl text-left border bg-stone-900/60 border-stone-800 hover:border-amber-400/50 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+          >
+            <div>
+              <strong className="text-white text-xs block group-hover:text-amber-300 transition-colors">
+                👑 Jimmy Lema (Msimamizi Mkuu)
+              </strong>
+              <div className="text-[11px] font-mono text-stone-400 mt-1">
+                Username: <span className="text-amber-300 font-semibold">admin</span> • Nenosiri: <span className="text-amber-300 font-semibold">admin123</span>
               </div>
             </div>
 
-            {/* 2. Samaki Samaki Lounge (Benson Mtui) */}
-            <div
-              onClick={() => fillAccount('samaki', 'password123', 'tenant-samaki')}
-              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
-                selectedDemoAccount === 'samaki'
-                  ? 'bg-blue-400/15 border-blue-400/60 text-white shadow-sm shadow-blue-400/10'
-                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
-              }`}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                loginDirectlyAs('admin', 'admin123', 'tenant-lema-hq');
+              }}
+              className="text-xs px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black transition-colors shrink-0 cursor-pointer shadow-md"
             >
-              <div className="flex items-center justify-between text-[11px] font-bold">
-                <span className="text-blue-400 flex items-center gap-1">
-                  <span>🏢 Samaki Lounge</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    loginDirectlyAs('samaki', 'password123', 'tenant-samaki');
-                  }}
-                  className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500 text-white font-bold hover:bg-blue-400 transition-colors"
-                >
-                  Ingia ➔
-                </button>
-              </div>
-              <div className="text-[10px] font-mono text-stone-400 mt-1">
-                User: <span className="text-blue-300 font-semibold">samaki</span> • Pass: <span className="text-blue-300 font-semibold">password123</span>
-              </div>
-            </div>
-
-            {/* 3. Chuo Hostel WiFi (Daniel Mushi) */}
-            <div
-              onClick={() => fillAccount('chuo', 'password123', 'tenant-hostel')}
-              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
-                selectedDemoAccount === 'chuo'
-                  ? 'bg-emerald-400/15 border-emerald-400/60 text-white shadow-sm shadow-emerald-400/10'
-                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
-              }`}
-            >
-              <div className="flex items-center justify-between text-[11px] font-bold">
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <span>🏫 Chuo Hostel WiFi</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    loginDirectlyAs('chuo', 'password123', 'tenant-hostel');
-                  }}
-                  className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors"
-                >
-                  Ingia ➔
-                </button>
-              </div>
-              <div className="text-[10px] font-mono text-stone-400 mt-1">
-                User: <span className="text-emerald-300 font-semibold">chuo</span> • Pass: <span className="text-emerald-300 font-semibold">password123</span>
-              </div>
-            </div>
-
-            {/* 4. Glamour Salon (Fatuma Bakari) */}
-            <div
-              onClick={() => fillAccount('glamour', 'password123', 'tenant-glamour')}
-              className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer relative group ${
-                selectedDemoAccount === 'glamour'
-                  ? 'bg-pink-400/15 border-pink-400/60 text-white shadow-sm shadow-pink-400/10'
-                  : 'bg-stone-900/60 border-stone-800 hover:border-stone-700 text-stone-300'
-              }`}
-            >
-              <div className="flex items-center justify-between text-[11px] font-bold">
-                <span className="text-pink-400 flex items-center gap-1">
-                  <span>💇 Glamour Salon</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    loginDirectlyAs('glamour', 'password123', 'tenant-glamour');
-                  }}
-                  className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500 text-white font-bold hover:bg-pink-400 transition-colors"
-                >
-                  Ingia ➔
-                </button>
-              </div>
-              <div className="text-[10px] font-mono text-stone-400 mt-1">
-                User: <span className="text-pink-300 font-semibold">glamour</span> • Pass: <span className="text-pink-300 font-semibold">password123</span>
-              </div>
-            </div>
+              {lang === 'sw' ? 'Ingia Papo Hapo ➔' : 'Quick Login ➔'}
+            </button>
           </div>
         </div>
 

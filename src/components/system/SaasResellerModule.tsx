@@ -1303,7 +1303,7 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
                 <input
                   type="text"
                   required
-                  placeholder="Mfano: Samaki Lounge WiFi au Chuo Hostel"
+                  placeholder="Mfano: Posta WiFi au Sokoni Hotspot"
                   value={newBizName}
                   onChange={(e) => setNewBizName(e.target.value)}
                   className="w-full p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-white placeholder-stone-500 focus:outline-hidden focus:border-purple-500 text-xs"
@@ -1316,7 +1316,7 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
                   <input
                     type="text"
                     required
-                    placeholder="Mfano: Daniel Mushi"
+                    placeholder="Mfano: Juma Rashid"
                     value={newOwnerName}
                     onChange={(e) => setNewOwnerName(e.target.value)}
                     className="w-full p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-white placeholder-stone-500 focus:outline-hidden focus:border-purple-500 text-xs"

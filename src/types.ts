@@ -200,10 +200,10 @@ export interface TenantSubscription {
 }
 
 export interface HotspotTenant {
-  id: string; // e.g. "tenant-lema-hq", "tenant-glamour", "tenant-samaki"
-  subdomain: string; // e.g. "glamour", "samaki", "kijiji"
-  businessName: string; // e.g. "Glamour Touch Salon & Spa"
-  ownerName: string; // e.g. "Fatuma Juma"
+  id: string; // e.g. "tenant-lema-hq"
+  subdomain: string; // e.g. "lema"
+  businessName: string; // e.g. "Lema Fast WiFi"
+  ownerName: string; // e.g. "Jimmy Lema"
   ownerPhone: string; // e.g. "0754 123 456"
   ownerEmail?: string;
   locationCity: string; // e.g. "Arusha", "Dar es Salaam"
@@ -214,7 +214,7 @@ export interface HotspotTenant {
   routerIpOrHost?: string;
   payoutAccount: string; // e.g. "5849201"
   payoutMethod: 'lipa_namba' | 'bank' | 'mobile_phone';
-  accountOwnerName: string; // e.g. "Fatuma Juma"
+  accountOwnerName: string; // e.g. "Jimmy Lema"
   subscription: TenantSubscription;
   settings: HotspotSettings;
   createdAt: string;

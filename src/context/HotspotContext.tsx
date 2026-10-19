@@ -128,222 +128,41 @@ const SEED_ACTIVE_SESSIONS: ActiveSession[] = [];
 
 const DEFAULT_TOWERS: NetworkTower[] = [];
 
-const DEFAULT_ADS: HotspotAdvertisement[] = [
-  {
-    id: 'ad-salon',
-    tag: '🔥 Ofa Maalum Mtaani',
-    title: 'GLAMOUR TOUCH SALON & SPA',
-    desc: 'Punguzo la 20% kwa wateja wa LEMA WiFi! Kusuka, kucha za gel & massage ya kisasa.',
-    action: 'Piga / WhatsApp',
-    phone: '0653 578 184',
-    sponsor: 'Glamour Salon',
-    priceMonthly: 25000,
-    startDate: '2026-10-01',
-    status: 'active',
-    impressions: 482,
-    clicks: 67,
-    bgGradient: 'from-fuchsia-950/80 via-purple-900/60 to-stone-900 border-fuchsia-500/40 text-fuchsia-200',
-    badgeColor: 'bg-fuchsia-500 text-white',
-    videoDurationSec: 10
-  },
-  {
-    id: 'ad-tech',
-    tag: '⚡ Vifaa Halisi vya Simu',
-    title: 'QUICK TECH ACCESSORIES',
-    desc: 'Chaja asilia za Type-C, Earphones za Bluetooth na Protectors zenye warranty. Mkabala na Stoo.',
-    action: 'Tazama Bidhaa',
-    phone: '0714 555 222',
-    sponsor: 'Quick Tech Store',
-    priceMonthly: 20000,
-    startDate: '2026-10-05',
-    status: 'active',
-    impressions: 319,
-    clicks: 45,
-    bgGradient: 'from-cyan-950/80 via-blue-900/60 to-stone-900 border-cyan-500/40 text-cyan-200',
-    badgeColor: 'bg-cyan-500 text-stone-950',
-    videoDurationSec: 10
-  },
-  {
-    id: 'ad-promo',
-    tag: '📢 Tangazo la Kibiashara',
-    title: 'TANGAZA BIASHARA YAKO HAPA!',
-    desc: 'Wafikie zaidi ya wateja 600+ wanaoingia mtandaoni mtaani kwako kila siku. Lipia nafasi leo!',
-    action: 'Tangaza Hapa',
-    phone: '0653 578 184',
-    sponsor: 'LEMA WiFi Ads',
-    priceMonthly: 30000,
-    startDate: '2026-10-10',
-    status: 'active',
-    impressions: 610,
-    clicks: 98,
-    bgGradient: 'from-amber-950/80 via-yellow-950/60 to-stone-900 border-amber-500/40 text-amber-200',
-    badgeColor: 'bg-amber-500 text-stone-950',
-    videoDurationSec: 10
-  }
-];
+const DEFAULT_ADS: HotspotAdvertisement[] = [];
 
 const DEFAULT_TENANTS: HotspotTenant[] = [
   {
     id: 'tenant-lema-hq',
     subdomain: 'lema',
-    businessName: 'Lema Fast WiFi (HQ Pilot)',
+    businessName: 'Lema Fast WiFi',
     ownerName: 'Jimmy Lema',
     ownerPhone: '0653 578 184',
     locationCity: 'Dar es Salaam',
     locationArea: 'Sinza Mori',
     brandColor: '#cca43b',
     tagline: 'Intaneti ya Kasi ya Fiber & Starlink',
-    routerType: 'mikrotik',
-    routerIpOrHost: '192.168.88.1',
+    routerType: 'omada',
+    routerIpOrHost: '192.168.0.254',
     payoutAccount: '5849201',
     payoutMethod: 'lipa_namba',
     accountOwnerName: 'Jimmy Lema',
     subscription: {
       id: 'sub-101',
-      plan: 'pro',
-      planName: 'Business Pro Tier (Hotspot 3)',
-      monthlyFee: 50000,
+      plan: 'enterprise',
+      planName: 'Enterprise Unlimited',
+      monthlyFee: 0,
       status: 'active',
       startDate: '2026-10-01',
-      nextBillingDate: '2026-11-01',
-      daysRemaining: 16,
+      nextBillingDate: '2030-01-01',
+      daysRemaining: 1200,
       autoRenew: true,
-      maxRouters: 3,
-      maxConcurrentUsers: 250,
+      maxRouters: 10,
+      maxConcurrentUsers: 1000,
       lastPaymentDate: '2026-10-01',
-      lastPaymentRef: 'MP261001LEMA'
+      lastPaymentRef: 'LEMA-DIRECT-OWNER'
     },
     settings: DEFAULT_SETTINGS,
     createdAt: '2026-10-01T08:00:00Z'
-  },
-  {
-    id: 'tenant-samaki',
-    subdomain: 'samaki',
-    businessName: 'Samaki Samaki Lounge WiFi',
-    ownerName: 'Benson Mtui',
-    ownerPhone: '0754 889 120',
-    locationCity: 'Dar es Salaam',
-    locationArea: 'Masaki & City Mall',
-    brandColor: '#3b82f6',
-    tagline: 'High Speed WiFi for Lounge Guests',
-    routerType: 'mikrotik',
-    routerIpOrHost: '192.168.89.1',
-    payoutAccount: '6749001',
-    payoutMethod: 'lipa_namba',
-    accountOwnerName: 'Benson Mtui',
-    subscription: {
-      id: 'sub-102',
-      plan: 'enterprise',
-      planName: 'Enterprise Tier (Matawi Mengi)',
-      monthlyFee: 100000,
-      status: 'active',
-      startDate: '2026-10-05',
-      nextBillingDate: '2026-11-05',
-      daysRemaining: 20,
-      autoRenew: true,
-      maxRouters: 6,
-      maxConcurrentUsers: 600,
-      lastPaymentDate: '2026-10-05',
-      lastPaymentRef: 'TG261005SAMAKI'
-    },
-    settings: {
-      ...DEFAULT_SETTINGS,
-      hotspotName: 'Samaki Samaki Lounge WiFi',
-      tagline: 'High Speed WiFi for Lounge Guests',
-      supportPhone: '0754 889 120',
-      merchantNumber: '6749001',
-      accountOwnerName: 'Benson Mtui',
-      payoutAccount: '6749001',
-      adminUsername: 'samaki',
-      adminPassword: 'password123',
-    },
-    createdAt: '2026-10-05T10:00:00Z'
-  },
-  {
-    id: 'tenant-hostel',
-    subdomain: 'chuo',
-    businessName: 'Chuo Kikuu Student Hostel WiFi',
-    ownerName: 'Daniel Mushi',
-    ownerPhone: '0782 441 900',
-    locationCity: 'Arusha',
-    locationArea: 'Njiro Complex',
-    brandColor: '#10b981',
-    tagline: 'Bando Nafuu la Wanafunzi 24/7',
-    routerType: 'mikrotik',
-    routerIpOrHost: '192.168.90.1',
-    payoutAccount: '0782441900',
-    payoutMethod: 'mobile_phone',
-    accountOwnerName: 'Daniel Mushi',
-    subscription: {
-      id: 'sub-103',
-      plan: 'pro',
-      planName: 'Business Pro Tier (Hotspot 3)',
-      monthlyFee: 50000,
-      status: 'due',
-      startDate: '2026-09-17',
-      nextBillingDate: '2026-10-17',
-      daysRemaining: 1,
-      autoRenew: true,
-      maxRouters: 3,
-      maxConcurrentUsers: 300,
-      lastPaymentDate: '2026-09-17',
-      lastPaymentRef: 'AR260917HOSTEL'
-    },
-    settings: {
-      ...DEFAULT_SETTINGS,
-      hotspotName: 'Chuo Kikuu Student Hostel WiFi',
-      tagline: 'Bando Nafuu la Wanafunzi 24/7',
-      supportPhone: '0782 441 900',
-      merchantNumber: '0782441900',
-      accountOwnerName: 'Daniel Mushi',
-      payoutAccount: '0782441900',
-      adminUsername: 'chuo',
-      adminPassword: 'password123',
-    },
-    createdAt: '2026-09-17T12:00:00Z'
-  },
-  {
-    id: 'tenant-glamour',
-    subdomain: 'glamour',
-    businessName: 'Glamour Touch Executive Salon & Barbershop',
-    ownerName: 'Fatuma Bakari',
-    ownerPhone: '0655 312 884',
-    locationCity: 'Mwanza',
-    locationArea: 'Nyamagana Mjini',
-    brandColor: '#ec4899',
-    tagline: 'Free 15-min WiFi & Fast Vocha',
-    routerType: 'ruijie',
-    routerIpOrHost: '192.168.91.1',
-    payoutAccount: '0655312884',
-    payoutMethod: 'mobile_phone',
-    accountOwnerName: 'Fatuma Bakari',
-    subscription: {
-      id: 'sub-104',
-      plan: 'starter',
-      planName: 'Starter Tier (Hotspot 1)',
-      monthlyFee: 30000,
-      status: 'trial',
-      startDate: '2026-10-12',
-      nextBillingDate: '2026-10-26',
-      daysRemaining: 10,
-      autoRenew: false,
-      maxRouters: 1,
-      maxConcurrentUsers: 80,
-      lastPaymentDate: '2026-10-12',
-      lastPaymentRef: 'FREE-TRIAL-14D'
-    },
-    settings: {
-      ...DEFAULT_SETTINGS,
-      hotspotName: 'Glamour Touch Salon WiFi',
-      tagline: 'Free 15-min WiFi & Fast Vocha',
-      supportPhone: '0655 312 884',
-      merchantNumber: '0655312884',
-      accountOwnerName: 'Fatuma Bakari',
-      payoutAccount: '0655312884',
-      adminUsername: 'glamour',
-      adminPassword: 'password123',
-    },
-    createdAt: '2026-10-12T14:00:00Z'
   }
 ];
 
@@ -439,7 +258,14 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem('wifi_hotspot_ads');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: HotspotAdvertisement[] = JSON.parse(saved);
+        return parsed.filter((ad) => 
+          ad.id !== 'ad-salon' && 
+          ad.id !== 'ad-tech' && 
+          ad.id !== 'ad-promo' &&
+          !ad.title?.toLowerCase().includes('glamour') &&
+          !ad.title?.toLowerCase().includes('quick tech')
+        );
       }
     } catch (e) {}
     return DEFAULT_ADS;
@@ -451,24 +277,17 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('wifi_hotspot_tenants');
       if (saved) {
         const parsed: HotspotTenant[] = JSON.parse(saved);
-        // Merge with DEFAULT_TENANTS so new fields, usernames, and passwords take effect immediately
-        const merged = DEFAULT_TENANTS.map((def) => {
-          const existing = parsed.find((p) => p.id === def.id);
-          if (!existing) return def;
-          return {
-            ...def,
-            ...existing,
-            settings: {
-              ...def.settings,
-              ...existing.settings,
-              adminUsername: def.settings.adminUsername || existing.settings?.adminUsername || def.subdomain,
-              adminPassword: def.settings.adminPassword || existing.settings?.adminPassword || 'password123',
-            }
-          };
-        });
-        // Include any user-created custom tenants from self-onboarding
-        const customTenants = parsed.filter((p) => !DEFAULT_TENANTS.some((def) => def.id === p.id));
-        return [...merged, ...customTenants];
+        // Clean out legacy demo tenants (samaki, hostel, glamour)
+        const cleaned = parsed.filter((t) => 
+          t.id !== 'tenant-samaki' && 
+          t.id !== 'tenant-hostel' && 
+          t.id !== 'tenant-glamour' &&
+          !t.businessName?.toLowerCase().includes('samaki') &&
+          !t.businessName?.toLowerCase().includes('glamour')
+        );
+        if (cleaned.length > 0) {
+          return cleaned;
+        }
       }
     } catch (e) {}
     return DEFAULT_TENANTS;
@@ -476,7 +295,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [activeTenantId, setActiveTenantId] = useState<string>(() => {
     const saved = localStorage.getItem('wifi_active_tenant_id');
-    return saved || 'tenant-lema-hq';
+    if (saved && saved !== 'tenant-samaki' && saved !== 'tenant-hostel' && saved !== 'tenant-glamour') {
+      return saved;
+    }
+    return 'tenant-lema-hq';
   });
 
   const activeTenant = tenants.find((t) => t.id === activeTenantId) || tenants[0] || DEFAULT_TENANTS[0];
