@@ -102,7 +102,7 @@ let whatsAppConfig: WhatsAppConfig = {
   accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
   appSecret: process.env.WHATSAPP_APP_SECRET || '',
   verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'lema_wifi_webhook_token',
-  appId: process.env.WHATSAPP_APP_ID || '1860632731565594',
+  appId: process.env.WHATSAPP_APP_ID || '966806779813692',
   lastError: null
 };
 
