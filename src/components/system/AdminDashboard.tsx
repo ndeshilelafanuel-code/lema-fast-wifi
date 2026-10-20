@@ -86,6 +86,8 @@ import { GisMapModule } from './GisMapModule';
 import { TowerManagementModule } from './TowerManagementModule';
 import { SpeedTestWidget } from './SpeedTestWidget';
 import { NetworkDiagnosticsModule } from './NetworkDiagnosticsModule';
+import { HardwareWiringGuideModal } from './HardwareWiringGuideModal';
+import { MikrotikScriptModal } from './MikrotikScriptModal';
 import { LemaLogo } from '../common/LemaLogo';
 
 export interface SystemAlert {
@@ -440,10 +442,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const saved = localStorage.getItem('lema_wifi_aps');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Filter out legacy dummy Ruijie AP
+        // Filter out legacy dummy APs
         return parsed.filter((ap: any) => 
           !ap.name?.toLowerCase().includes('ruijie') && 
           !ap.model?.toLowerCase().includes('ruijie') &&
+          !ap.name?.toLowerCase().includes('sokoni') &&
+          !ap.site?.toLowerCase().includes('sokoni') &&
+          !ap.name?.toLowerCase().includes('smart wifi node') &&
           ap.mac !== '50:C7:BF:70:E2:B0'
         );
       }
@@ -491,8 +496,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           if (data && Array.isArray(data.inventory)) {
             if (data.inventory.length > 0) {
               if (isMounted) {
-                setEquipmentInventory(data.inventory);
-                const serverAps = data.inventory
+                const filteredInventory = data.inventory.filter((item: ScannedEquipment) => 
+                  !item.name?.toLowerCase().includes('sokoni') &&
+                  !item.site?.toLowerCase().includes('sokoni') &&
+                  !item.name?.toLowerCase().includes('smart wifi node')
+                );
+                setEquipmentInventory(filteredInventory);
+                const serverAps = filteredInventory
                   .filter((item: ScannedEquipment) => item.category === 'ap')
                   .map((item: ScannedEquipment) => {
                     const isOnline = item.status === 'online';
@@ -508,6 +518,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   });
                 if (serverAps.length > 0) {
                   setAccessPoints(serverAps);
+                } else {
+                  setAccessPoints([]);
                 }
               }
             } else {
@@ -542,23 +554,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, []);
 
-  // Wizard States
+  // Wizard & Omada Controller States (matching Video 1, 2, 3)
   const [showAddRouterForm, setShowAddRouterForm] = useState<boolean>(false);
-  const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'openwrt'>('omada');
-  const [newRouterName, setNewRouterName] = useState<string>('');
-  const [newRouterSite, setNewRouterSite] = useState<string>('Sokoni Area');
+  const [selectedDeviceVendor, setSelectedDeviceVendor] = useState<'mikrotik' | 'omada' | 'ruijie'>('omada');
+  const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'openwrt' | 'mikrotik'>('omada');
+  const [newRouterName, setNewRouterName] = useState<string>('Lema-Omada-1');
+  const [newRouterSite, setNewRouterSite] = useState<string>('Nyansoo Site');
   const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>('https://omada.lemawifi.online');
-  const [newRouterNasIp, setNewRouterNasIp] = useState<string>('');
+  const [newRouterNasIp, setNewRouterNasIp] = useState<string>('192.168.111.171');
   const [isFindingSites, setIsFindingSites] = useState<boolean>(false);
-  const [siteFound, setSiteFound] = useState<boolean>(false);
+  const [siteFound, setSiteFound] = useState<boolean>(true);
+  const [omadaSiteName, setOmadaSiteName] = useState<string>('Lema-Omada-1');
+  const [showCreateSiteModal, setShowCreateSiteModal] = useState<boolean>(false);
+  const [newSiteInput, setNewSiteInput] = useState<string>('Lema-Omada-1');
+  const [verifiedOmadaStatus, setVerifiedOmadaStatus] = useState<string | null>(null);
+  const [isVerifyingOmada, setIsVerifyingOmada] = useState<boolean>(false);
+  const [showMikrotikModal, setShowMikrotikModal] = useState<boolean>(false);
 
-  // AP Claim States
+  // Hardware Wiring & Voltage Modal States
+  const [showHardwareWiringModal, setShowHardwareWiringModal] = useState<boolean>(false);
+  const [hardwareGuideTab, setHardwareGuideTab] = useState<'voltage' | 'cabling' | 'tplink' | 'controller'>('voltage');
+
+  // AP Claim & Adoption States (from Video 1 & 2)
   const [showClaimApForm, setShowClaimApForm] = useState<boolean>(false);
   const [claimApMac, setClaimApMac] = useState<string>('');
+  const [claimApName, setClaimApName] = useState<string>('Outdoor AP (EAP225)');
   const [claimApModel, setClaimApModel] = useState<string>('EAP225-Outdoor');
-  const [claimApSite, setClaimApSite] = useState<string>('Mshikamano Site');
+  const [claimApSite, setClaimApSite] = useState<string>('Nyansoo Site');
   const [isClaimingAp, setIsClaimingAp] = useState<boolean>(false);
   const [apClaimStep, setApClaimStep] = useState<string>('');
+  const [adoptingApModal, setAdoptingApModal] = useState<any | null>(null);
+  const [isAdoptingProgress, setIsAdoptingProgress] = useState<boolean>(false);
+  const [useCustomDeviceLogin, setUseCustomDeviceLogin] = useState<boolean>(false);
+  const [customDeviceUser, setCustomDeviceUser] = useState<string>('admin');
+  const [customDevicePass, setCustomDevicePass] = useState<string>('admin');
+  const [copiedDevUrl, setCopiedDevUrl] = useState<boolean>(false);
+  const [copiedDevUser, setCopiedDevUser] = useState<boolean>(false);
+  const [copiedDevPass, setCopiedDevPass] = useState<boolean>(false);
 
   // Payment Gateway Configuration states (Mobile Money STK-Push - AzamPay Only)
   const [gatewayApiKey, setGatewayApiKey] = useState<string>(() => {
@@ -3971,450 +4003,988 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* 11. MODULE: ROUTERS */}
+        {/* 11. MODULE: ROUTERS & CONTROLLERS (MATCHING VIDEO 1 & 2) */}
         {activeTab === 'routers' && (
-          <div className="space-y-8 animate-fadeIn">
-            {/* Linked Routers / Controllers Card */}
-            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Radio className="w-5 h-5 text-sky-400" />
-                  <span>Routers & Controllers ({routers.length})</span>
-                </h3>
+          <div className="space-y-6 animate-fadeIn">
+            {/* Vendor Selector Header Bar */}
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-amber-400" />
+                    <span>Routers & Cloud Controllers</span>
+                  </h3>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Chagua mfumo wako wa kugawa intaneti: MikroTik RouterOS au TP-Link Omada Cloud.
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowQrEquipmentModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors cursor-pointer shadow-sm"
+                    onClick={() => {
+                      setHardwareGuideTab('voltage');
+                      setShowHardwareWiringModal(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 rounded-xl transition-all cursor-pointer shadow-sm"
                   >
-                    <QrCode className="w-3.5 h-3.5 text-yellow-300" />
-                    <span>Skani QR ya Router</span>
+                    <span>📘 Mwongozo wa Waya & Umeme</span>
                   </button>
                   <button
                     onClick={() => setShowAddRouterForm(!showAddRouterForm)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-stone-950 bg-sky-400 hover:bg-sky-300 rounded-lg transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-colors cursor-pointer shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Unganisha Router Mpya</span>
+                    <span>+ Add Network</span>
                   </button>
                 </div>
               </div>
 
-              {/* Add Router Wizard Form */}
-              {showAddRouterForm && (
-                <div className="p-4 bg-stone-950 border border-stone-800 rounded-xl space-y-4 text-xs">
-                  <h4 className="font-bold text-white text-xs border-b border-stone-800 pb-2">
-                    Hatua ya 1: Chagua Chapa ya Router/Controller
-                  </h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewRouterType('omada')}
-                      className={`p-2.5 rounded-lg border text-center font-semibold transition-all ${
-                        newRouterType === 'omada'
-                          ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                          : 'border-stone-800 text-stone-400 hover:bg-stone-900'
-                      }`}
-                    >
-                      TP-Link Omada
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewRouterType('ruijie')}
-                      className={`p-2.5 rounded-lg border text-center font-semibold transition-all ${
-                        newRouterType === 'ruijie'
-                          ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-                          : 'border-stone-800 text-stone-400 hover:bg-stone-900'
-                      }`}
-                    >
-                      Ruijie Reyee (Smart AP)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewRouterType('openwrt')}
-                      className={`p-2.5 rounded-lg border text-center font-semibold transition-all ${
-                        newRouterType === 'openwrt'
-                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                          : 'border-stone-800 text-stone-400 hover:bg-stone-900'
-                      }`}
-                    >
-                      OpenWrt / Linux
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-stone-400 block mb-1">Jina ya Kifaa (Router Name):</label>
-                      <input
-                        type="text"
-                        placeholder="Mshikamano AP Main"
-                        value={newRouterName}
-                        onChange={(e) => setNewRouterName(e.target.value)}
-                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-stone-400 block mb-1">Eneo (Site/Location):</label>
-                      <input
-                        type="text"
-                        placeholder="Mshikamano Site"
-                        value={newRouterSite}
-                        onChange={(e) => setNewRouterSite(e.target.value)}
-                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  {newRouterType === 'omada' && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-stone-400 block mb-1">Omada Controller URL / Domain:</label>
-                        <input
-                          type="text"
-                          value={newRouterControllerUrl}
-                          onChange={(e) => setNewRouterControllerUrl(e.target.value)}
-                          className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs font-mono text-blue-400"
-                        />
-                      </div>
-                      <div className="flex items-end gap-2.5">
-                        <div className="flex-1">
-                          <label className="text-stone-400 block mb-1">RADIUS NAS IP Address (Autodetected):</label>
-                          <input
-                            type="text"
-                            disabled
-                            placeholder="Kagua sites kwanza..."
-                            value={newRouterNasIp}
-                            className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 text-stone-300 text-xs font-mono"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsFindingSites(true);
-                            setTimeout(() => {
-                              setIsFindingSites(false);
-                              setNewRouterNasIp('102.223.14.88');
-                              setSiteFound(true);
-                            }, 1500);
-                          }}
-                          className="px-4 py-2 font-semibold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer h-[38px] flex items-center justify-center min-w-[120px]"
-                        >
-                          {isFindingSites ? (
-                            <span className="w-4 h-4 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <span>Find Sites</span>
-                          )}
-                        </button>
-                      </div>
-                      {siteFound && (
-                        <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                          Site imepatikana kwenye controller yako! RADIUS NAS IP imesanidiwa.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-2 pt-2 border-t border-stone-800">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddRouterForm(false);
-                        setSiteFound(false);
-                      }}
-                      className="px-3 py-1.5 text-stone-400 hover:text-white"
-                    >
-                      Ghairi
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!newRouterName) return;
-                        const nr = {
-                          id: `r-${Date.now()}`,
-                          name: newRouterName,
-                          type: newRouterType === 'omada' ? 'TP-Link Omada' : newRouterType === 'ruijie' ? 'Ruijie Reyee' : 'OpenWrt',
-                          site: newRouterSite,
-                          status: 'connected',
-                          nasIp: newRouterNasIp || '192.168.88.1',
-                          controllerUrl: newRouterControllerUrl,
-                        };
-                        setRouters([...routers, nr]);
-                        setShowAddRouterForm(false);
-                        setNewRouterName('');
-                        setSiteFound(false);
-                        setNewRouterNasIp('');
-                      }}
-                      className="px-4 py-1.5 font-bold text-stone-950 bg-sky-400 hover:bg-sky-300 rounded-lg"
-                    >
-                      Unganisha Kifaa
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Routers List */}
-              <div className="space-y-3">
-                {routers.map((r) => (
-                  <div
-                    key={r.id}
-                    className="p-4 bg-stone-950 border border-stone-850 rounded-xl flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400 mt-1">
-                        <Radio className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-white text-xs">{r.name}</h4>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            Active & Connected
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400 font-mono">
-                          <span>Chapa: <strong className="text-white font-sans">{r.type}</strong></span>
-                          <span>Eneo: <strong className="text-white font-sans">{r.site}</strong></span>
-                          <span>RADIUS NAS IP: <strong className="text-white">{r.nasIp}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setRouters(routers.filter((item) => item.id !== r.id))}
-                      className="p-1.5 rounded-lg text-stone-500 hover:text-rose-400 hover:bg-stone-900 transition-colors"
-                      title="Futa kifaa"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 12. MODULE: ACCESS POINTS */}
-        {activeTab === 'aps' && (
-          <div className="space-y-6 animate-fadeIn">
-            {/* Claimed Access Points (APs) Card */}
-            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
-                  <span>Access Points / Antennas ({accessPoints.length})</span>
-                </h3>
+              {/* Vendor Choice Radio Bar (from Video 1) */}
+              <div className="pt-4 flex flex-wrap items-center gap-2 sm:gap-4">
+                <span className="text-xs font-semibold text-stone-400">Choose your Device:</span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowQrEquipmentModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors cursor-pointer shadow-lg shadow-indigo-600/20"
+                    type="button"
+                    onClick={() => setSelectedDeviceVendor('omada')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      selectedDeviceVendor === 'omada'
+                        ? 'bg-amber-400 text-stone-950 border-amber-400 shadow-md shadow-amber-400/20'
+                        : 'bg-stone-950 text-stone-300 border-stone-800 hover:border-stone-700'
+                    }`}
                   >
-                    <QrCode className="w-3.5 h-3.5 text-yellow-300" />
-                    <span>Skani QR ya AP</span>
+                    <Radio className="w-3.5 h-3.5" />
+                    <span>TP-Link AP (Omada)</span>
                   </button>
+
                   <button
-                    onClick={() => {
-                      setWizardStep('brand');
-                      setCapturedStickerImg(null);
-                      setWizardLogs([]);
-                      setShowAiApWizard(true);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors cursor-pointer shadow-lg shadow-emerald-600/20"
+                    type="button"
+                    onClick={() => setSelectedDeviceVendor('mikrotik')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
+                      selectedDeviceVendor === 'mikrotik'
+                        ? 'bg-amber-400 text-stone-950 border-amber-400 shadow-md shadow-amber-400/20'
+                        : 'bg-stone-950 text-stone-300 border-stone-800 hover:border-stone-700'
+                    }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5 animate-pulse text-yellow-300" />
-                    <span>Sajili AP kwa Lema AI ✨</span>
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span>MikroTik Router</span>
                   </button>
-                  <button
-                    onClick={() => setShowClaimApForm(!showClaimApForm)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adopt Manually</span>
-                  </button>
+
+                  <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-stone-950 text-stone-500 border border-stone-800 flex items-center gap-2 cursor-not-allowed">
+                    <Radio className="w-3.5 h-3.5 text-stone-600" />
+                    <span>Ruijie (Coming soon)</span>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Claim AP Form */}
-              {showClaimApForm && (
-                <div className="p-4 bg-stone-950 border border-stone-800 rounded-xl space-y-4 text-xs">
-                  <h4 className="font-bold text-white text-xs border-b border-stone-800 pb-2">
-                    Sajili Access Point Mpya Kwenye Controller (SaaS Claim)
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-stone-400 block mb-1">Andika MAC Address ya Kifaa:</label>
-                      <input
-                        type="text"
-                        placeholder="50:C7:BF:70:E2:B0"
-                        value={claimApMac}
-                        onChange={(e) => setClaimApMac(e.target.value.toUpperCase())}
-                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white font-mono text-xs uppercase"
-                      />
-                      <span className="text-[10px] text-stone-400 mt-1 block">Inapatikana nyuma ya lebo ya antenna au AP yako.</span>
-                    </div>
-                    <div>
-                      <label className="text-stone-400 block mb-1">Model / Chapa:</label>
+            {/* FORM: CONNECT TP-LINK OMADA (MATCHING VIDEO 1) */}
+            {selectedDeviceVendor === 'omada' && (showAddRouterForm || routers.filter(r => r.type === 'TP-Link Omada').length === 0) && (
+              <div className="p-5 sm:p-6 bg-stone-950 border border-stone-800 rounded-2xl space-y-5 animate-fadeIn">
+                <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Router Type: TP-Link Omada</span>
+                    <h4 className="text-base font-bold text-white">Connect TP-Link Omada</h4>
+                    <p className="text-xs text-stone-400 mt-0.5">
+                      Create or select your Omada site, then connect your access point or gateway.
+                    </p>
+                  </div>
+                  {routers.filter(r => r.type === 'TP-Link Omada').length > 0 && (
+                    <button
+                      onClick={() => setShowAddRouterForm(false)}
+                      className="text-xs text-stone-400 hover:text-white"
+                    >
+                      Funga Fomu ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="text-stone-300 font-semibold block mb-1.5">
+                      Site <span className="text-rose-400">*</span>:
+                    </label>
+                    <div className="flex items-center gap-2">
                       <select
-                        value={claimApModel}
-                        onChange={(e) => setClaimApModel(e.target.value)}
-                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
+                        value={newRouterSite}
+                        onChange={(e) => setNewRouterSite(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 text-white text-xs"
                       >
-                        <option value="EAP225-Outdoor">TP-Link EAP225-Outdoor</option>
-                        <option value="EAP110-Outdoor">TP-Link EAP110-Outdoor</option>
-                        <option value="EAP610-Outdoor">TP-Link EAP610-Outdoor (Wi-Fi 6)</option>
-                        <option value="Ruijie RG-RAP6201">Ruijie RAP6201 Outdoor</option>
+                        <option value="Nyansoo Site">Nyansoo Site</option>
+                        <option value="Sokoni Ghorofani">Sokoni Ghorofani</option>
+                        <option value="Mshikamano AP Main">Mshikamano AP Main</option>
+                        <option value="Stendi Kuu">Stendi Kuu</option>
                       </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const site = prompt('Weka jina la eneo jipya (Site Name):');
+                          if (site && site.trim()) setNewRouterSite(site.trim());
+                        }}
+                        className="text-amber-400 hover:text-amber-300 font-bold whitespace-nowrap cursor-pointer text-xs"
+                      >
+                        + New site
+                      </button>
                     </div>
                   </div>
 
-                  {isClaimingAp ? (
-                    <div className="p-3 bg-stone-900 border border-stone-800 rounded-lg space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                        <span className="font-semibold text-emerald-400 animate-pulse">{apClaimStep}</span>
-                      </div>
-                      <div className="w-full bg-stone-800 h-1 rounded-full overflow-hidden">
-                        <div className="bg-emerald-400 h-full" style={{ width: '70%', transition: 'width 2s' }} />
-                      </div>
+                  <div>
+                    <label className="text-stone-300 font-semibold block mb-1.5">
+                      Router Name <span className="text-rose-400">*</span>:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. RodLink 1 au Lema-Omada-1"
+                      value={newRouterName}
+                      onChange={(e) => setNewRouterName(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-900 text-white text-xs font-mono"
+                    />
+                    <span className="text-[10px] text-stone-400 mt-1 block">A friendly name to identify this router in your dashboard.</span>
+                  </div>
+                </div>
+
+                {/* Omada Cloud Controller Details Section */}
+                <div className="p-4 rounded-xl bg-stone-900/60 border border-stone-800 space-y-3.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="font-bold text-white text-xs">Lema Fast WiFi Omada Controller</h5>
+                      <p className="text-[11px] text-stone-400">Your router will be configured automatically on our cloud controller.</p>
                     </div>
-                  ) : (
-                    <div className="flex justify-end gap-2 pt-2 border-t border-stone-800">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      Cloud Ready 🟢
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-stone-300 font-semibold block mb-1">Controller Inform URL:</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={newRouterControllerUrl}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-emerald-400 text-xs font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                    <div>
+                      <label className="text-stone-300 font-semibold block mb-1">
+                        Omada Site <span className="text-rose-400">*</span>:
+                      </label>
+                      <input
+                        type="text"
+                        value={omadaSiteName}
+                        onChange={(e) => setOmadaSiteName(e.target.value)}
+                        placeholder="Click Find sites first"
+                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-white text-xs font-mono"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setShowClaimApForm(false)}
-                        className="px-3 py-1.5 text-stone-400 hover:text-white"
+                        onClick={() => setShowCreateSiteModal(true)}
+                        className="flex-1 py-2 px-3 font-semibold text-xs bg-stone-800 hover:bg-stone-750 text-stone-200 border border-stone-700 rounded-xl transition-all cursor-pointer"
                       >
-                        Ghairi
+                        Create site
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          if (!claimApMac) return;
-                          setIsClaimingAp(true);
-                          setApClaimStep('1. Inatafuta vifaa vilivyopo kwenye mtandao...');
-                          
+                          setIsFindingSites(true);
                           setTimeout(() => {
-                            setApClaimStep('2. Inasajili MAC Address kwenye Controller ya Mtaa WiFi...');
-                          }, 1000);
-
-                          setTimeout(() => {
-                            setApClaimStep('3. Inasubiri AP ikubali (Adopting Device)...');
-                          }, 2200);
-
-                          setTimeout(() => {
-                            const newAp = {
-                              mac: claimApMac,
-                              model: claimApModel,
-                              site: claimApSite,
-                              status: 'connected',
-                              uptime: 'Sekunde chache zilizopita'
-                            };
-                            setAccessPoints([...accessPoints, newAp]);
-                            setIsClaimingAp(false);
-                            setShowClaimApForm(false);
-                            setClaimApMac('');
-                          }, 3500);
+                            setIsFindingSites(false);
+                            setSiteFound(true);
+                            setNewRouterNasIp('192.168.111.171');
+                            showToast('Omada Controller', 'Site imepatikana kikamilifu! RADIUS NAS ID imesanidiwa.', 'success');
+                          }, 900);
                         }}
-                        className="px-4 py-1.5 font-bold text-stone-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg"
+                        className="flex-1 py-2 px-3 font-bold text-xs bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        Anza Claim & Adopt
+                        {isFindingSites ? (
+                          <span className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span>Find sites</span>
+                        )}
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* APs List */}
-              <div className="space-y-3">
-                {accessPoints.length === 0 && (
-                  <div className="p-8 text-center bg-stone-950 border border-stone-850 rounded-2xl space-y-3">
-                    <Radio className="w-8 h-8 text-stone-600 mx-auto" />
-                    <p className="text-sm font-bold text-white">Hakuna AP Iliyosajiliwa Bado (Mifano Yote Imefutwa)</p>
-                    <p className="text-xs text-stone-400 max-w-md mx-auto">
-                      Taarifa zote za mfano zimeondolewa kwenye mfumo. Sasa unaweza kusajili kifaa chako halisi cha <strong>TP-Link Omada EAP 772 Outdoor</strong> kwa kutumia kamera ya simu au kuingiza taarifa zake moja kwa moja.
-                    </p>
-                    <button
-                      onClick={() => setShowQrEquipmentModal(true)}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all inline-flex items-center gap-2 cursor-pointer shadow-lg"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      <span>Skani au Sajili TP-Link EAP 772 Yako</span>
-                    </button>
                   </div>
-                )}
-                {accessPoints.map((ap) => {
-                  const isConnected = ap.status === 'connected';
-                  return (
-                    <div
-                      key={ap.mac}
-                      className={`p-4 bg-stone-950 border rounded-xl flex items-center justify-between gap-4 text-xs font-mono transition-all ${
-                        isConnected ? 'border-stone-850' : 'border-rose-900/60 bg-rose-950/15'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`p-2.5 rounded-lg border mt-1 font-sans ${
-                            isConnected
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                          }`}
-                        >
-                          <Radio className="w-5 h-5" />
+
+                  <div>
+                    <label className="text-stone-300 font-semibold block mb-1">
+                      RADIUS NAS ID <span className="text-rose-400">*</span>:
+                    </label>
+                    <input
+                      type="text"
+                      value={newRouterNasIp}
+                      onChange={(e) => setNewRouterNasIp(e.target.value)}
+                      className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-stone-300 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-stone-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRouterForm(false)}
+                    className="px-4 py-2 text-stone-400 hover:text-white text-xs"
+                  >
+                    Ghairi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newRouterName) return;
+                      const nr = {
+                        id: `r-omada-${Date.now()}`,
+                        name: newRouterName,
+                        type: 'TP-Link Omada',
+                        site: newRouterSite,
+                        status: 'connected',
+                        nasIp: newRouterNasIp || '192.168.111.171',
+                        controllerUrl: newRouterControllerUrl,
+                        siteId: '5a43ee4a5b28a474c76763d3ab',
+                        guestSsid: 'Lema Fast WiFi (Omada_5Ghz)',
+                        hotspotEnabled: true,
+                        uptime: '3 siku zilizopita',
+                        onlineUsers: 1,
+                        cpu: '4%',
+                        memory: '28%',
+                        storage: '12%',
+                        bandwidthDown: '3.36 GB',
+                        bandwidthUp: '1.12 GB',
+                        apiLatency: '12ms'
+                      };
+                      setRouters([...routers.filter(r => r.type !== 'TP-Link Omada'), nr]);
+                      setShowAddRouterForm(false);
+                      showToast('TP-Link Omada', `Router/Controller "${newRouterName}" imeunganishwa kikamilifu!`, 'success');
+                    }}
+                    className="px-5 py-2 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-400/20"
+                  >
+                    Link Omada Site
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DETAILED ROUTER VIEW (MATCHING VIDEO 1 & 2) */}
+            {selectedDeviceVendor === 'omada' && routers.some(r => r.type === 'TP-Link Omada') && (
+              <div className="space-y-6">
+                {routers.filter(r => r.type === 'TP-Link Omada').map((routerItem) => (
+                  <div key={routerItem.id} className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-6 animate-fadeIn">
+                    
+                    {/* Router Top Bar Header */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-stone-800">
+                      <div>
+                        <div className="flex items-center gap-2.5">
+                          <h4 className="text-lg font-black text-white">{routerItem.name}</h4>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            Connected 🟢
+                          </span>
                         </div>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2 font-sans">
-                            <h4 className="font-bold text-white text-xs">{ap.model}</h4>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 border ${
-                                isConnected
-                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                  : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                              }`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
-                                }`}
-                              />
-                              {isConnected ? 'Adopted & Active (🟢 Online)' : '🔴 OFFLINE (Imezimwa)'}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400">
-                            <span>
-                              MAC Address: <strong className="text-white uppercase">{ap.mac}</strong>
-                            </span>
-                            <span>
-                              Eneo: <strong className="text-white font-sans">{ap.site}</strong>
-                            </span>
-                            <span>
-                              Hali ya Kifaa:{' '}
-                              <strong
-                                className={`font-sans ${
-                                  isConnected ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-bold'
-                                }`}
-                              >
-                                {ap.uptime}
-                              </strong>
-                            </span>
-                          </div>
-                        </div>
+                        <p className="text-xs text-stone-400 mt-1">
+                          Router details and APs. Site: <strong className="text-white">{routerItem.site}</strong>
+                        </p>
                       </div>
 
-                    <button
-                      onClick={() => {
-                        setAccessPoints(accessPoints.filter((item) => item.mac !== ap.mac));
-                        setEquipmentInventory((prev) => prev.filter((item) => item.macAddress !== ap.mac));
-                        fetch(`/api/v1/hardware/equipment/${encodeURIComponent(ap.mac)}`, { method: 'DELETE' }).catch(() => {});
-                      }}
-                      className="p-1.5 rounded-lg text-stone-500 hover:text-rose-400 hover:bg-stone-900 transition-colors"
-                      title="Ondoa AP"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsVerifyingOmada(true);
+                            setTimeout(() => {
+                              setIsVerifyingOmada(false);
+                              setVerifiedOmadaStatus(`Connected to Omada Controller and site ${routerItem.name} (1 device(s) online)`);
+                              showToast(
+                                'Omada Connection Verified ✅',
+                                `Connected to Omada Controller and site ${routerItem.name} (1 device(s) online)`,
+                                'success'
+                              );
+                            }, 1200);
+                          }}
+                          className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-stone-950 bg-sky-400 hover:bg-sky-300 rounded-xl transition-all cursor-pointer shadow-md shadow-sky-400/20"
+                        >
+                          {isVerifyingOmada ? (
+                            <span className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-stone-950" />
+                          )}
+                          <span>Verify Omada connection</span>
+                        </button>
+
+                        <button
+                          onClick={() => setShowAddRouterForm(true)}
+                          className="px-3 py-2 text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-xl"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (confirm(`Una uhakika unataka kuondoa router ${routerItem.name}?`)) {
+                              setRouters(routers.filter(r => r.id !== routerItem.id));
+                              showToast('Router Imeondolewa', `Router ${routerItem.name} imeondolewa.`, 'info');
+                            }
+                          }}
+                          className="p-2 text-stone-400 hover:text-rose-400 bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-xl transition-colors"
+                          title="Futa kifaa"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  );
-                })}
+
+                    {/* Verification Live Feedback Toast/Banner */}
+                    {verifiedOmadaStatus && (
+                      <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center justify-between text-xs text-emerald-300">
+                        <span className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>{verifiedOmadaStatus}</span>
+                        </span>
+                        <button
+                          onClick={() => setVerifiedOmadaStatus(null)}
+                          className="text-stone-400 hover:text-white text-xs px-2"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Metrics Row (from Video 1) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
+                        <span className="text-[10px] text-stone-400 block uppercase">CPU Utilization</span>
+                        <span className="text-base font-bold text-white font-mono">{routerItem.cpu || '4%'}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
+                        <span className="text-[10px] text-stone-400 block uppercase">Memory</span>
+                        <span className="text-base font-bold text-white font-mono">{routerItem.memory || '28%'}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
+                        <span className="text-[10px] text-stone-400 block uppercase">Storage</span>
+                        <span className="text-base font-bold text-white font-mono">{routerItem.storage || '12%'}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-stone-950 border border-stone-800">
+                        <span className="text-[10px] text-stone-400 block uppercase">Uptime</span>
+                        <span className="text-base font-bold text-emerald-400 font-mono">{routerItem.uptime || '3 siku'}</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-stone-950 border border-stone-800 col-span-2 sm:col-span-1">
+                        <span className="text-[10px] text-stone-400 block uppercase">Online Users</span>
+                        <span className="text-base font-bold text-amber-400 font-mono">{activeSessions.length || 1} wateja</span>
+                      </div>
+                    </div>
+
+                    {/* Section 1: Hotspot (Voucher WiFi Login) */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h5 className="text-sm font-bold text-white">Hotspot (Voucher WiFi Login)</h5>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              Enabled on Router / Guest 🟢
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-400 mt-0.5">
+                            Customers are sent to your branded package and voucher page when they join the WiFi network.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showToast(
+                              'Hotspot Re-applied ✅',
+                              'Omada controller captive portal configuration has been synced and re-applied.',
+                              'success'
+                            );
+                          }}
+                          className="px-4 py-2 font-bold text-xs bg-stone-800 hover:bg-stone-750 text-white rounded-xl border border-stone-700 transition-all cursor-pointer whitespace-nowrap"
+                        >
+                          Re-apply Hotspot
+                        </button>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-stone-900 border border-stone-850 flex items-center justify-between text-xs font-mono">
+                        <span className="text-stone-400">Guest SSID Broadcast:</span>
+                        <span className="text-amber-400 font-bold">{routerItem.guestSsid || 'Lema Fast WiFi (Omada_5Ghz)'}</span>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Router Information */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-stone-400">Router Information</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+                        <div>
+                          <span className="text-[10px] text-stone-500 block">CONTROLLER URL</span>
+                          <span className="text-white font-semibold">{routerItem.controllerUrl || 'https://omada.lemawifi.online'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-stone-500 block">SITE ID</span>
+                          <span className="text-white font-semibold truncate block">{routerItem.siteId || '5a43ee4a5b28a474c76763d3ab'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-stone-500 block">RADIUS NAS IP</span>
+                          <span className="text-emerald-400 font-semibold">{routerItem.nasIp || '192.168.111.171'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-stone-500 block">LAST SEEN</span>
+                          <span className="text-stone-300">Just now (Active)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Connection Status Indicators */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
+                      <h5 className="text-xs font-bold uppercase tracking-wider text-stone-400">Connection Status</h5>
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div className="p-3 rounded-xl bg-stone-900 border border-stone-850">
+                          <span className="text-[10px] text-stone-500 uppercase block mb-1">CONNECTIVITY</span>
+                          <span className="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            Connected
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-stone-900 border border-stone-850">
+                          <span className="text-[10px] text-stone-500 uppercase block mb-1">RADIUS SERVER</span>
+                          <span className="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            Operational
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-stone-900 border border-stone-850">
+                          <span className="text-[10px] text-stone-500 uppercase block mb-1">API LATENCY</span>
+                          <span className="text-xs font-bold text-emerald-400 font-mono">
+                            {routerItem.apiLatency || '12ms'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 4: Live Bandwidth Metrics */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-stone-400">Bandwidth & Traffic</h5>
+                        <span className="text-[11px] text-stone-400">Traffic from the connected Omada Access Points</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                        <div className="p-3 rounded-xl bg-stone-900 border border-stone-850">
+                          <span className="text-[10px] text-stone-500 block uppercase">DOWNLOAD DATA</span>
+                          <span className="text-lg font-black text-amber-400">3.36 GB</span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-stone-900 border border-stone-850">
+                          <span className="text-[10px] text-stone-500 block uppercase">UPLOAD DATA</span>
+                          <span className="text-lg font-black text-sky-400">1.12 GB</span>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* MIKROTIK ROUTER VIEW */}
+            {selectedDeviceVendor === 'mikrotik' && (
+              <div className="p-5 sm:p-6 bg-stone-950 border border-stone-800 rounded-2xl space-y-4 animate-fadeIn">
+                <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                  <div>
+                    <h4 className="text-base font-bold text-white">MikroTik RouterOS Integration</h4>
+                    <p className="text-xs text-stone-400 mt-0.5">
+                      Unganisha MikroTik Router yako (hEX, hAP ac2, Cloud Hosted Router) kwa script ya haraka.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowMikrotikModal(true)}
+                    className="px-3.5 py-1.5 font-bold text-xs bg-sky-500 hover:bg-sky-400 text-stone-950 rounded-xl cursor-pointer"
+                  >
+                    Fungua Script ya MikroTik
+                  </button>
+                </div>
+                <div className="p-4 rounded-xl bg-stone-900 border border-stone-800 text-xs text-stone-300 space-y-2">
+                  <p>1. Fungua programu ya <strong>Winbox</strong> na uingie kwenye MikroTik yako kama admin.</p>
+                  <p>2. Bonyeza menyu ya <strong>New Terminal</strong>.</p>
+                  <p>3. Bonyeza kitufe cha "Fungua Script ya MikroTik" hapo juu, nakili amri nzima, na uibandike kwenye Terminal ya Winbox kisha gonga Enter.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 12. MODULE: ACCESS POINTS (CLAIM & ADOPT FLOW MATCHING VIDEO 1 & 2) */}
+        {activeTab === 'aps' && (
+          <div className="space-y-6 animate-fadeIn">
+            
+            {/* Top Device Login Info Banner (Exactly as shown in Video 1 & 2) */}
+            <div className="p-5 rounded-2xl bg-stone-900 border border-stone-800 space-y-3.5 shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                  Device login for your access points
+                </h4>
+                <button
+                  onClick={() => {
+                    setHardwareGuideTab('cabling');
+                    setShowHardwareWiringModal(true);
+                  }}
+                  className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                >
+                  <span>📘 Mwongozo wa Waya & Voltage (24V vs 48V)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Open each access point&apos;s own page at <code className="text-amber-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">tplinkeap.net</code> and point it to the controller address shown below. Lema Fast WiFi then adopts it automatically — you never need controller credentials. A brand-new access point will be on factory login: needs no device login.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs font-mono">
+                {/* Controller Address */}
+                <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-2">
+                  <div className="truncate">
+                    <span className="text-[10px] text-stone-500 block font-sans">CONTROLLER ADDRESS:</span>
+                    <span className="text-emerald-400 truncate block">https://omada.lemawifi.online</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('https://omada.lemawifi.online');
+                      setCopiedDevUrl(true);
+                      setTimeout(() => setCopiedDevUrl(false), 2000);
+                    }}
+                    className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
+                    title="Nakili URL"
+                  >
+                    {copiedDevUrl ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Device Username */}
+                <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] text-stone-500 block font-sans">DEVICE USERNAME:</span>
+                    <span className="text-white">lema-adm9x</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('lema-adm9x');
+                      setCopiedDevUser(true);
+                      setTimeout(() => setCopiedDevUser(false), 2000);
+                    }}
+                    className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
+                    title="Nakili Username"
+                  >
+                    {copiedDevUser ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Device Password */}
+                <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] text-stone-500 block font-sans">DEVICE PASSWORD:</span>
+                    <span className="text-white">••••••••</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('Lema@Node2026!');
+                      setCopiedDevPass(true);
+                      setTimeout(() => setCopiedDevPass(false), 2000);
+                    }}
+                    className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
+                    title="Nakili Password"
+                  >
+                    {copiedDevPass ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             </div>
+
+            {/* Access Points Card & Table (Claim & Adopt Flow) */}
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
+                    <span>Access Points ({accessPoints.length})</span>
+                  </h3>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Claim the MAC printed on each access point, point it to the controller, and it is adopted automatically.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowQrEquipmentModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-colors cursor-pointer shadow-sm"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>Skani QR</span>
+                  </button>
+                  <button
+                    onClick={() => setShowClaimApForm(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-colors cursor-pointer shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Claim access point</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* AP Table List */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-stone-950/80 text-stone-400 font-semibold border-b border-stone-800">
+                    <tr>
+                      <th className="py-3 px-4">NAME</th>
+                      <th className="py-3 px-4">MAC</th>
+                      <th className="py-3 px-4">SITE / ROUTER</th>
+                      <th className="py-3 px-4">STATUS</th>
+                      <th className="py-3 px-4">ADOPTION</th>
+                      <th className="py-3 px-4 text-right">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-800 font-mono">
+                    {accessPoints.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-stone-500 font-sans">
+                          No access points yet. Claim the MAC printed on the back of each device and the controller adopts it automatically.
+                        </td>
+                      </tr>
+                    ) : (
+                      accessPoints.map((ap) => {
+                        const isConnected = ap.status === 'connected';
+                        const isClaimed = ap.status === 'claimed';
+                        return (
+                          <tr key={ap.mac} className="hover:bg-stone-850/50 transition-colors">
+                            <td className="py-3.5 px-4 font-sans font-bold text-white flex items-center gap-2">
+                              <Radio className={`w-4 h-4 ${isConnected ? 'text-emerald-400' : 'text-amber-400'}`} />
+                              <span>{ap.name || ap.model || 'Access point'}</span>
+                            </td>
+                            <td className="py-3.5 px-4 text-stone-200 uppercase">{ap.mac}</td>
+                            <td className="py-3.5 px-4 font-sans text-stone-300">{ap.site || 'Nyansoo Site'}</td>
+                            <td className="py-3.5 px-4 font-sans">
+                              {isConnected ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-max">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  Connected
+                                </span>
+                              ) : isClaimed ? (
+                                <span className="text-[11px] text-amber-400 font-sans">
+                                  Claimed — waiting for controller to see it
+                                </span>
+                              ) : (
+                                <span className="text-[11px] text-rose-400 font-sans">Offline</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 font-sans">
+                              {isConnected ? (
+                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5" />
+                                  Adopted
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setAdoptingApModal(ap)}
+                                  className="px-3 py-1 font-bold text-xs bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-lg transition-all cursor-pointer shadow-sm"
+                                >
+                                  Adopt now
+                                </button>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                onClick={() => {
+                                  setAccessPoints(accessPoints.filter(item => item.mac !== ap.mac));
+                                  showToast('AP Removed', `AP ${ap.mac} imeondolewa.`, 'info');
+                                }}
+                                className="text-stone-400 hover:text-rose-400 font-sans text-xs transition-colors"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* MODAL: CLAIM ACCESS POINT (FROM VIDEO 1) */}
+            {showClaimApForm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                    <h4 className="text-sm font-bold text-white">Claim access point</h4>
+                    <button
+                      onClick={() => setShowClaimApForm(false)}
+                      className="text-stone-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="space-y-3.5 text-xs">
+                    <div>
+                      <label className="text-stone-300 font-semibold block mb-1">
+                        Omada site / router <span className="text-rose-400">*</span>:
+                      </label>
+                      <select
+                        value={claimApSite}
+                        onChange={(e) => setClaimApSite(e.target.value)}
+                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-white text-xs"
+                      >
+                        <option value="Nyansoo Site">Nyansoo Site (RodLink 1)</option>
+                        <option value="Sokoni Ghorofani">Sokoni Ghorofani (Lema-Omada-1)</option>
+                        <option value="Mshikamano Site">Mshikamano Site</option>
+                      </select>
+                      <span className="text-[10px] text-stone-500 mt-0.5 block">Select the router whose site claims this device.</span>
+                    </div>
+
+                    <div>
+                      <label className="text-stone-300 font-semibold block mb-1">
+                        MAC address <span className="text-rose-400">*</span>:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="68-FF-7B-79-A3-E8"
+                        value={claimApMac}
+                        onChange={(e) => setClaimApMac(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-white text-xs font-mono uppercase"
+                      />
+                      <span className="text-[10px] text-stone-400 mt-1 block">
+                        Printed on the MAC label on the back of the access point or status page.
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-stone-300 font-semibold block mb-1">
+                        Name (optional):
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Reception AP, Sokoni Pole 1"
+                        value={claimApName}
+                        onChange={(e) => setClaimApName(e.target.value)}
+                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-white text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-stone-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowClaimApForm(false)}
+                      className="px-4 py-1.5 text-xs text-stone-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!claimApMac) return;
+                        const cleanMac = claimApMac.trim().toUpperCase();
+                        const newAp = {
+                          mac: cleanMac,
+                          name: claimApName || `Access point ${cleanMac.slice(-5)}`,
+                          model: claimApModel || 'EAP225-Outdoor',
+                          site: claimApSite,
+                          status: 'claimed',
+                          uptime: 'Waiting for adoption'
+                        };
+                        setAccessPoints([...accessPoints.filter(a => a.mac !== cleanMac), newAp]);
+                        setShowClaimApForm(false);
+                        setClaimApMac('');
+                        showToast('Access Point Claimed', `AP yenye MAC ${cleanMac} imesajiliwa. Bonyeza "Adopt now" kuikamilisha.`, 'success');
+                      }}
+                      className="px-5 py-1.5 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-md shadow-amber-400/20"
+                    >
+                      Claim
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: ADOPT ACCESS POINT (FROM VIDEO 2) */}
+            {adoptingApModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                    <h4 className="text-sm font-bold text-white">Adopt access point</h4>
+                    <button
+                      onClick={() => setAdoptingApModal(null)}
+                      className="text-stone-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="space-y-3.5 text-xs">
+                    <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-amber-400">LEMA FAST WIFI DEVICE LOGIN</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          Automatic
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-400">
+                        This is a fast first time adoption. The controller will log in using device credentials and adopt it automatically.
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
+                        <div className="p-2 rounded bg-stone-900 border border-stone-800 text-stone-300">
+                          <span className="text-[9px] text-stone-500 block font-sans">USERNAME</span>
+                          lema-adm9x
+                        </div>
+                        <div className="p-2 rounded bg-stone-900 border border-stone-800 text-stone-300">
+                          <span className="text-[9px] text-stone-500 block font-sans">PASSWORD</span>
+                          ••••••••
+                        </div>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-stone-400 hover:text-stone-300">
+                      <input
+                        type="checkbox"
+                        checked={useCustomDeviceLogin}
+                        onChange={(e) => setUseCustomDeviceLogin(e.target.checked)}
+                        className="rounded border-stone-700 bg-stone-950 text-amber-500 focus:ring-0"
+                      />
+                      <span>Use a different device login</span>
+                    </label>
+
+                    {useCustomDeviceLogin && (
+                      <div className="grid grid-cols-2 gap-2 p-3 bg-stone-950 rounded-xl border border-stone-800">
+                        <div>
+                          <label className="text-[10px] text-stone-400 block mb-1">Username:</label>
+                          <input
+                            type="text"
+                            value={customDeviceUser}
+                            onChange={(e) => setCustomDeviceUser(e.target.value)}
+                            className="w-full px-2 py-1.5 border border-stone-700 rounded bg-stone-900 text-white text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-stone-400 block mb-1">Password:</label>
+                          <input
+                            type="password"
+                            value={customDevicePass}
+                            onChange={(e) => setCustomDevicePass(e.target.value)}
+                            className="w-full px-2 py-1.5 border border-stone-700 rounded bg-stone-900 text-white text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {isAdoptingProgress && (
+                      <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                          <span className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Adopting device... (Communicating with Omada Controller)</span>
+                        </div>
+                        <div className="w-full bg-stone-800 h-1 rounded-full overflow-hidden">
+                          <div className="bg-emerald-400 h-full animate-pulse" style={{ width: '85%' }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-stone-800">
+                    <button
+                      type="button"
+                      disabled={isAdoptingProgress}
+                      onClick={() => setAdoptingApModal(null)}
+                      className="px-4 py-1.5 text-xs text-stone-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAdoptingProgress}
+                      onClick={() => {
+                        setIsAdoptingProgress(true);
+                        setTimeout(() => {
+                          setIsAdoptingProgress(false);
+                          setAccessPoints(accessPoints.map(a => {
+                            if (a.mac === adoptingApModal.mac) {
+                              return {
+                                ...a,
+                                status: 'connected',
+                                uptime: 'Sekunde chache zilizopita (Adopted)'
+                              };
+                            }
+                            return a;
+                          }));
+                          setAdoptingApModal(null);
+                          showToast('Access Point Adopted 🟢', `Access Point ${adoptingApModal.mac} sasa imekubaliwa na iko tayari kurusha Wi-Fi ya wateja!`, 'success');
+                        }, 2000);
+                      }}
+                      className="px-5 py-1.5 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-md shadow-amber-400/20"
+                    >
+                      {isAdoptingProgress ? 'Adopting...' : 'Start adoption'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: CREATE OMADA SITE (FROM VIDEO 1) */}
+            {showCreateSiteModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                    <h4 className="text-sm font-bold text-white">Create an Omada site</h4>
+                    <button
+                      onClick={() => setShowCreateSiteModal(false)}
+                      className="text-stone-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="text-stone-300 font-semibold block mb-1">
+                        Omada site name <span className="text-rose-400">*</span>:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. RodLink 1 au Lema-Omada-1"
+                        value={newSiteInput}
+                        onChange={(e) => setNewSiteInput(e.target.value)}
+                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-white text-xs font-mono"
+                      />
+                      <span className="text-[10px] text-stone-500 mt-1 block">
+                        Site is automatically created on the controller once saved.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-stone-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateSiteModal(false)}
+                      className="px-4 py-1.5 text-xs text-stone-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newSiteInput) return;
+                        setOmadaSiteName(newSiteInput.trim());
+                        setNewRouterName(newSiteInput.trim());
+                        setShowCreateSiteModal(false);
+                        showToast('Omada Site Created', `Site "${newSiteInput}" imetengenezwa kikamilifu!`, 'success');
+                      }}
+                      className="px-5 py-1.5 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-md shadow-amber-400/20"
+                    >
+                      Create Omada site
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 
@@ -6421,6 +6991,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onClose={() => setShowSpeedTestModal(false)}
           businessName={settings.hotspotName || 'LEMA FAST WiFi'}
           theme="dark"
+        />
+      )}
+
+      {/* Hardware Cabling, Voltage & Setup Guide Modal (Matching Video 1, 2, 3) */}
+      <HardwareWiringGuideModal
+        isOpen={showHardwareWiringModal}
+        onClose={() => setShowHardwareWiringModal(false)}
+        defaultTab={hardwareGuideTab}
+        lang={lang}
+      />
+
+      {/* MikroTik Configuration Script Modal */}
+      {showMikrotikModal && (
+        <MikrotikScriptModal
+          settings={settings}
+          onClose={() => setShowMikrotikModal(false)}
         />
       )}
     </div>

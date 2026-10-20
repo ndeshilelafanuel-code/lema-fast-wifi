@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
 import { AP_ONLY_BRANDS, COMPARISON_METRICS } from '../data/wifiGuideData';
+import { HardwareWiringGuideModal } from './system/HardwareWiringGuideModal';
 import {
   Radio,
   CheckCircle2,
@@ -25,6 +26,7 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
   const [activeBrandId, setActiveBrandId] = useState<string>('ruijie-reyee');
   const [demoVouchers, setDemoVouchers] = useState<string[]>(['RY-8291', 'RY-4519', 'RY-7730']);
   const [selectedDuration, setSelectedDuration] = useState<string>('24h');
+  const [showWiringModal, setShowWiringModal] = useState<boolean>(false);
 
   const selectedBrand = AP_ONLY_BRANDS.find((b) => b.id === activeBrandId) || AP_ONLY_BRANDS[0];
 
@@ -64,6 +66,21 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
               ? 'Ndiyo! Unaweza kuanzisha biashara yako ya WiFi bila kununua router ya MikroTik kwa kutumia "Smart Outdoor AP" zenye mfumo wa ndani wa Cloud Hotspot na Vocha unaoendeshwa moja kwa moja kutoka kwenye simu yako.'
               : 'Yes! You can launch your street WiFi business without buying a MikroTik router by using Smart Outdoor APs that run built-in Cloud Hotspots and voucher generators directly from your mobile phone.'}
           </p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowWiringModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-400/20 transition-all cursor-pointer"
+            >
+              <Zap className="w-4 h-4 text-stone-950" />
+              <span>
+                {lang === 'sw'
+                  ? '📘 Fungua Mchoro wa Waya & Tahadhari ya Umeme (24V vs 48V)'
+                  : '📘 Open Cabling Diagram & PoE Voltage Warning (24V vs 48V)'}
+              </span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* The 3 Things You Need in AP-Only Setup */}
@@ -448,6 +465,12 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
           </div>
         </div>
       </div>
+
+      <HardwareWiringGuideModal
+        isOpen={showWiringModal}
+        onClose={() => setShowWiringModal(false)}
+        lang={lang}
+      />
     </section>
   );
 };

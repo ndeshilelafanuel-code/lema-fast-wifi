@@ -127,29 +127,7 @@ const SEED_TRANSACTIONS: PaymentTransaction[] = [];
 
 const SEED_ACTIVE_SESSIONS: ActiveSession[] = [];
 
-const DEFAULT_TOWERS: NetworkTower[] = [
-  {
-    id: 'tower-sokoni-1',
-    name: 'Smart WiFi Node - Sokoni Ghorofani',
-    location: 'Sokoni Ghorofani',
-    ipAddress: '192.168.88.115',
-    macAddress: '74:83:C2:55:1A:E9',
-    model: 'Smart WiFi Node (Network Hardware)',
-    coverageRadiusMeters: 200,
-    status: 'online',
-    frequencyBand: 'Dual-Band 2.4/5GHz (Wi-Fi 7 Ready)',
-    txPowerDbm: 28,
-    antennaType: 'Omni-directional 360°',
-    heightMeters: 18,
-    notes: 'Serial: 1DF999CBE7FD30 • PoE: 24V/48V • Imesawazishwa toka lemawifi.online',
-    coordinates: {
-      lat: -6.7924,
-      lng: 39.2083,
-    },
-    installedAt: '2026-10-19T17:06:03.799Z',
-    lastPingMs: 4,
-  },
-];
+const DEFAULT_TOWERS: NetworkTower[] = [];
 
 const DEFAULT_ADS: HotspotAdvertisement[] = [];
 
@@ -313,10 +291,16 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('wifi_hotspot_towers');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.filter((t: NetworkTower) => t.id !== 'tower-1' && !t.name.includes('Town Center'));
+        return parsed.filter((t: NetworkTower) => 
+          t.id !== 'tower-1' && 
+          t.id !== 'tower-sokoni-1' && 
+          !t.name?.toLowerCase().includes('town center') &&
+          !t.name?.toLowerCase().includes('sokoni') &&
+          !t.location?.toLowerCase().includes('sokoni')
+        );
       }
     } catch (e) {}
-    return DEFAULT_TOWERS;
+    return [];
   });
 
   // Advertisement Campaigns State (Managed via HotspotContext)

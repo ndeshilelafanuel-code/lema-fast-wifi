@@ -14,50 +14,53 @@ export const MikrotikScriptModal: React.FC<MikrotikScriptModalProps> = ({ settin
 
   // 1. TP-Link Omada External Portal & RADIUS Setup Guide (No MikroTik Required)
   const omadaScript = `# ==============================================================
-# MTAA WIFI - TP-LINK OMADA CONTROLLER & ACCESS POINT SETUP
+# LEMA FAST WIFI - TP-LINK OMADA CLOUD CONTROLLER & EAP772 SETUP
 # Hotspot Name: ${settings.hotspotName}
-# Works on: TP-Link EAP110-Outdoor, EAP225-Outdoor, EAP610, OC200 / Omada Cloud
-# Physical Wiring: [ Airtel 4G/5G Router ] ➔ [ TP-Link Omada AP ] (HAPANA MIKROTIK INAYOHITAJIKA!)
+# Works on: TP-Link EAP772, EAP225-Outdoor, EAP610, OC200 / Omada Cloud
 # ==============================================================
 
-SURA YA 1: JINSI INAVYOFANYA KAZI BILA MIKROTIK
-- Vifaa vya TP-Link Omada vina "External Web Portal" na "RADIUS Client" ya ndani.
-- Airtel Router inatoa intaneti tu kupitia LAN cable kwenda kwenye Omada AP.
-- Mfumo wetu wa Cloud Billing unawasiliana moja kwa moja na Omada Controller.
-- Mteja akilipa M-Pesa, mfumo unamruhusu; masaa 24 yakiisha, OMADA INAMKATA AUTOMATIC!
+1. INGIA NA UANDAE OMADA CLOUD CONTROLLER:
+- Fungua Omada Cloud Portal kwenye browser ya simu au kompyuta (omada.tplinkcloud.com).
+- Ingia kwa TP-Link ID yako, au fungua akaunti ikiwa huna.
+- Chagua Add Controller kisha Cloud-Based Controller.
+- Weka jina linalotambulisha biashara yako: Lema Fast WiFi.
 
-SURA YA 2: HATUA ZA KUSANIDI KWENYE OMADA CONTROLLER
-1. FUNGUA OMADA CONTROLLER (Cloud au Software):
-   - Nenda: Settings ➔ Authentication ➔ Hotspot
-   - Bonyeza: "+ Create New Portal"
-   - Portal Name: ${settings.hotspotName} Portal
-   - Applies To: Chagua SSID ya Wi-Fi ya wateja (mfano: "${settings.hotspotName}")
+2. ONGEZA EAP772-OUTDOOR kwenye CONTROLLER:
+- Hakikisha AP imeunganishwa kwenye router yenye DHCP na ina intaneti.
+- Fungua ukurasa wa Devices ndani ya controller, chagua Add Devices.
+- Weka serial number au chukua MAC address ya EAP772, kisha fanya Adopt.
+- Subiri kifaa kionekane Connected / Online na Adopted / Managed.
 
-2. CHAGUA PORTAL TYPE:
-   - Weka: "External Web Portal"
-   - Portal URL: https://wifi.mtaawifi.net/portal?merchant=${settings.merchantNumber}
+3. TENGENEZA MTANDAO WA WIFI (SSID):
+- Katika site ya Lema Fast WiFi: Settings ➔ Wireless Networks ➔ "+ Create New Wireless Network".
+- Weka SSID Name: Lema Fast WiFi (Acha Security Mode kuwa "None" au Open kwa ajili ya Captive Portal).
+- Weka VLAN ya wateja ikiwa router yako inaunga mkono VLAN.
 
-3. RADIUS PROFILE (KWA AJILI YA AUTOMATIC EXPIRATION & SPEED LIMITS):
-   - Nenda: Authentication ➔ RADIUS Profile ➔ "+ Create New RADIUS Profile"
-   - Profile Name: Mtaa-WiFi-Radius
-   - Authentication Server IP: 102.223.14.88
-   - Authentication Port: 1812
-   - Accounting Server IP: 102.223.14.88
-   - Accounting Port: 1813
-   - RADIUS Password/Secret: mtaa_secret_${settings.merchantNumber.replace(/[^0-9]/g, '') || '849201'}
-   - Interim Update Interval: 60 seconds (Inamkata mteja mara moja muda ukimalizika)
+4. SANIDI EXTERNAL WEB PORTAL YA LEMA FAST WIFI:
+- Nenda: Settings ➔ Authentication ➔ Portal ➔ Create New Portal.
+- Portal Name: Lema Fast WiFi Portal (Chagua SSID ya Lema Fast WiFi).
+- Portal Type: Chagua "External Web Portal".
+- Portal URL: https://www.lemawifi.online/portal
+- RADIUS Profile: Weka IP ya Seva ya RADIUS (102.223.14.88), Port 1812/1813.
 
-4. PRE-AUTHENTICATION ACCESS (WALLED GARDEN - MALIPO YA M-PESA BILA VOCHA):
-   Kwenye Hotspot Portal Settings, ongeza vikoa vifuatavyo kwenye "Pre-Authentication Access":
-   - *.paypack.co
-   - *.beem.africa
-   - *.selcom.net
-   - *.vodacom.co.tz
-   - *.tigo.co.tz
-   - *.airtel.co.tz
+5. RUHUSU PORTAL KUFUNGUKA KABLA YA MALIPI (PRE-AUTHENTICATION ACCESS / WALLED GARDEN):
+- Kwenye Authentication-Free Access Control / Pre-Authentication Access, ruhusu:
+  • domain ya portal: www.lemawifi.online
+  • domain za malipo (AzamPay, Paypack, Selcom, M-Pesa, Tigo Pesa, Airtel Money, HaloPesa)
+  • Huduma za DNS na DHCP
 
-5. HONGERA!
-   - Ukiwa na Router yako ya Airtel na AP ya TP-Link Omada, biashara inajiendesha 100% automatic bila gharama ya kununua MikroTik!`;
+6. UNGANISHA PORTAL NA OMADA CLOUD API (BROWSERAUTH):
+- Kwa Cloud-Based Controller, tumia HTTPS POST kwenda API ya browserauth kulingana na eneo la Controller yako (Region prefix):
+  • aps1: https://aps1-api-omada-controller.tplinkcloud.com/portal/radius/browserauth
+  • euw1: https://euw1-api-omada-controller.tplinkcloud.com/portal/radius/browserauth
+  • use1: https://use1-api-omada-controller.tplinkcloud.com/portal/radius/browserauth
+- Backend ya Lema Fast WiFi itapokea ombi la mteja, itafanya STK Push ya M-Pesa/Tigo/Airtel, na ikishathibitisha malipo itatuma ombi la browserauth kumruhusu mteja intaneti moja kwa moja!
+
+7. FANYA MAJARIBIO KABLA YA KUANZA BIASHARA:
+- AP inaonekana Online kwenye Omada Cloud.
+- SSID ya Lema Fast WiFi inaonekana kwenye simu.
+- Mteja akijiunga anaelekezwa kwenye portal ya malipo hata kabla ya kulipia.
+- Baada ya kulipia kwa simu, intaneti inafunguka mara moja!`;
 
   // 1. OpenWrt / OpenNDS Captive Portal Script
   const openwrtScript = `# ==============================================================

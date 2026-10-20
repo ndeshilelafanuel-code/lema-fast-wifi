@@ -423,9 +423,9 @@ async function processApOutageAlert(params: {
     (h) => (h.ipAddress && h.ipAddress.includes(targetIp)) || (params.apMac && h.macAddress.toUpperCase() === params.apMac.toUpperCase())
   );
   
-  const apName = params.apName || foundDevice?.name || 'Smart WiFi Node (Sokoni Node)';
-  const site = params.site || foundDevice?.site || 'Sokoni Ghorofani';
-  const apMac = params.apMac || foundDevice?.macAddress || '74:83:C2:55:1A:E9';
+  const apName = params.apName || foundDevice?.name || 'Smart WiFi AP';
+  const site = params.site || foundDevice?.site || 'Kituo Kikuu';
+  const apMac = params.apMac || foundDevice?.macAddress || '';
 
   // Update device status in memory and disk
   if (foundDevice) {
@@ -689,18 +689,7 @@ interface AssociatedWifiClient {
 }
 
 const WIFI_CLIENTS_FILE = path.resolve(__dirname, 'wifi-clients.json');
-let wifiClients: AssociatedWifiClient[] = [
-  {
-    id: 'cli-omada-1',
-    ip: '192.168.88.142',
-    mac: 'DA:A1:19:4F:92:B1',
-    ssid: 'Omada_5Ghz',
-    apName: 'Smart WiFi Node (Sokoni Node)',
-    deviceModel: 'Android Mobile (Connected)',
-    connectedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    status: 'pending_login'
-  }
-];
+let wifiClients: AssociatedWifiClient[] = [];
 
 function loadSavedWifiClients() {
   try {
@@ -738,7 +727,7 @@ app.all('/api/v1/omada/client/connect', (req, res) => {
   const ip = query.ip || body.ip || '192.168.88.142';
   const mac = (query.mac || body.mac || 'DA:A1:19:4F:92:B1').toUpperCase();
   const ssid = query.ssid || body.ssid || 'Omada_5Ghz';
-  const apName = query.ap || body.ap || 'Smart WiFi Node (Sokoni Node)';
+  const apName = query.ap || body.ap || 'Smart WiFi AP';
   const model = query.model || body.model || 'Wireless Device';
 
   const existingIdx = wifiClients.findIndex((c) => c.mac === mac);
