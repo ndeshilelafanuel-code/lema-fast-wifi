@@ -521,7 +521,7 @@ _Mfumo wa Lema Fast WiFi Watchdog Monitoring_`;
   return logEntry;
 }
 
-// Webhook endpoint called by MikroTik Netwatch or Dashboard Watchdog
+// Webhook & Heartbeat endpoint called by Smart AP (TP-Link Omada, Ruijie Reyee) or Dashboard Watchdog
 app.all('/api/v1/hardware/alert/outage', async (req, res) => {
   const query = req.query as any;
   const body = (req.body || {}) as any;
@@ -545,6 +545,54 @@ app.all('/api/v1/hardware/alert/outage', async (req, res) => {
     success: true,
     message: status === 'down' ? 'Arifa ya dharura ya kuzima kwa AP imetumwa kwa Msimamizi' : 'Arifa ya kuwaka kwa AP imetumwa kwa Msimamizi',
     alert: result
+  });
+});
+
+// Smart AP Automated Heartbeat Receiver (TP-Link Omada / Ruijie Reyee - Bila MikroTik)
+app.all('/api/v1/hardware/heartbeat', async (req, res) => {
+  const query = req.query as any;
+  const body = (req.body || {}) as any;
+  const targetIp = (query.ip || body.ip || '192.168.88.115') as string;
+  const targetMac = (query.mac || body.mac || '') as string;
+
+  loadSavedHardware();
+  const device = savedHardware.find(
+    (h) => (h.ipAddress && h.ipAddress.includes(targetIp)) || (targetMac && h.macAddress.toUpperCase() === targetMac.toUpperCase())
+  );
+
+  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  let wasOffline = false;
+
+  if (device) {
+    if (device.status === 'offline') wasOffline = true;
+    device.status = 'online';
+    device.lastSeen = nowStr;
+    saveHardwareToDisk();
+  }
+
+  const towers = loadSavedTowers();
+  const tower = towers.find((t: any) => t.ipAddress === targetIp || (targetMac && t.macAddress === targetMac));
+  if (tower) {
+    if (tower.status === 'offline') wasOffline = true;
+    tower.status = 'online';
+    saveTowersToFile(towers);
+  }
+
+  if (wasOffline) {
+    processApOutageAlert({
+      status: 'up',
+      apIp: targetIp,
+      apMac: targetMac || device?.macAddress,
+      apName: device?.name,
+      site: device?.site
+    }).catch(() => {});
+  }
+
+  return res.json({
+    success: true,
+    status: 'online',
+    lastSeen: nowStr,
+    message: 'Heartbeat ya Smart AP imepokelewa kikamilifu bila MikroTik!'
   });
 });
 
@@ -681,7 +729,7 @@ app.get('/api/v1/omada/clients', (_req, res) => {
   return res.json({ success: true, count: wifiClients.length, clients: wifiClients });
 });
 
-// POST register/connect client on Wi-Fi (called by Omada Controller or MikroTik DHCP)
+// POST register/connect client on Wi-Fi (called by Omada Controller or Smart AP DHCP)
 app.all('/api/v1/omada/client/connect', (req, res) => {
   const query = req.query as any;
   const body = (req.body || {}) as any;

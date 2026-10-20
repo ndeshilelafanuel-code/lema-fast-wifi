@@ -7,7 +7,7 @@
     "macAddress": "74:83:C2:55:1A:E9",
     "model": "Smart WiFi Node (Network Hardware)",
     "coverageRadiusMeters": 200,
-    "status": "online",
+    "status": "offline",
     "frequencyBand": "Dual-Band 2.4/5GHz (Wi-Fi 7 Ready)",
     "txPowerDbm": 28,
     "antennaType": "Omni-directional 360°",

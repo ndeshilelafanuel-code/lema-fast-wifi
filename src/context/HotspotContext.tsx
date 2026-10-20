@@ -391,21 +391,36 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem('wifi_hotspot_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  // Load saved towers from backend server if available
+  // Load and poll saved towers from backend server in real-time (Watchdog sync)
   useEffect(() => {
-    fetch('/api/v1/towers')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.success && Array.isArray(data.towers) && data.towers.length > 0) {
-          setTowers((current) => {
-            if (current.length === 0) return data.towers;
-            const currentIds = new Set(current.map((t) => t.id));
-            const newOnes = data.towers.filter((t: NetworkTower) => !currentIds.has(t.id));
-            return newOnes.length > 0 ? [...newOnes, ...current] : current;
-          });
-        }
-      })
-      .catch(() => {});
+    let isMounted = true;
+    const fetchTowers = () => {
+      fetch('/api/v1/towers')
+        .then((res) => res.json())
+        .then((data) => {
+          if (isMounted && data && data.success && Array.isArray(data.towers) && data.towers.length > 0) {
+            setTowers((current) => {
+              if (current.length === 0) return data.towers;
+              const serverMap = new Map(data.towers.map((t: NetworkTower) => [t.id, t]));
+              const updatedCurrent = current.map((t) => {
+                const serverItem: any = serverMap.get(t.id);
+                return serverItem ? { ...t, ...serverItem } : t;
+              });
+              const currentIds = new Set(current.map((t) => t.id));
+              const missingFromServer = data.towers.filter((t: NetworkTower) => !currentIds.has(t.id));
+              return [...missingFromServer, ...updatedCurrent];
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchTowers();
+    const interval = setInterval(fetchTowers, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -414,13 +429,6 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_towers', JSON.stringify(towers));
-    if (towers.length > 0) {
-      fetch('/api/v1/towers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ towers }),
-      }).catch(() => {});
-    }
   }, [towers]);
 
   useEffect(() => {
@@ -727,30 +735,53 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       installedAt: new Date().toISOString(),
       lastPingMs: towerData.lastPingMs || Math.floor(Math.random() * 8) + 2,
     };
-    setTowers((prev) => [newTower, ...prev]);
+    setTowers((prev) => {
+      const updated = [newTower, ...prev];
+      fetch('/api/v1/towers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ towers: updated }),
+      }).catch(() => {});
+      return updated;
+    });
     return newTower;
   };
 
   const updateTower = (id: string, updates: Partial<NetworkTower>) => {
-    setTowers((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    setTowers((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
+      fetch('/api/v1/towers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ towers: updated }),
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const deleteTower = (id: string) => {
-    setTowers((prev) => prev.filter((t) => t.id !== id));
+    setTowers((prev) => {
+      const updated = prev.filter((t) => t.id !== id);
+      fetch('/api/v1/towers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ towers: updated }),
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const importTowers = (newTowers: NetworkTower[]) => {
     if (!Array.isArray(newTowers) || newTowers.length === 0) return;
     setTowers((prev) => {
-      const existingIds = new Set(prev.map((t) => t.id));
-      const filteredNew = newTowers.filter((t) => !existingIds.has(t.id));
-      const merged = [...filteredNew, ...prev];
-      fetch('/api/v1/towers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ towers: merged }),
-      }).catch(() => {});
-      return merged;
+      const incomingMap = new Map(newTowers.map((t) => [t.id, t]));
+      const updatedPrev = prev.map((t) => {
+        const inc = incomingMap.get(t.id);
+        return inc ? { ...t, ...inc } : t;
+      });
+      const prevIds = new Set(prev.map((t) => t.id));
+      const brandNew = newTowers.filter((t) => !prevIds.has(t.id));
+      return [...brandNew, ...updatedPrev];
     });
   };
 

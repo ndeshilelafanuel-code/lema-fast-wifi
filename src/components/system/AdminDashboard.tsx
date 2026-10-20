@@ -71,7 +71,7 @@ import {
   Legend
 } from 'recharts';
 import { VoucherPrintSheet } from './VoucherPrintSheet';
-import { MikrotikScriptModal } from './MikrotikScriptModal';
+import { SmartApScriptModal } from './SmartApScriptModal';
 import { SmsTemplateConfigPanel } from './SmsTemplateConfigPanel';
 import { DailySummaryReportModal } from './DailySummaryReportModal';
 import { BillingModule } from './BillingModule';
@@ -480,7 +480,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(equipmentInventory));
   }, [equipmentInventory]);
 
-  // Sync Hardware Inventory with backend server disk (so PC, Phone, and all devices share the exact same APs)
+  // Sync Hardware Inventory with backend server disk (so PC, Phone, and all devices share the exact same APs in real time)
   useEffect(() => {
     let isMounted = true;
     const syncServerHardware = async () => {
@@ -494,23 +494,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 setEquipmentInventory(data.inventory);
                 const serverAps = data.inventory
                   .filter((item: ScannedEquipment) => item.category === 'ap')
-                  .map((item: ScannedEquipment) => ({
-                    mac: item.macAddress,
-                    model: item.model,
-                    site: item.site,
-                    status: 'connected',
-                    uptime: 'Online (Imeunganishwa)',
-                  }));
-                if (serverAps.length > 0) {
-                  setAccessPoints((prev) => {
-                    const combined = [...serverAps];
-                    prev.forEach((p) => {
-                      if (!combined.some((c) => c.mac.toUpperCase() === p.mac.toUpperCase())) {
-                        combined.push(p);
-                      }
-                    });
-                    return combined;
+                  .map((item: ScannedEquipment) => {
+                    const isOnline = item.status === 'online';
+                    return {
+                      mac: item.macAddress,
+                      model: item.model,
+                      site: item.site,
+                      status: isOnline ? 'connected' : 'disconnected',
+                      uptime: isOnline
+                        ? ((item as any).lastSeen ? `Online (Seen: ${(item as any).lastSeen})` : 'Online (Imeunganishwa)')
+                        : 'Offline (Imezimwa / Hakuna Mawasiliano)',
+                    };
                   });
+                if (serverAps.length > 0) {
+                  setAccessPoints(serverAps);
                 }
               }
             } else {
@@ -533,19 +530,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }
         }
       } catch (e) {
-        console.warn('Could not sync hardware from server:', e);
+        console.warn('Could not sync hardware inventory:', e);
       }
     };
 
     syncServerHardware();
+    const interval = setInterval(syncServerHardware, 3000);
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 
   // Wizard States
   const [showAddRouterForm, setShowAddRouterForm] = useState<boolean>(false);
-  const [newRouterType, setNewRouterType] = useState<'omada' | 'mikrotik' | 'openwrt'>('omada');
+  const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'openwrt'>('omada');
   const [newRouterName, setNewRouterName] = useState<string>('');
   const [newRouterSite, setNewRouterSite] = useState<string>('Sokoni Area');
   const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>('https://omada.lemawifi.online');
@@ -4020,14 +4019,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setNewRouterType('mikrotik')}
+                      onClick={() => setNewRouterType('ruijie')}
                       className={`p-2.5 rounded-lg border text-center font-semibold transition-all ${
-                        newRouterType === 'mikrotik'
+                        newRouterType === 'ruijie'
                           ? 'bg-amber-500/20 border-amber-500 text-amber-400'
                           : 'border-stone-800 text-stone-400 hover:bg-stone-900'
                       }`}
                     >
-                      MikroTik
+                      Ruijie Reyee (Smart AP)
                     </button>
                     <button
                       type="button"
@@ -4133,7 +4132,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         const nr = {
                           id: `r-${Date.now()}`,
                           name: newRouterName,
-                          type: newRouterType === 'omada' ? 'TP-Link Omada' : newRouterType === 'mikrotik' ? 'MikroTik' : 'OpenWrt',
+                          type: newRouterType === 'omada' ? 'TP-Link Omada' : newRouterType === 'ruijie' ? 'Ruijie Reyee' : 'OpenWrt',
                           site: newRouterSite,
                           status: 'connected',
                           nasIp: newRouterNasIp || '192.168.88.1',
@@ -4342,30 +4341,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </button>
                   </div>
                 )}
-                {accessPoints.map((ap) => (
-                  <div
-                    key={ap.mac}
-                    className="p-4 bg-stone-950 border border-stone-850 rounded-xl flex items-center justify-between gap-4 text-xs font-mono"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mt-1 font-sans">
-                        <Radio className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2 font-sans">
-                          <h4 className="font-bold text-white text-xs">{ap.model}</h4>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            Adopted & Active
-                          </span>
+                {accessPoints.map((ap) => {
+                  const isConnected = ap.status === 'connected';
+                  return (
+                    <div
+                      key={ap.mac}
+                      className={`p-4 bg-stone-950 border rounded-xl flex items-center justify-between gap-4 text-xs font-mono transition-all ${
+                        isConnected ? 'border-stone-850' : 'border-rose-900/60 bg-rose-950/15'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`p-2.5 rounded-lg border mt-1 font-sans ${
+                            isConnected
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          }`}
+                        >
+                          <Radio className="w-5 h-5" />
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400">
-                          <span>MAC Address: <strong className="text-white uppercase">{ap.mac}</strong></span>
-                          <span>Eneo: <strong className="text-white font-sans">{ap.site}</strong></span>
-                          <span>Muda Halisi (Uptime): <strong className="text-white font-sans">{ap.uptime}</strong></span>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 font-sans">
+                            <h4 className="font-bold text-white text-xs">{ap.model}</h4>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 border ${
+                                isConnected
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
+                                }`}
+                              />
+                              {isConnected ? 'Adopted & Active (🟢 Online)' : '🔴 OFFLINE (Imezimwa)'}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400">
+                            <span>
+                              MAC Address: <strong className="text-white uppercase">{ap.mac}</strong>
+                            </span>
+                            <span>
+                              Eneo: <strong className="text-white font-sans">{ap.site}</strong>
+                            </span>
+                            <span>
+                              Hali ya Kifaa:{' '}
+                              <strong
+                                className={`font-sans ${
+                                  isConnected ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-bold'
+                                }`}
+                              >
+                                {ap.uptime}
+                              </strong>
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
                     <button
                       onClick={() => {
@@ -4378,8 +4410,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -5659,7 +5692,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="font-bold text-stone-800">Ruijie / Omada AP Only:</span> Mteja anapojaribu kufungua Captive Portal kupitia AP ya huyo Tenant, portal (iliyopo kwenye cloud yako) inaangalia kwanza kama huyo Tenant amezuiwa. Kama ndiyo, badala ya kuonyesha fomu ya kuandika vocha au kulipia, portal inatoa ukurasa wa block uliorandishwa nyekundu!
                         </li>
                         <li>
-                          <span className="font-bold text-stone-800">MikroTik Router Mode:</span> Kama mtumiaji anatumia MikroTik inayoongea na RADIUS server yako binafsi, mteja anapoandika vocha MikroTik inatuma maombi RADIUS. Server inakataa papo hapo kwa kurudisha <code>Access-Reject</code> ikiwa <code>tenant_status === "suspended"</code>.
+                          <span className="font-bold text-stone-800">Smart AP Cloud Mode (Omada / Reyee):</span> Mteja anapojaribu kufungua Captive Portal, Lema Fast WiFi Cloud inakagua moja kwa moja kama mteja anayo vocha au amelipa. Kila kitu kinadhibitiwa moja kwa moja kupitia Smart AP na ISP modem bila kuhitaji router ya ziada!
                         </li>
                       </ul>
                     </div>
@@ -5690,9 +5723,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         />
       )}
 
-      {/* MikroTik Script Modal */}
+      {/* Smart AP Cloud Setup Modal (Zero MikroTik) */}
       {showScriptModal && (
-        <MikrotikScriptModal
+        <SmartApScriptModal
           settings={settings}
           onClose={() => setShowScriptModal(false)}
         />
@@ -6286,8 +6319,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }}
               className="w-full text-left p-2.5 hover:bg-stone-800 rounded-xl transition-colors text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
-              <span>📜</span>
-              <span>MikroTik Setup Script</span>
+              <span>📡</span>
+              <span>Smart AP Cloud Setup (Bila MikroTik)</span>
             </button>
 
             {/* Option 4: Print Vouchers */}

@@ -1,0 +1,416 @@
+import React, { useState } from 'react';
+import { HotspotSettings } from '../../types';
+import { LemaLogo } from '../common/LemaLogo';
+import { X, Copy, Check, Terminal, FileCode2, Download, Radio, ShieldCheck, Zap } from 'lucide-react';
+
+interface SmartApScriptModalProps {
+  settings: HotspotSettings;
+  onClose: () => void;
+}
+
+export const SmartApScriptModal: React.FC<SmartApScriptModalProps> = ({ settings, onClose }) => {
+  const [activeTab, setActiveTab] = useState<'omada' | 'reyee' | 'walled-garden' | 'openwrt' | 'saas-api' | 'architecture'>('omada');
+  const [copied, setCopied] = useState<boolean>(false);
+
+  // 1. TP-Link Omada External Portal & Cloud Hotspot (Zero MikroTik)
+  const omadaScript = `# ==============================================================
+# LEMA FAST WIFI - TP-LINK OMADA CONTROLLER & ACCESS POINT SETUP
+# Hotspot Name: ${settings.hotspotName}
+# Works on: TP-Link EAP110-Outdoor, EAP225-Outdoor, EAP610-Outdoor, EAP772-Outdoor (Wi-Fi 7)
+# Physical Wiring: [ ISP Modem / Starlink ] ➔ [ PoE Injector ] ➔ [ TP-Link Omada AP ]
+# MUHIMU: HAPANA MIKROTIK INAYOHITAJIKA! (100% SMART AP + ISP PEKEE)
+# ==============================================================
+
+SURA YA 1: JINSI INAVYOFANYA KAZI BILA MIKROTIK
+- Vifaa vya TP-Link Omada vina "External Web Portal" na "Cloud RADIUS" ya ndani.
+- Modemu ya ISP (Airtel 5G, Halotel, Starlink au Fiber) inatoa intaneti na IP address (DHCP) moja kwa moja.
+- Waya unatoka kwenye modemu ya ISP unachomekwa kwenye PoE Injector (LAN port).
+- Waya mwingine unatoka kwenye PoE Injector (PoE port) kwenda juu kwenye Smart AP ya TP-Link Omada.
+- Mfumo wetu wa Lema Fast WiFi Cloud Portal unawasiliana moja kwa moja na Omada AP.
+- Mteja akilipa M-Pesa, mfumo unamruhusu; masaa au siku zikimalizika, OMADA INAMKATA AUTOMATIC!
+
+SURA YA 2: HATUA ZA KUSANIDI KWENYE OMADA APP AU CONTROLLER
+1. FUNGUA OMADA APP (Simu ya Mkononi) AU OMADA CONTROLLER:
+   - Nenda: Settings ➔ Authentication ➔ Hotspot
+   - Bonyeza: "+ Create New Portal"
+   - Portal Name: ${settings.hotspotName} Cloud Portal
+   - Applies To: Chagua SSID ya Wi-Fi ya wateja (mfano: "${settings.hotspotName}")
+
+2. CHAGUA PORTAL TYPE:
+   - Weka: "External Web Portal"
+   - Portal URL: https://www.lemawifi.online/portal?merchant=${settings.merchantNumber}
+
+3. RADIUS PROFILE (KWA AJILI YA AUTOMATIC EXPIRATION & SPEED LIMITS):
+   - Nenda: Authentication ➔ RADIUS Profile ➔ "+ Create New RADIUS Profile"
+   - Profile Name: Lema-WiFi-Cloud
+   - Authentication Server IP: 102.223.14.88
+   - Authentication Port: 1812
+   - Accounting Server IP: 102.223.14.88
+   - Accounting Port: 1813
+   - RADIUS Password/Secret: lema_secret_${settings.merchantNumber.replace(/[^0-9]/g, '') || '849201'}
+   - Interim Update Interval: 60 seconds (Inamkata mteja mara moja muda ukimalizika)
+
+4. PRE-AUTHENTICATION ACCESS (WALLED GARDEN - MALIPO YA M-PESA BILA VOCHA):
+   Kwenye Hotspot Portal Settings, ongeza vikoa vifuatavyo kwenye "Pre-Authentication Access":
+   - *.lemawifi.online
+   - *.vodacom.co.tz
+   - *.tigo.co.tz
+   - *.airtel.co.tz
+   - *.halotel.co.tz
+   - *.selcom.net
+   - *.paypack.co
+   - *.azampay.com
+
+5. HONGERA!
+   - Ukiwa na Modemu yako ya ISP na AP ya TP-Link Omada, biashara inajiendesha 100% automatic bila gharama wala usumbufu wa kununua MikroTik!`;
+
+  // 2. Ruijie Reyee Cloud AP Setup Guide (Zero MikroTik)
+  const reyeeScript = `# ==============================================================
+# LEMA FAST WIFI - RUIJIE REYEE SMART AP CLOUD CONFIGURATION
+# Hotspot Name: ${settings.hotspotName}
+# Works on: Ruijie Reyee RG-RAP6202(G), RG-EAP602 Outdoor, RG-RAP2260(E)
+# Physical Wiring: [ ISP Modem / Starlink ] ➔ [ PoE Injector ] ➔ [ Ruijie Reyee AP ]
+# MUHIMU: HAPANA MIKROTIK INAYOHITAJIKA! (100% SMART AP + ISP PEKEE)
+# ==============================================================
+
+SURA YA 1: JINSI RUIJIE REYEE INAVYOFANYA KAZI BILA MIKROTIK
+- Ruijie Reyee ina mfumo wa "Reyee Cloud Captive Portal" uliomo ndani ya kila AP bure kabisa.
+- Huna haja ya PC wala server ya nyumbani; unasanidi kila kitu kwa simu yako kupitia "Ruijie Reyee App".
+- Waya unatoka kwenye modemu ya Airtel / Vodacom / Starlink kwenda kwenye PoE Injector, kisha kwenye Reyee AP.
+- Reyee AP inagawa IP addresses, inazuia wateja kuunganishwa bila vocha, na inalinda kasi (Speed Limit).
+
+SURA YA 2: HATUA ZA KUSANIDI KWENYE RUIJIE REYEE APP
+1. SAKINISHA APP YA "RUIJIE REYEE" KWENYE SIMU YAKO (PlayStore / App Store).
+2. UNDA PROJECT MPYA YA HOTSPOT:
+   - Bonyeza: "Add Project" ➔ Scan QR Code iliyopo nyuma ya AP ya Reyee.
+   - Project Name: ${settings.hotspotName}
+   - Scenario: Public WiFi / Hotspot
+
+3. WASHA CAPTIVE PORTAL:
+   - Nenda: Project Settings ➔ Auth & Portal ➔ "Captive Portal"
+   - Portal Type: Chagua "External Authentication" au "One-Click / Voucher Auth"
+   - Server URL: https://www.lemawifi.online/portal?merchant=${settings.merchantNumber}
+
+4. WEKA WALLED GARDEN (Kuruhusu Malipo ya M-Pesa na Tigo Pesa):
+   - Nenda: "Auth-Free Whitelist / Walled Garden"
+   - Ongeza:
+     • lemawifi.online
+     • *.vodacom.co.tz
+     • *.tigo.co.tz
+     • *.airtel.co.tz
+     • *.selcom.net
+     • *.paypack.co
+
+5. SPEED LIMIT (Kasi kwa Kila Mtumiaji):
+   - Weka Download: 3 Mbps (3072 Kbps)
+   - Weka Upload: 1 Mbps (1024 Kbps)
+   - Hii inahakikisha intaneti haikwami hata wateja 100 wakiunganishwa pamoja!`;
+
+  // 3. Walled Garden Allowlist for Mobile Money
+  const walledGardenScript = `# ==============================================================
+# LEMA FAST WIFI - WALLED GARDEN & PAYMENT GATEWAYS ALLOWLIST
+# Inafanya kazi kwenye: TP-Link Omada, Ruijie Reyee, OpenWrt, na Starlink
+# ==============================================================
+
+# Orodha ya Vikoa (Domains) Vinavyotakiwa Kuruhusiwa Bila Vocha:
+# Weka hizi kwenye sehemu ya "Auth-Free Whitelist" au "Pre-Auth Access":
+
+lemawifi.online
+api.lemawifi.online
+*.vodacom.co.tz
+*.tigo.co.tz
+*.airtel.co.tz
+*.halotel.co.tz
+*.selcom.net
+*.beem.africa
+*.paypack.co
+*.azampay.com
+*.swalasms.com
+
+# DNS Ports Zinazotakiwa Kuwa Wazi:
+Port: 53 (UDP/TCP - Domain Name Resolution)
+Port: 80 (HTTP - Captive Portal Redirection)
+Port: 443 (HTTPS - Secure Payment Checkouts)`;
+
+  // 4. OpenWrt / Linux Smart Gateway
+  const openwrtScript = `# ==============================================================
+# LEMA FAST WIFI - OPENWRT / OPENNDS CAPTIVE PORTAL CONFIGURATION
+# Hotspot Name: ${settings.hotspotName}
+# Works on: Any OpenWrt AP, Raspberry Pi, Orange Pi, or Linux Gateway
+# ==============================================================
+
+# 1. Install OpenNDS Captive Portal on OpenWrt
+opkg update
+opkg install opennds
+
+# 2. Configure OpenNDS Gateway (/etc/config/opennds)
+cat << 'EOF' > /etc/config/opennds
+config opennds
+	option enabled '1'
+	option fwd_daemon '1'
+	option gatewayinterface 'br-lan'
+	option gatewayname '${settings.hotspotName}'
+	option maxclients '250'
+	option preauthidle '15'
+	option sessiontimeout '1440'
+	option checkinterval '30'
+
+# Allow Payment Gateway Endpoints (Walled Garden)
+list authenticated_users 'allow all to 102.223.0.0/16'
+list authenticated_users 'allow all to *.lemawifi.online'
+list authenticated_users 'allow all to *.vodacom.co.tz'
+list authenticated_users 'allow all to *.tigo.co.tz'
+list authenticated_users 'allow all to *.airtel.co.tz'
+list authenticated_users 'allow all to *.selcom.net'
+EOF
+
+# 3. Enable & Restart OpenNDS Service
+/etc/init.d/opennds enable
+/etc/init.d/opennds restart
+
+# 4. Automatic Expiry Sync Daemon (Cron Script)
+cat << 'EOF' > /usr/bin/hotspot-expiry-sync.sh
+#!/bin/sh
+EXPIRED_MACS=$(curl -s -X GET "https://www.lemawifi.online/api/v1/sessions/expired?hotspot_id=${settings.merchantNumber}")
+for mac in $EXPIRED_MACS; do
+  openndsctl deauth "$mac"
+  echo "[HOTSPOT] Expired & Deauthorized MAC: $mac"
+done
+EOF
+
+chmod +x /usr/bin/hotspot-expiry-sync.sh
+(crontab -l 2>/dev/null; echo "* * * * * /usr/bin/hotspot-expiry-sync.sh") | crontab -
+`;
+
+  // 5. Cloud REST API Specifications for Hardware Controller
+  const saasApiGuide = `{
+  "platform": "Lema Fast WiFi Standalone AP SaaS Engine",
+  "version": "v2.0.0 (Zero-MikroTik Architecture)",
+  "hotspot_name": "${settings.hotspotName}",
+  "merchant_id": "${settings.merchantNumber}",
+  "endpoints": {
+    "1_authorize_user": {
+      "method": "POST",
+      "url": "https://www.lemawifi.online/api/v1/gateway/authorize",
+      "headers": { "Authorization": "Bearer YOUR_HOTSPOT_SECRET_KEY" },
+      "request_body": {
+        "voucher_code": "8492",
+        "mac_address": "AA:BB:CC:DD:EE:FF",
+        "ip_address": "192.168.88.115"
+      },
+      "response": {
+        "status": "success",
+        "session_id": "sess_991823",
+        "duration_hours": 24,
+        "expires_at": "2026-10-06T14:00:00Z",
+        "rate_limit_kbps": { "upload": 1024, "download": 2560 }
+      }
+    },
+    "2_poll_expired_sessions": {
+      "method": "GET",
+      "url": "https://www.lemawifi.online/api/v1/gateway/expired-sessions",
+      "response": {
+        "expired_macs": ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]
+      }
+    },
+    "3_ap_heartbeat": {
+      "method": "POST",
+      "url": "https://www.lemawifi.online/api/v1/hardware/heartbeat",
+      "request_body": {
+        "ip": "192.168.88.115",
+        "mac": "74:83:C2:55:1A:E9",
+        "active_clients_count": 14,
+        "status": "online"
+      }
+    }
+  }
+}`;
+
+  // 6. Architecture Comparison & Roadmap Guide
+  const architectureGuide = `# ==============================================================
+# BLUEPRINT YA USANIFU: AP PEKEE NA MODEM YA ISP (ZERO MIKROTIK)
+# ==============================================================
+
+1. MFUMO WA AP TU + MODEM YA ISP (Architecture Rasmi ya Lema Fast WiFi)
+   - Muundo wa Waya: [ Modemu ya ISP / Starlink ] ➔ [ PoE Injector ] ➔ [ Smart AP ]
+   - Modemu ya ISP (Airtel 5G, Halotel, Starlink au Fiber):
+     • Inatoa intaneti ya kasi ya juu.
+     • Inagawa IP addresses (DHCP) kwa wateja wote.
+   - Smart Outdoor AP (TP-Link Omada au Ruijie Reyee):
+     • Inarusha mawimbi yenye nguvu mtaani (mita 150 hadi 250).
+     • Ina ukurasa wa vocha ndani yake (Captive Portal).
+     • Inafunga na kufungulia wateja intaneti kulingana na malipo ya M-Pesa.
+     • Inadhibiti spidi (Bandwidth Management) bila kuhitaji MikroTik!
+
+2. KWA NINI TUMEONDOA MIKROTIK KABISA?
+   ✓ Gharama Ndogo Sana: Huhitaji kununua router ya ziada ya MikroTik (Tsh 120,000 - 250,000).
+   ✓ Usanidi Rahisi: Hakuna script ngumu za RouterOS; kila kitu kinasanidiwa kwa simu kupitia Omada/Reyee App.
+   ✓ Uimara wa Umeme: Vifaa vichache vinavyotumia umeme (AP moja na Modemu moja tu).
+   ✓ Matengenezo Machache: Hakuna tatizo la MikroTik kuganda au kujaza RAM.`;
+
+  const getActiveCode = () => {
+    if (activeTab === 'omada') return omadaScript;
+    if (activeTab === 'reyee') return reyeeScript;
+    if (activeTab === 'walled-garden') return walledGardenScript;
+    if (activeTab === 'openwrt') return openwrtScript;
+    if (activeTab === 'saas-api') return saasApiGuide;
+    return architectureGuide;
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(getActiveCode());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const code = getActiveCode();
+    const filename =
+      activeTab === 'omada'
+        ? 'tp-link-omada-setup.txt'
+        : activeTab === 'reyee'
+        ? 'ruijie-reyee-setup.txt'
+        : activeTab === 'openwrt'
+        ? 'openwrt-opennds-setup.sh'
+        : activeTab === 'saas-api'
+        ? 'saas-gateway-api.json'
+        : activeTab === 'walled-garden'
+        ? 'walled-garden-whitelist.txt'
+        : 'ap-only-architecture.md';
+
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="p-4 sm:p-5 border-b border-stone-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <LemaLogo variant="horizontal" size="xs" theme="dark" showSlogan={false} />
+            <span className="text-stone-500 text-xs hidden sm:inline">|</span>
+            <span className="text-white font-bold text-xs sm:text-sm">Smart AP Setup (Bila MikroTik)</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab navigation */}
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-stone-950 border-b border-stone-800 text-xs">
+          <button
+            onClick={() => setActiveTab('omada')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'omada'
+                ? 'bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/20'
+                : 'text-blue-400 hover:bg-stone-850 border border-blue-500/30'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>TP-Link Omada AP</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('reyee')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'reyee'
+                ? 'bg-amber-400 text-stone-950 font-black shadow-lg shadow-amber-400/20'
+                : 'text-amber-400 hover:bg-stone-850 border border-amber-500/40'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Ruijie Reyee AP</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('walled-garden')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+              activeTab === 'walled-garden'
+                ? 'bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/20'
+                : 'text-emerald-400 hover:bg-stone-850 border border-emerald-500/30'
+            }`}
+          >
+            Walled Garden (Malipo)
+          </button>
+
+          <button
+            onClick={() => setActiveTab('openwrt')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+              activeTab === 'openwrt'
+                ? 'bg-purple-500 text-white font-bold'
+                : 'text-purple-400 hover:bg-stone-850 border border-purple-500/30'
+            }`}
+          >
+            OpenWrt / Linux AP
+          </button>
+
+          <button
+            onClick={() => setActiveTab('saas-api')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+              activeTab === 'saas-api'
+                ? 'bg-stone-700 text-white font-bold'
+                : 'text-stone-400 hover:bg-stone-850 border border-stone-700'
+            }`}
+          >
+            Cloud API
+          </button>
+
+          <button
+            onClick={() => setActiveTab('architecture')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+              activeTab === 'architecture'
+                ? 'bg-stone-700 text-white font-bold'
+                : 'text-stone-400 hover:bg-stone-850 border border-stone-700'
+            }`}
+          >
+            Muundo (Blueprint)
+          </button>
+        </div>
+
+        {/* Code display area */}
+        <div className="p-4 flex-1 overflow-y-auto bg-stone-950 font-mono text-xs leading-relaxed text-stone-300">
+          <pre className="whitespace-pre-wrap select-all font-mono">{getActiveCode()}</pre>
+        </div>
+
+        {/* Footer actions */}
+        <div className="p-4 border-t border-stone-800 flex items-center justify-between bg-stone-900 gap-3">
+          <div className="text-[11px] text-stone-400 hidden sm:block">
+            {activeTab === 'omada' && 'TP-Link Omada External Portal & RADIUS Setup Guide'}
+            {activeTab === 'reyee' && 'Ruijie Reyee Cloud Hotspot & Mobile Voucher Setup Guide'}
+            {activeTab === 'walled-garden' && 'Vikoa vya malipo ya M-Pesa, Mixx by Yas, na Tigo bila vocha'}
+            {activeTab === 'openwrt' && 'OpenWrt OpenNDS configuration script'}
+            {activeTab === 'saas-api' && 'REST API schema ya kusawazisha na Smart AP Cloud'}
+            {activeTab === 'architecture' && 'Mwongozo wa kutumia Smart AP + Modemu ya ISP bila MikroTik'}
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleCopy}
+              className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? 'Imenakiliwa!' : 'Nakili Maelekezo'}</span>
+            </button>
+
+            <button
+              onClick={handleDownload}
+              className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-400/20 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Pakua Faili</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
