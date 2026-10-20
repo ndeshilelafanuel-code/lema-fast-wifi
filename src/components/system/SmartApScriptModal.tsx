@@ -175,8 +175,8 @@ chmod +x /usr/bin/hotspot-expiry-sync.sh
       "method": "POST",
       "url": "https://www.lemawifi.online/api/v1/hardware/heartbeat",
       "request_body": {
-        "ip": "192.168.88.115",
-        "mac": "74:83:C2:55:1A:E9",
+        "ip": "192.168.1.153",
+        "mac": "D4:D6:DF:0D:B3:A0",
         "active_clients_count": 14,
         "status": "online"
       }

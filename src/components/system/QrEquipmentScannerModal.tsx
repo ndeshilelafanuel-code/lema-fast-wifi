@@ -212,7 +212,7 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
 
     const model = fields['MODEL'] || fields['M'] || (data.includes('EAP772') ? 'EAP772-Outdoor' : data.includes('EAP225') ? 'EAP225-Outdoor' : data.includes('RAP') ? 'RG-RAP6202G' : data.includes('HEX') ? 'RB750Gr3 hEX' : 'Smart WiFi Node');
     const serial = fields['SERIAL'] || fields['SN'] || fields['S/N'] || fields['S'] || (data.match(/[A-Z0-9]{10,14}/)?.[0] || '22771SK007720');
-    const mac = fields['MAC'] || fields['M'] || (data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/)?.[0] || '74:83:C2:55:1A:E9');
+    const mac = fields['MAC'] || fields['M'] || (data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/)?.[0] || 'D4:D6:DF:0D:B3:A0');
     const deviceKey = fields['KEY'] || fields['DEVICEKEY'] || fields['PIN'] || '772A-EAP7-7200-WIFI7';
     const mfr = fields['MFR'] || fields['BRAND'] || (model.includes('EAP') ? 'TP-Link' : model.includes('RAP') ? 'Ruijie' : model.includes('RB') ? 'MikroTik' : 'Network Hardware');
 
@@ -335,7 +335,7 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
     {
       title: 'TP-Link Omada EAP772-Outdoor (Wi-Fi 7 Tri-Band)',
       category: 'ap',
-      code: 'MFR:TP-Link;MODEL:EAP772-Outdoor;SN:22771SK007720;MAC:74:83:C2:55:1A:E9;KEY:772A-EAP7-7200-WIFI7;POE:802.3at;',
+      code: 'MFR:TP-Link;MODEL:EAP772-Outdoor;SN:22771SK007720;MAC:D4:D6:DF:0D:B3:A0;KEY:772A-EAP7-7200-WIFI7;POE:802.3at;',
       desc: 'Antenna ya nje ya kizazi cha kisasa cha Wi-Fi 7 (Tri-Band 2.4/5/6GHz) yenye spidi na uwezo mkubwa wa wateja.',
       icon: '🚀',
       brand: 'TP-Link',
@@ -608,7 +608,7 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
                         value={manualMac}
                         onChange={(e) => setManualMac(e.target.value)}
                         className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-hidden focus:border-indigo-500"
-                        placeholder="mf. 74:83:C2:55:1A:E9"
+                        placeholder="mf. D4:D6:DF:0D:B3:A0"
                         required
                       />
                     </div>

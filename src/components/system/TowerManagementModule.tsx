@@ -74,6 +74,9 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     siteSuggestion: string;
     status: 'pending' | 'adopted';
   }>>([]);
+  const [editingApId, setEditingApId] = useState<string | null>(null);
+  const [tempEditMac, setTempEditMac] = useState<string>('');
+  const [tempEditIp, setTempEditIp] = useState<string>('');
   const [editingTower, setEditingTower] = useState<NetworkTower | null>(null);
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
@@ -96,9 +99,9 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
           setDiscoveredAps([
             {
               id: 'disc-eap772',
-              mac: '74:83:C2:55:1A:E9',
+              mac: 'D4:D6:DF:0D:B3:A0',
               model: 'TP-Link Omada EAP772-Outdoor (Wi-Fi 7 Tri-Band)',
-              ip: '192.168.0.254',
+              ip: '192.168.1.153',
               siteSuggestion: 'Lema Fast WiFi - Mnara Mkuu wa Nje',
               status: 'pending'
             }
@@ -1346,11 +1349,91 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400 font-mono">
-                            <span>MAC: <strong className="text-stone-200">{ap.mac}</strong></span>
-                            <span>IP: <strong className="text-stone-200">{ap.ip}</strong></span>
-                            <span>Eneo Linalopendekezwa: <strong className="text-amber-300 font-sans">{ap.siteSuggestion}</strong></span>
-                          </div>
+                          {editingApId === ap.id ? (
+                            <div className="pt-2 space-y-2 bg-stone-900/80 p-3 rounded-xl border border-stone-800 text-[11px] font-mono">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-stone-400 block text-[10px] font-sans">MAC Address:</label>
+                                  <input
+                                    type="text"
+                                    value={tempEditMac}
+                                    onChange={(e) => setTempEditMac(e.target.value)}
+                                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-white font-mono uppercase"
+                                    placeholder="D4:D6:DF:0D:B3:A0"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-stone-400 block text-[10px] font-sans">IP Address:</label>
+                                  <input
+                                    type="text"
+                                    value={tempEditIp}
+                                    onChange={(e) => setTempEditIp(e.target.value)}
+                                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-white font-mono"
+                                    placeholder="192.168.1.153"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 pt-1 font-sans">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTempEditMac('D4:D6:DF:0D:B3:A0');
+                                    setTempEditIp('192.168.1.153');
+                                  }}
+                                  className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                                >
+                                  ⚡ Tumia MAC Halisi ya EAP772 (D4:D6:DF:0D:B3:A0)
+                                </button>
+                                <span className="text-stone-600">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDiscoveredAps((prev) =>
+                                      prev.map((item) =>
+                                        item.id === ap.id
+                                          ? {
+                                              ...item,
+                                              mac: tempEditMac.trim() || item.mac,
+                                              ip: tempEditIp.trim() || item.ip,
+                                            }
+                                          : item
+                                      )
+                                    );
+                                    setEditingApId(null);
+                                  }}
+                                  className="px-2.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-md text-[10px] cursor-pointer"
+                                >
+                                  Hifadhi
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingApId(null)}
+                                  className="px-2.5 py-0.5 bg-stone-800 text-stone-300 rounded-md text-[10px] cursor-pointer"
+                                >
+                                  Ghairi
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400 font-mono">
+                              <span>MAC: <strong className="text-emerald-400 font-bold">{ap.mac}</strong></span>
+                              <span>IP: <strong className="text-stone-200">{ap.ip}</strong></span>
+                              <span>Eneo Linalopendekezwa: <strong className="text-amber-300 font-sans">{ap.siteSuggestion}</strong></span>
+                              {!isAdopted && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingApId(ap.id);
+                                    setTempEditMac(ap.mac);
+                                    setTempEditIp(ap.ip);
+                                  }}
+                                  className="text-[10px] font-sans text-sky-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                                >
+                                  ✏️ Hariri MAC/IP
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="shrink-0 flex items-center gap-2">
