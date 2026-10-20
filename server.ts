@@ -567,6 +567,7 @@ app.all('/api/v1/hardware/heartbeat', async (req, res) => {
     if (device.status === 'offline') wasOffline = true;
     device.status = 'online';
     device.lastSeen = nowStr;
+    (device as any).lastHeartbeat = Date.now();
     saveHardwareToDisk();
   }
 
@@ -575,6 +576,7 @@ app.all('/api/v1/hardware/heartbeat', async (req, res) => {
   if (tower) {
     if (tower.status === 'offline') wasOffline = true;
     tower.status = 'online';
+    (tower as any).lastHeartbeat = Date.now();
     saveTowersToFile(towers);
   }
 
@@ -2184,6 +2186,48 @@ app.post('/api/v1/towers', (req, res) => {
 // Start Express server and mount Vite in middleware mode
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+
+  // Background Watchdog: Mark APs offline if no heartbeat received for 30 seconds (Bila MikroTik)
+  setInterval(() => {
+    loadSavedHardware();
+    const now = Date.now();
+    let hwUpdated = false;
+
+    savedHardware.forEach((h) => {
+      const last = (h as any).lastHeartbeat || 0;
+      // If item is online and last heartbeat was more than 35 seconds ago
+      if (h.status === 'online' && last > 0 && now - last > 35000) {
+        h.status = 'offline';
+        hwUpdated = true;
+        console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) haijatuma heartbeat kwa zaidi ya sekunde 35 - Imebadilishwa kuwa OFFLINE!`);
+        processApOutageAlert({
+          status: 'down',
+          apIp: h.ipAddress,
+          apMac: h.macAddress,
+          apName: h.name,
+          site: h.site
+        }).catch(() => {});
+      }
+    });
+
+    if (hwUpdated) {
+      saveHardwareToDisk();
+    }
+
+    const towers = loadSavedTowers();
+    let towersUpdated = false;
+    towers.forEach((t: any) => {
+      const last = t.lastHeartbeat || 0;
+      if (t.status === 'online' && last > 0 && now - last > 35000) {
+        t.status = 'offline';
+        towersUpdated = true;
+      }
+    });
+
+    if (towersUpdated) {
+      saveTowersToFile(towers);
+    }
+  }, 10000);
 
   if (!isProd) {
     const vite = await createViteServer({
