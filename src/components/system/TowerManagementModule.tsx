@@ -56,7 +56,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showDiscoveryModal, setShowDiscoveryModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showNetwatchModal, setShowNetwatchModal] = useState(false);
   const [isSendingAlertTest, setIsSendingAlertTest] = useState(false);
@@ -64,86 +63,11 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   const [isSyncingServer, setIsSyncingServer] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isCopiedNetwatch, setIsCopiedNetwatch] = useState(false);
-  const [isScanningNetwork, setIsScanningNetwork] = useState(false);
-  const [scanStepLog, setScanStepLog] = useState<string[]>([]);
-  const [discoveredAps, setDiscoveredAps] = useState<Array<{
-    id: string;
-    mac: string;
-    model: string;
-    ip: string;
-    siteSuggestion: string;
-    status: 'pending' | 'adopted';
-  }>>([]);
-  const [editingApId, setEditingApId] = useState<string | null>(null);
-  const [tempEditMac, setTempEditMac] = useState<string>('');
-  const [tempEditIp, setTempEditIp] = useState<string>('');
   const [editingTower, setEditingTower] = useState<NetworkTower | null>(null);
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
 
-  const handleStartNetworkScan = () => {
-    setIsScanningNetwork(true);
-    setScanStepLog([]);
-    const logs = [
-      '📡 Inatuma Layer 2 Broadcast ping kwenye swichi na mtandao wa ndani...',
-      '🔍 Inakagua subnet kwa ajili ya itifaki ya TP-Link Omada Discovery...',
-      '📍 Kifaa cha TP-Link Omada EAP772-Outdoor (Wi-Fi 7) kimegunduliwa kikiwa tayari!',
-      '⚡ Data halisi za MAC Address na IP zimesomwa kwa ajili ya Adoption.'
-    ];
 
-    logs.forEach((log, index) => {
-      setTimeout(() => {
-        setScanStepLog((prev) => [...prev, log]);
-        if (index === logs.length - 1) {
-          setIsScanningNetwork(false);
-          setDiscoveredAps([
-            {
-              id: 'disc-eap772',
-              mac: 'D4:D6:DF:0D:B3:A0',
-              model: 'TP-Link Omada EAP772-Outdoor (Wi-Fi 7 Tri-Band)',
-              ip: '192.168.1.153',
-              siteSuggestion: 'Lema Fast WiFi - Mnara Mkuu wa Nje',
-              status: 'pending'
-            }
-          ]);
-        }
-      }, (index + 1) * 600);
-    });
-  };
-
-  const handleAdoptDiscoveredAp = (ap: {
-    id: string;
-    mac: string;
-    model: string;
-    ip: string;
-    siteSuggestion: string;
-    status: 'pending' | 'adopted';
-  }) => {
-    const created = addTower({
-      name: ap.siteSuggestion,
-      location: ap.siteSuggestion,
-      ipAddress: ap.ip,
-      macAddress: ap.mac,
-      model: ap.model,
-      coverageRadiusMeters: 200,
-      status: 'online',
-      frequencyBand: 'Dual-Band 2.4/5GHz (Auto-Adopted)',
-      txPowerDbm: 27,
-      antennaType: 'Omni-directional 360°',
-      heightMeters: 16,
-      notes: `Kifaa kilichosajiliwa kiotomatiki kupitia Network Discovery Scan (MAC: ${ap.mac})`,
-      coordinates: {
-        lat: -6.7924 + (Math.random() - 0.5) * 0.04,
-        lng: 39.2083 + (Math.random() - 0.5) * 0.04,
-      },
-    });
-
-    setDiscoveredAps((prev) =>
-      prev.map((item) => (item.id === ap.id ? { ...item, status: 'adopted' } : item))
-    );
-
-    showToast(`Access Point "${ap.model}" imeunganishwa (Adopted) kwenye mnara mpya!`);
-  };
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -186,8 +110,8 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   const [addForm, setAddForm] = useState({
     name: '',
     location: '',
-    ipAddress: '192.168.88.10',
-    macAddress: '50:C7:BF:70:E2:B0',
+    ipAddress: '',
+    macAddress: '',
     model: 'Omada EAP772 Outdoor WiFi 7',
     coverageRadiusMeters: 200,
     status: 'online' as 'online' | 'offline' | 'maintenance',
@@ -374,17 +298,7 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
             </button>
           )}
 
-          <button
-            onClick={() => {
-              setShowDiscoveryModal(true);
-              handleStartNetworkScan();
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
-            title="Tafuta vifaa vya AP vilivyochomekwa kwenye mtandao (Auto-Discovery)"
-          >
-            <Scan className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span>Scan Mtandao (Auto-Discovery)</span>
-          </button>
+
 
           <button
             onClick={() => setShowSyncModal(true)}
@@ -509,46 +423,42 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
         </div>
       </div>
 
-      {/* AP Addition & Scanning Methods Guide Banner */}
-      <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 border border-indigo-900/60 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden">
+      {/* Real Equipment Registration Banner */}
+      <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 border border-amber-500/30 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-indigo-400" />
-                <span>Njia za Ku-add AP Kwenye Mfumo (Kama Kwenye Video)</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                <Shield className="w-3 h-3 text-amber-400" />
+                <span>Usajili wa Vifaa Halisi vya Mtandao</span>
               </span>
-              <span className="text-stone-400 text-[11px] font-mono">Omada & Reyee Cloud Adoption</span>
+              <span className="text-stone-400 text-[11px] font-mono">Bila Data za Uongo</span>
             </div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <QrCode className="w-4 h-4 text-amber-400" />
-              <span>Ndio! Ku-scan AP kwa Kamera na Ku-scan Mtandao (Discovery) Kunawezekana 100%</span>
+              <span>Sajili Vifaa Vyako Halisi (Access Points & Routers)</span>
             </h3>
             <p className="text-stone-300 text-xs leading-relaxed max-w-3xl">
-              Kwenye video uliyoiona, mtumiaji hakujaza maneno mengi: alitumia <strong>Kamera ku-scan QR/Barcode</strong> ya stika iliyopo nyuma ya AP (inayonasa MAC na Serial papo hapo), au alitumia <strong>Scan ya Mtandao (Discovery)</strong> ambapo AP inapochomekwa kwenye swichi inatambuliwa yenyewe ikiwa &quot;Pending&quot; na kubonyeza kitufe kimoja tu cha <strong>&quot;Adopt&quot;</strong>!
+              Kivinjari cha wavuti hakiwezi kupiga scan mtandao wa ndani (LAN/Wi-Fi) wa chumbani kwako kwa sababu za kiusalama. Ili kusajili kifaa chako (AP ya TP-Link au Router ya Airtel), jaza taarifa zake halisi kwa mkono au tumia kamera kusoma stika ya kifaa.
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Sajili Kifaa Kipya</span>
+            </button>
             {onOpenScanner && (
               <button
                 onClick={onOpenScanner}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg flex items-center gap-1.5"
+                className="px-3.5 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md flex items-center gap-1.5"
               >
-                <Camera className="w-4 h-4" />
-                <span>Jaribu Skani Kamera</span>
+                <Camera className="w-4 h-4 text-amber-400" />
+                <span>Skani Stika (Kamera)</span>
               </button>
             )}
-            <button
-              onClick={() => {
-                setShowDiscoveryModal(true);
-                handleStartNetworkScan();
-              }}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg flex items-center gap-1.5"
-            >
-              <Scan className="w-4 h-4" />
-              <span>Jaribu Scan Mtandao</span>
-            </button>
           </div>
         </div>
       </div>
@@ -831,8 +741,8 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1 sm:col-span-1">
                   <label className="font-bold text-stone-700">Model ya Kifaa:</label>
                   <select
                     value={addForm.model}
@@ -841,24 +751,37 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                   >
                     <option value="Omada EAP772 Outdoor WiFi 7">Omada EAP772 Outdoor WiFi 7</option>
                     <option value="Omada EAP650-Outdoor">Omada EAP650-Outdoor</option>
-                    <option value="Omada EAP610-Outdoor">Omada EAP610-Outdoor</option>
                     <option value="Omada EAP225-Outdoor">Omada EAP225-Outdoor</option>
+                    <option value="Router ya Airtel (5G / 4G)">Router ya Airtel (5G / 4G)</option>
+                    <option value="Starlink Gen 2/3 Router">Starlink Gen 2/3 Router</option>
+                    <option value="MikroTik RB750Gr3 hEX">MikroTik RB750Gr3 hEX</option>
                     <option value="MikroTik cAP ac Outdoor">MikroTik cAP ac Outdoor</option>
-                    <option value="MikroTik NetMetal ax">MikroTik NetMetal ax</option>
-                    <option value="MikroTik BaseBox 5">MikroTik BaseBox 5</option>
                     <option value="Ubiquiti UniFi AC Mesh Pro">Ubiquiti UniFi AC Mesh Pro</option>
+                    <option value="Generic Router / AP">Generic Router / AP</option>
                   </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-stone-700">IP Address:</label>
+                  <label className="font-bold text-stone-700">IP Address Halisi:</label>
                   <input
                     type="text"
                     required
-                    placeholder="192.168.88.10"
+                    placeholder="mf. 192.168.1.153 au 192.168.8.1"
                     value={addForm.ipAddress}
                     onChange={(e) => setAddForm({ ...addForm, ipAddress: e.target.value })}
                     className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 font-mono focus:outline-none focus:ring-1 focus:ring-[#cca43b]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">MAC Address (Stika):</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="mf. D4:D6:DF:0D:B3:A0"
+                    value={addForm.macAddress}
+                    onChange={(e) => setAddForm({ ...addForm, macAddress: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 font-mono uppercase focus:outline-none focus:ring-1 focus:ring-[#cca43b]"
                   />
                 </div>
               </div>
@@ -1005,8 +928,8 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1 sm:col-span-1">
                   <label className="font-bold text-stone-700">Model ya Kifaa:</label>
                   <input
                     type="text"
@@ -1024,6 +947,17 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                     value={editForm.ipAddress}
                     onChange={(e) => setEditForm({ ...editForm, ipAddress: e.target.value })}
                     className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 font-mono focus:outline-none focus:ring-1 focus:ring-[#cca43b]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">MAC Address:</label>
+                  <input
+                    type="text"
+                    value={editForm.macAddress}
+                    onChange={(e) => setEditForm({ ...editForm, macAddress: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 font-mono uppercase focus:outline-none focus:ring-1 focus:ring-[#cca43b]"
+                    placeholder="mf. D4:D6:DF:0D:B3:A0"
                   />
                 </div>
               </div>
@@ -1240,258 +1174,7 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
         </div>
       )}
 
-      {/* 5. MODAL: NETWORK AUTO-DISCOVERY SCANNER (TP-LINK OMADA & RUIJIE AP SCANNER) */}
-      {showDiscoveryModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col relative text-white animate-fadeIn">
-            {/* Header */}
-            <div className="p-5 border-b border-stone-800 flex items-center justify-between bg-stone-950/60">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl">
-                  <Scan className="w-5 h-5 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm uppercase tracking-wider text-white">
-                    Network Auto-Discovery & Adoption (Scan ya Mtandao)
-                  </h3>
-                  <p className="text-[10px] text-stone-400">
-                    Huu ndio mfumo wa kiuhalisia: unagundua AP zilizochomekwa kwenye mtandao bila kuandika maneno kwa mkono!
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDiscoveryModal(false)}
-                className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
-              {/* Scan Status Console */}
-              <div className="bg-stone-950 border border-stone-800 rounded-2xl p-4 space-y-3 font-mono text-[11px]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-stone-300 font-sans font-bold text-xs">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span>Hali ya Utafutaji (Broadcast Discovery 192.168.88.x)</span>
-                  </div>
-                  <button
-                    onClick={handleStartNetworkScan}
-                    disabled={isScanningNetwork}
-                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-[10px] font-sans font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${isScanningNetwork ? 'animate-spin' : ''}`} />
-                    <span>Rudia Scan</span>
-                  </button>
-                </div>
-
-                <div className="space-y-1.5 pt-1 border-t border-stone-850">
-                  {scanStepLog.map((log, index) => (
-                    <div key={index} className="flex items-center gap-2 text-emerald-400 animate-fadeIn">
-                      <span className="text-emerald-500">✓</span>
-                      <span>{log}</span>
-                    </div>
-                  ))}
-                  {isScanningNetwork && (
-                    <div className="flex items-center gap-2 text-amber-400 animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                      <span>Inachambua pakiti za Layer 2...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Discovered Devices List */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-white uppercase tracking-wider text-xs flex items-center gap-1.5">
-                    <Radio className="w-4 h-4 text-emerald-400" />
-                    <span>Vifaa Vilivyogunduliwa Hewani ({discoveredAps.length})</span>
-                  </h4>
-                  <span className="text-[10px] text-stone-400">
-                    Bofya kitufe cha <strong>&quot;Adopt&quot;</strong> kukiunganisha kwenye minara mara moja!
-                  </span>
-                </div>
-
-                <div className="space-y-2.5">
-                  {discoveredAps.length === 0 && (
-                    <div className="p-8 text-center bg-stone-950/80 rounded-2xl border border-stone-850 space-y-3">
-                      <Radio className="w-8 h-8 text-stone-600 mx-auto" />
-                      <p className="text-xs font-bold text-stone-200">Hakuna AP ya Mfano (Taarifa Zote za Zamani Zimeondolewa)</p>
-                      <p className="text-[11px] text-stone-400 max-w-sm mx-auto">
-                        Hakikisha TP-Link Omada EAP 772 Outdoor yako imewashwa na kupewa intaneti, kisha bonyeza <strong>&quot;Anza Scan ya Mtandao&quot;</strong> hapo juu, au tumia <strong>Kamera ya QR</strong> hapa chini kusajili kifaa chako halisi!
-                      </p>
-                    </div>
-                  )}
-                  {discoveredAps.map((ap) => {
-                    const isAdopted = ap.status === 'adopted';
-                    return (
-                      <div
-                        key={ap.id}
-                        className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          isAdopted
-                            ? 'bg-emerald-950/20 border-emerald-500/30'
-                            : 'bg-stone-950 border-stone-800 hover:border-emerald-500/50'
-                        }`}
-                      >
-                        <div className="space-y-1 font-sans">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <strong className="text-white text-xs font-bold">{ap.model}</strong>
-                            {isAdopted ? (
-                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold flex items-center gap-1">
-                                <Check className="w-3 h-3 text-emerald-400" />
-                                Adopted & Active
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-bold animate-pulse">
-                                Pending Adoption
-                              </span>
-                            )}
-                          </div>
-                          {editingApId === ap.id ? (
-                            <div className="pt-2 space-y-2 bg-stone-900/80 p-3 rounded-xl border border-stone-800 text-[11px] font-mono">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-stone-400 block text-[10px] font-sans">MAC Address:</label>
-                                  <input
-                                    type="text"
-                                    value={tempEditMac}
-                                    onChange={(e) => setTempEditMac(e.target.value)}
-                                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-white font-mono uppercase"
-                                    placeholder="D4:D6:DF:0D:B3:A0"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-stone-400 block text-[10px] font-sans">IP Address:</label>
-                                  <input
-                                    type="text"
-                                    value={tempEditIp}
-                                    onChange={(e) => setTempEditIp(e.target.value)}
-                                    className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-white font-mono"
-                                    placeholder="192.168.1.153"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 pt-1 font-sans">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setTempEditMac('D4:D6:DF:0D:B3:A0');
-                                    setTempEditIp('192.168.1.153');
-                                  }}
-                                  className="text-[10px] text-amber-400 hover:underline cursor-pointer"
-                                >
-                                  ⚡ Tumia MAC Halisi ya EAP772 (D4:D6:DF:0D:B3:A0)
-                                </button>
-                                <span className="text-stone-600">|</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDiscoveredAps((prev) =>
-                                      prev.map((item) =>
-                                        item.id === ap.id
-                                          ? {
-                                              ...item,
-                                              mac: tempEditMac.trim() || item.mac,
-                                              ip: tempEditIp.trim() || item.ip,
-                                            }
-                                          : item
-                                      )
-                                    );
-                                    setEditingApId(null);
-                                  }}
-                                  className="px-2.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-md text-[10px] cursor-pointer"
-                                >
-                                  Hifadhi
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingApId(null)}
-                                  className="px-2.5 py-0.5 bg-stone-800 text-stone-300 rounded-md text-[10px] cursor-pointer"
-                                >
-                                  Ghairi
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400 font-mono">
-                              <span>MAC: <strong className="text-emerald-400 font-bold">{ap.mac}</strong></span>
-                              <span>IP: <strong className="text-stone-200">{ap.ip}</strong></span>
-                              <span>Eneo Linalopendekezwa: <strong className="text-amber-300 font-sans">{ap.siteSuggestion}</strong></span>
-                              {!isAdopted && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingApId(ap.id);
-                                    setTempEditMac(ap.mac);
-                                    setTempEditIp(ap.ip);
-                                  }}
-                                  className="text-[10px] font-sans text-sky-400 hover:underline cursor-pointer flex items-center gap-0.5"
-                                >
-                                  ✏️ Hariri MAC/IP
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="shrink-0 flex items-center gap-2">
-                          {isAdopted ? (
-                            <span className="text-xs text-emerald-400 font-bold px-3 py-1.5 rounded-xl bg-emerald-500/10">
-                              ✓ Ipo Kwenye Orodha
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleAdoptDiscoveredAp(ap)}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-xs transition-all shadow-lg active:scale-95 cursor-pointer flex items-center gap-1.5"
-                            >
-                              <Zap className="w-3.5 h-3.5 text-yellow-300" />
-                              <span>⚡ Adopt Kwenye Mnara</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Explanatory note about Camera QR option */}
-              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div className="space-y-0.5 text-stone-300">
-                  <strong className="text-white block font-bold">Unapendelea njia ya ku-scan kwa kamera?</strong>
-                  <p className="text-[11px] text-stone-400">
-                    Unaweza kuelekeza kamera ya simu kwenye stika iliyopo nyuma ya AP au kwenye boksi lake kusoma MAC Address na Serial papo hapo.
-                  </p>
-                </div>
-                {onOpenScanner && (
-                  <button
-                    onClick={() => {
-                      setShowDiscoveryModal(false);
-                      onOpenScanner();
-                    }}
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Fungua Skani ya Kamera</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-stone-800 flex justify-end bg-stone-950/40">
-              <button
-                onClick={() => setShowDiscoveryModal(false)}
-                className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
-              >
-                Funga Dirisha
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Sync & Backup / Import-Export Modal */}
       {showSyncModal && (

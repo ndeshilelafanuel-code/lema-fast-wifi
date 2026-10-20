@@ -64,9 +64,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [showUssdPrompt, setShowUssdPrompt] = useState<boolean>(false);
-  const [simulatedPin, setSimulatedPin] = useState<string>('');
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState<'mpesa' | 'tigopesa' | 'airtel' | 'halopesa'>('mpesa');
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [userPin, setUserPin] = useState<string>('');
   const [inlineUssdState, setInlineUssdState] = useState<{
     active: boolean;
     orderId?: string;
@@ -76,7 +77,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     pkgName: string;
     secondsRemaining: number;
   } | null>(null);
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   // Auto-detect Telco by phone number prefix
   const handlePhoneNumberChange = (val: string) => {
@@ -152,8 +152,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
 
   // Live real-time Billing & Session Expiry tracking states
   const [timeLeftSec, setTimeLeftSec] = useState<number>(0);
-  const [simulatedDataLimitMb, setSimulatedDataLimitMb] = useState<number>(1000); // 1 GB allocation
-  const [simulatedDataUsedMb, setSimulatedDataUsedMb] = useState<number>(0);
   const [isSpeakingVoice, setIsSpeakingVoice] = useState<boolean>(false);
   const [showVoiceGuideModal, setShowVoiceGuideModal] = useState<boolean>(false);
   const [showAiPortalHelp, setShowAiPortalHelp] = useState<boolean>(false);
@@ -161,7 +159,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   
   // Speed Test & Expiry Alert States
   const [showSpeedTestModal, setShowSpeedTestModal] = useState<boolean>(false);
-  const [simulateLowTime, setSimulateLowTime] = useState<boolean>(false);
   const [showTopUpDrawer, setShowTopUpDrawer] = useState<boolean>(false);
   const [renewalPackageId, setRenewalPackageId] = useState<string>(settings.packages[0]?.id || 'pkg_1hr');
   const [smsReminderSent, setSmsReminderSent] = useState<boolean>(false);
@@ -188,15 +185,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     return null;
   });
 
-  // Client Device Identity Simulation (Client IP & MAC)
-  const [clientMac] = useState<string>(() => {
-    const saved = localStorage.getItem('wifi_client_mac');
-    if (saved) return saved;
-    const generated = `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
-    localStorage.setItem('wifi_client_mac', generated);
-    return generated;
-  });
-  const [clientIp] = useState<string>('192.168.88.104');
+  // Client Device Identity (Real Session Data)
+  const clientMac = currentClientSession?.macAddress || 'N/A';
+  const clientIp = currentClientSession?.ipAddress || 'N/A';
 
   // 2. In-Portal QR Camera Scanner
   const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
@@ -345,7 +336,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     const pkg = settings.packages.find((p) => p.id === pkgId) || settings.packages[0];
     const addedSecs = (pkg.durationHours || 1) * 3600;
     setTimeLeftSec((prev) => prev + addedSecs);
-    setSimulateLowTime(false);
     setShowTopUpDrawer(false);
     setStatusMessage({
       type: 'success',
@@ -386,28 +376,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
       const secLeft = calculateSecondsLeft();
       setTimeLeftSec(secLeft);
 
-      // Simulate live random device download consumption (drains 0.4 MB to 1.8 MB per second)
-      setSimulatedDataUsedMb((prev) => {
-        const nextUsed = prev + (0.4 + Math.random() * 1.4);
-        if (nextUsed >= simulatedDataLimitMb) {
-          clearInterval(billingInterval);
-          // Zero balance disconnect trigger!
-          disconnectSession(currentClientSession.id);
-          setStatusMessage({
-            type: 'error',
-            text: lang === 'sw'
-              ? 'Bando lako la MB limeisha kikamilifu! Unganisha kifurushi kipya kuendelea kuvinjari.'
-              : 'Your data balance has reached zero! Purchase a new profile package to resume browsing.'
-          });
-          return simulatedDataLimitMb;
-        }
-        return nextUsed;
-      });
-
       // Auto-disconnect if session time is depleted
       if (secLeft <= 0) {
         clearInterval(billingInterval);
-        disconnectSession(currentClientSession.id);
+        disconnectSession(currentClientSession?.id || '');
         setStatusMessage({
           type: 'error',
           text: lang === 'sw'
@@ -418,7 +390,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
     }, 1000);
 
     return () => clearInterval(billingInterval);
-  }, [currentClientSession, simulatedDataLimitMb, lang]);
+  }, [currentClientSession, lang]);
 
   const formatTime = (totalSecs: number) => {
     const hrs = Math.floor(totalSecs / 3600);
@@ -691,8 +663,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                 type="password"
                 maxLength={4}
                 placeholder="••••"
-                value={simulatedPin}
-                onChange={(e) => setSimulatedPin(e.target.value)}
+                value={userPin}
+                onChange={(e) => setUserPin(e.target.value)}
                 className="w-full text-center text-lg tracking-widest font-mono py-2.5 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 autoFocus
               />
@@ -909,7 +881,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
             </div>
 
             {/* EXPIRY ALERT & ONE-CLICK TOP-UP BANNER */}
-            {((timeLeftSec > 0 && timeLeftSec <= 900) || simulateLowTime) && (
+            {timeLeftSec > 0 && timeLeftSec <= 900 && (
               <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 to-amber-950/90 border-2 border-rose-500/80 shadow-xl text-white space-y-3 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -921,16 +893,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
                         Tahadhari: Kifurushi Kinakaribia Kuisha!
                       </h4>
                       <p className="text-[10px] text-stone-300 font-mono">
-                        Muda uliosalia: <strong className="text-amber-300 font-bold">{formatTime(simulateLowTime ? 480 : timeLeftSec)}</strong>
+                        Muda uliosalia: <strong className="text-amber-300 font-bold">{formatTime(timeLeftSec)}</strong>
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setSimulateLowTime(false)}
-                    className="text-[10px] text-stone-400 hover:text-white cursor-pointer px-2 py-0.5 rounded bg-black/40"
-                  >
-                    Funga
-                  </button>
                 </div>
 
                 <p className="text-[11px] text-stone-200 leading-tight">
@@ -978,57 +944,39 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
               <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
                 <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Muda Uliobaki</span>
                 <span className="text-sm font-black font-mono text-amber-400 block animate-pulse">
-                  {formatTime(simulateLowTime ? 480 : timeLeftSec)}
+                  {formatTime(timeLeftSec)}
                 </span>
               </div>
 
-              {/* Card 2: Simulated Data Balance */}
+              {/* Card 2: Bando la MB */}
               <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
                 <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Bando la MB</span>
                 <span className="text-sm font-black font-mono text-emerald-400 block">
-                  {Math.max(0, Math.round(simulatedDataLimitMb - simulatedDataUsedMb))} MB
+                  {currentClientSession ? `${(currentClientSession.bytesDown / 1024 / 1024).toFixed(1)} MB` : '0 MB'}
                 </span>
               </div>
             </div>
 
-            {/* Simulation toggle & Speed Test launch in session */}
+            {/* Session Info */}
             <div className="flex items-center justify-between text-[11px] px-1 bg-stone-900/60 p-2 rounded-xl border border-stone-800">
-              <button
-                type="button"
-                onClick={() => setSimulateLowTime(!simulateLowTime)}
-                className="text-[10px] font-bold text-stone-400 hover:text-amber-400 flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <span>⏰</span>
-                <span>{simulateLowTime ? 'Rudisha Muda Kamili' : 'Jaribu Arifa ya Kuisha (Test Alert)'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowSpeedTestModal(true)}
-                className="text-[10px] font-black text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/30"
-              >
-                <Gauge className="w-3 h-3" />
-                <span>Pima Kasi Hapa</span>
-              </button>
+               <span className="text-stone-400">IP: {clientIp}</span>
+               <span className="text-stone-400">MAC: {clientMac}</span>
             </div>
 
-            {/* Simulated Live Data Usage Progress Bar */}
+            {/* Data Usage Progress Bar */}
             <div className="bg-stone-850 rounded-xl p-4 border border-stone-800 space-y-2">
               <div className="flex justify-between text-[11px]">
-                <span className="text-stone-400">Matumizi ya Data (Simulated Usage):</span>
+                <span className="text-stone-400">Matumizi ya Data:</span>
                 <span className="text-white font-mono font-bold">
-                  {simulatedDataUsedMb.toFixed(1)} MB / {simulatedDataLimitMb} MB
+                  {currentClientSession ? (currentClientSession.bytesDown / 1024 / 1024).toFixed(1) : '0'} MB
                 </span>
               </div>
               <div className="w-full bg-stone-900 h-1.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-emerald-400 h-full transition-all duration-300" 
-                  style={{ width: `${Math.min(100, (simulatedDataUsedMb / simulatedDataLimitMb) * 100)}%` }} 
+                  style={{ width: `100%` }} 
                 />
               </div>
-              <p className="text-[10px] text-stone-500 italic text-right">
-                Inakula MB kiotomatiki kutokana na michezo & video za nyuma.
-              </p>
             </div>
 
             {/* Smart Dynamic Bandwidth & Bursting Visualization */}

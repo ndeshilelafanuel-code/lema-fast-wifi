@@ -210,11 +210,15 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
       }
     });
 
-    const model = fields['MODEL'] || fields['M'] || (data.includes('EAP772') ? 'EAP772-Outdoor' : data.includes('EAP225') ? 'EAP225-Outdoor' : data.includes('RAP') ? 'RG-RAP6202G' : data.includes('HEX') ? 'RB750Gr3 hEX' : 'Smart WiFi Node');
-    const serial = fields['SERIAL'] || fields['SN'] || fields['S/N'] || fields['S'] || (data.match(/[A-Z0-9]{10,14}/)?.[0] || '22771SK007720');
-    const mac = fields['MAC'] || fields['M'] || (data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/)?.[0] || 'D4:D6:DF:0D:B3:A0');
-    const deviceKey = fields['KEY'] || fields['DEVICEKEY'] || fields['PIN'] || '772A-EAP7-7200-WIFI7';
-    const mfr = fields['MFR'] || fields['BRAND'] || (model.includes('EAP') ? 'TP-Link' : model.includes('RAP') ? 'Ruijie' : model.includes('RB') ? 'MikroTik' : 'Network Hardware');
+    const macMatch = data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/);
+    const mac = fields['MAC'] || fields['M'] || (macMatch ? macMatch[0] : '');
+
+    const serialMatch = data.match(/(?:S\/N|SN|Serial)[:\s]*([A-Za-z0-9]+)/i) || data.match(/\b([A-Z0-9]{10,16})\b/);
+    const serial = fields['SERIAL'] || fields['SN'] || fields['S/N'] || fields['S'] || (serialMatch ? (serialMatch[1] || serialMatch[0]) : '');
+
+    const model = fields['MODEL'] || fields['M'] || (data.match(/(?:Model)[:\s]*([A-Za-z0-9-]+)/i)?.[1]) || (data.includes('EAP772') ? 'EAP772-Outdoor' : data.includes('EAP225') ? 'EAP225-Outdoor' : 'Kifaa cha Mtandao');
+    const deviceKey = fields['KEY'] || fields['DEVICEKEY'] || fields['PIN'] || '';
+    const mfr = fields['MFR'] || fields['BRAND'] || (model.toLowerCase().includes('eap') ? 'TP-Link' : model.toLowerCase().includes('rap') ? 'Ruijie' : model.toLowerCase().includes('rb') ? 'MikroTik' : 'Network Hardware');
 
     let category: 'ap' | 'router' | 'switch' | 'starlink' | 'power' = 'ap';
     if (model.toLowerCase().includes('hex') || model.toLowerCase().includes('router') || model.toLowerCase().includes('rb')) category = 'router';
@@ -225,12 +229,12 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
     return {
       manufacturer: mfr,
       model: model,
-      serialNumber: serial.toUpperCase(),
-      macAddress: mac.toUpperCase(),
+      serialNumber: serial ? serial.toUpperCase() : '',
+      macAddress: mac ? mac.toUpperCase() : '',
       deviceKey: deviceKey,
       category: category,
       poeVoltage: category === 'ap' ? '24V/48V PoE' : '12V DC',
-      ipAddress: '192.168.88.' + Math.floor(Math.random() * 150 + 20),
+      ipAddress: '',
     };
   };
 
@@ -244,9 +248,14 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
     setParsedData(parsed);
 
     // Auto-generate suggested friendly name
-    const cleanModel = parsed.model || 'Device';
-    setAssignedName(`${cleanModel} (${parsed.manufacturer}) - Sokoni Node`);
-    showToast('QR Code Imesomwa!', `Kifaa cha ${parsed.manufacturer} ${parsed.model} kimegunduliwa!`, 'success');
+    const cleanModel = parsed.model || 'Kifaa';
+    setAssignedName(`${cleanModel} (${parsed.manufacturer})`);
+    
+    if (parsed.macAddress) {
+      showToast('QR Code Imesomwa!', `Kifaa: ${parsed.manufacturer} ${parsed.model} (MAC: ${parsed.macAddress})`, 'success');
+    } else {
+      showToast('Hakuna MAC Address!', 'Msimbo umesomwa lakini hakuna anwani ya MAC iliyogunduliwa. Tafadhali andika MAC address mwenyewe.', 'warning');
+    }
   };
 
   // Upload Photo File Handler
@@ -270,9 +279,11 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
           if (code && code.data) {
             handleCodeDetected(code.data);
           } else {
-            // If QR code isn't directly parsed, simulate OCR parsing of equipment label
-            const simulatedOcr = `MFR:TP-Link;MODEL:EAP225-Outdoor;SN:22611SK004068;MAC:20:E1:5D:44:16:D2;KEY:12BA-E1EF-7DAA-19DE-9000;`;
-            handleCodeDetected(simulatedOcr);
+            showToast(
+              'Imeshindwa Kusoma QR',
+              'Picha uliyopakia haina QR Code inayosomeka au picha haina mwanga wa kutosha. Hakikisha unapiga picha stika au QR code moja kwa moja.',
+              'warning'
+            );
           }
         }
       };
@@ -329,66 +340,6 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
   }, [isOpen, activeTab, parsedData, facingMode]);
 
   if (!isOpen) return null;
-
-  // Sample Preset Equipment Labels for 1-click testing
-  const sampleLabels = [
-    {
-      title: 'TP-Link Omada EAP772-Outdoor (Wi-Fi 7 Tri-Band)',
-      category: 'ap',
-      code: 'MFR:TP-Link;MODEL:EAP772-Outdoor;SN:22771SK007720;MAC:D4:D6:DF:0D:B3:A0;KEY:772A-EAP7-7200-WIFI7;POE:802.3at;',
-      desc: 'Antenna ya nje ya kizazi cha kisasa cha Wi-Fi 7 (Tri-Band 2.4/5/6GHz) yenye spidi na uwezo mkubwa wa wateja.',
-      icon: '🚀',
-      brand: 'TP-Link',
-    },
-    {
-      title: 'TP-Link EAP225-Outdoor Access Point',
-      category: 'ap',
-      code: 'MFR:TP-Link;MODEL:EAP225-Outdoor;SN:22611SK004068;MAC:20:E1:5D:44:16:D2;KEY:12BA-E1EF-7DAA-19DE-9000;POE:24V/48V;',
-      desc: 'Antenna ya nje yenye spidi ya AC1200 na uwezo wa mita 200.',
-      icon: '📡',
-      brand: 'TP-Link',
-    },
-    {
-      title: 'Ruijie Reyee RG-RAP6202G Outdoor AP',
-      category: 'ap',
-      code: 'MFR:Ruijie;MODEL:RG-RAP6202G;SN:22811RJ003921;MAC:00:D0:F8:8C:31:1A;KEY:34CF-F2AB-90AA;POE:802.3at;',
-      desc: 'Antenna ya Gigabit Dual-Band yenye Cloud Self-Organizing Network.',
-      icon: '📶',
-      brand: 'Ruijie',
-    },
-    {
-      title: 'MikroTik hEX (RB750Gr3) Gateway Router',
-      category: 'router',
-      code: 'MFR:MikroTik;MODEL:RB750Gr3 hEX;SN:884102941CCB;MAC:48:8F:5A:11:BC:02;KEY:MT-HEX-ADMIN;PORTS:5xGigabit;',
-      desc: 'Router yenye Dual Core CPU ya kusimamia wateja na Bandwidth shaping.',
-      icon: '⚡',
-      brand: 'MikroTik',
-    },
-    {
-      title: 'Starlink Standard Kit Gen 3 Terminal',
-      category: 'starlink',
-      code: 'MFR:Starlink;MODEL:Standard Kit Gen 3;SN:STAR-TZ-99412;MAC:D8:0D:17:82:90:EE;KEY:SL-TERMINAL-01;POE:57V DC;',
-      desc: 'Dish la satelaiti ya Starlink kutoa intaneti ya kasi ya 150-250Mbps.',
-      icon: '🛰️',
-      brand: 'Starlink',
-    },
-    {
-      title: 'Tenda TEG1008P 8-Port Gigabit PoE Switch',
-      category: 'switch',
-      code: 'MFR:Tenda;MODEL:TEG1008P-8-PoE;SN:TEG1008P-499120;MAC:C4:6E:1F:33:AA:91;KEY:POE-SW-120W;PORTS:8xPoE;',
-      desc: 'Switch ya kusambaza umeme (PoE) kwa antenna 8 za mitaani.',
-      icon: '🔌',
-      brand: 'Tenda',
-    },
-    {
-      title: 'Must 12V 200Ah Lithium LiFePO4 Battery',
-      category: 'power',
-      code: 'MFR:Must Solar;MODEL:LiFePO4-12V-200Ah;SN:MST-LI-200-8819;MAC:BMS-48-22-00-11;KEY:BMS-200A;VOLT:12.8V;',
-      desc: 'Betri ya lithium ya sola kuhakikisha mtandao hauzimiki wakati wa giza.',
-      icon: '🔋',
-      brand: 'Must Power',
-    },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 bg-stone-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">

@@ -88,6 +88,7 @@ import { SpeedTestWidget } from './SpeedTestWidget';
 import { NetworkDiagnosticsModule } from './NetworkDiagnosticsModule';
 import { HardwareWiringGuideModal } from './HardwareWiringGuideModal';
 import { MikrotikScriptModal } from './MikrotikScriptModal';
+import jsQR from 'jsqr';
 import { LemaLogo } from '../common/LemaLogo';
 
 export interface SystemAlert {
@@ -656,13 +657,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [wizardLogs, setWizardLogs] = useState<string[]>([]);
   const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
   const [wizardExtractedDetails, setWizardExtractedDetails] = useState<any>({
-    manufacturer: 'TP-Link',
-    model: 'EAP225-Outdoor',
-    serialNumber: '22611SK004068',
-    deviceKey: '12BA-E1EF-7DAA-19DE-9000',
-    macAddress: '20:E1:5D:44:16:D2'
+    manufacturer: '',
+    model: '',
+    serialNumber: '',
+    deviceKey: '',
+    macAddress: ''
   });
-  const [wizardNewSsid, setWizardNewSsid] = useState<string>('DUKANI KWA ALI 5G WIFI');
+  const [wizardNewSsid, setWizardNewSsid] = useState<string>('Lema Fast WiFi');
 
   const [sites, setSites] = useState<any[]>([]);
   const [newSiteName, setNewSiteName] = useState('');
@@ -6429,11 +6430,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         setWizardBrand('omada');
                         setWizardStep('capture');
                         setWizardExtractedDetails({
-                          manufacturer: 'TP-Link',
-                          model: 'EAP225-Outdoor',
-                          serialNumber: '22611SK004068',
-                          deviceKey: '12BA-E1EF-7DAA-19DE-9000',
-                          macAddress: '20:E1:5D:44:16:D2'
+                          manufacturer: 'TP-Link Omada',
+                          model: '',
+                          serialNumber: '',
+                          deviceKey: '',
+                          macAddress: ''
                         });
                       }}
                       className="p-5 rounded-2xl border border-stone-800 hover:border-indigo-500/50 bg-stone-950/50 hover:bg-indigo-600/5 transition-all text-center space-y-3 cursor-pointer group"
@@ -6443,7 +6444,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                       <div>
                         <strong className="text-xs font-bold text-white block">TP-Link Omada</strong>
-                        <span className="text-[10px] text-stone-400">EAP Series (e.g. EAP225)</span>
+                        <span className="text-[10px] text-stone-400">EAP Series (e.g. EAP772, EAP225)</span>
                       </div>
                     </button>
 
@@ -6454,10 +6455,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         setWizardStep('capture');
                         setWizardExtractedDetails({
                           manufacturer: 'Ruijie Reyee',
-                          model: 'RG-RAP6202G',
-                          serialNumber: '22811RJ003921',
-                          deviceKey: '34CF-F2AB-90AA-21EE-7000',
-                          macAddress: '00:D0:F8:8C:31:1A'
+                          model: '',
+                          serialNumber: '',
+                          deviceKey: '',
+                          macAddress: ''
                         });
                       }}
                       className="p-5 rounded-2xl border border-stone-800 hover:border-indigo-500/50 bg-stone-950/50 hover:bg-indigo-600/5 transition-all text-center space-y-3 cursor-pointer group"
@@ -6467,7 +6468,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                       <div>
                         <strong className="text-xs font-bold text-white block">Ruijie Reyee</strong>
-                        <span className="text-[10px] text-stone-400">RAP Series (e.g. RAP6202)</span>
+                        <span className="text-[10px] text-stone-400">RAP Series (e.g. RAP6202G)</span>
                       </div>
                     </button>
 
@@ -6478,10 +6479,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         setWizardStep('capture');
                         setWizardExtractedDetails({
                           manufacturer: 'Ubiquiti UniFi',
-                          model: 'U6-Mesh-Outdoor',
-                          serialNumber: 'U6M092144',
-                          deviceKey: '55FF-90CC-31AA-18BB-2000',
-                          macAddress: 'F4:92:BF:E1:92:44'
+                          model: '',
+                          serialNumber: '',
+                          deviceKey: '',
+                          macAddress: ''
                         });
                       }}
                       className="p-5 rounded-2xl border border-stone-800 hover:border-indigo-500/50 bg-stone-950/50 hover:bg-indigo-600/5 transition-all text-center space-y-3 cursor-pointer group"
@@ -6509,132 +6510,116 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Camera Feed / Simulator Container */}
-                    <div className="bg-stone-950 border border-stone-800 rounded-2xl overflow-hidden p-4 relative flex flex-col items-center justify-center min-h-[220px]">
-                      {/* Laser red scan line */}
-                      <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-red-500 shadow-md shadow-red-500/50 animate-bounce z-10" />
-                      
-                      <div className="text-center space-y-3 relative z-10 flex flex-col items-center">
-                        <span className="text-3xl">📷</span>
-                        <span className="font-bold text-stone-300">Live AI Scanner Camera</span>
-                        <p className="text-[10px] text-stone-500 max-w-[180px] leading-relaxed">Sogeza karibu stika ya kifaa ili mfumo uisome yenyewe.</p>
-                        
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setCapturedStickerImg('simulated-sticker');
-                              setWizardStep('analyze');
-                              // Run simulated analyzing logs
-                              setWizardLogs([]);
-                              const logs = [
-                                '🔍 Identifying manufacturer...',
-                                '📍 Locating Serial Number...',
-                                '⚙️ Extracting Device Key & MAC...',
-                                '🔒 Verifying Cloud adoption handshake...',
-                                '⚡ Registering from sticker...',
-                                '⚙️ Controller preconfiguration...'
-                              ];
-                              let i = 0;
-                              const interval = setInterval(() => {
-                                if (i < logs.length) {
-                                  setWizardLogs((prev) => [...prev, logs[i]]);
-                                  i++;
-                                } else {
-                                  clearInterval(interval);
-                                  setTimeout(() => {
-                                    setWizardStep('results');
-                                  }, 800);
-                                }
-                              }, 700);
-                            }}
-                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-lg cursor-pointer transition-colors"
-                          >
-                            Capture Photo
-                          </button>
-                          
-                          <label className="px-3.5 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 font-bold rounded-lg cursor-pointer transition-colors">
-                            Upload File
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={() => {
-                                setCapturedStickerImg('uploaded-sticker');
-                                setWizardStep('analyze');
-                                setWizardLogs([]);
-                                const logs = [
-                                  '🔍 Scanning uploaded photo with OCR...',
-                                  '📍 Parsing metadata and barcodes...',
-                                  '⚙️ Extracting Device Key...',
-                                  '🔒 Contacting Cloud gateway...',
-                                  '⚡ Confirming active site adoption...'
-                                ];
-                                let i = 0;
-                                const interval = setInterval(() => {
-                                  if (i < logs.length) {
-                                    setWizardLogs((prev) => [...prev, logs[i]]);
-                                    i++;
-                                  } else {
-                                    clearInterval(interval);
-                                    setTimeout(() => {
-                                      setWizardStep('results');
-                                    }, 800);
-                                  }
-                                }, 600);
-                              }}
-                            />
-                          </label>
+                    {/* View 1: Real Photo Upload */}
+                    <div className="bg-stone-950 border border-stone-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                      <div>
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-3">
+                          📷
                         </div>
+                        <h5 className="font-bold text-white text-xs">Pakia Picha ya Stika / QR Code</h5>
+                        <p className="text-[11px] text-stone-400 mt-1 leading-relaxed">
+                          Piga picha lebo iliyopo nyuma ya kifaa chako au kwenye boksi ili kusoma MAC Address na Serial Number.
+                        </p>
                       </div>
+
+                      <label className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl cursor-pointer transition-colors text-center block text-xs">
+                        Chagua Picha ya Stika
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const img = new Image();
+                              img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                  ctx.drawImage(img, 0, 0);
+                                  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                  const code = jsQR(imgData.data, imgData.width, imgData.height);
+                                  if (code && code.data) {
+                                    const macMatch = code.data.match(/([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})/);
+                                    const snMatch = code.data.match(/(?:SN|S\/N|Serial)[:\s]*([A-Za-z0-9]+)/i);
+                                    setWizardExtractedDetails((prev: any) => ({
+                                      ...prev,
+                                      macAddress: macMatch ? macMatch[0].toUpperCase() : prev.macAddress,
+                                      serialNumber: snMatch ? snMatch[1].toUpperCase() : prev.serialNumber
+                                    }));
+                                    showToast('QR Imesomwa', 'Taarifa za kifaa zimesomwa kutoka kwenye QR Code.', 'success');
+                                  } else {
+                                    showToast('Picha Imepokelewa', 'Hakuna QR code inayosomeka kwenye picha. Tafadhali andika MAC Address kwenye fomu ya pembeni.', 'info');
+                                  }
+                                }
+                              };
+                              img.src = ev.target?.result as string;
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
                     </div>
 
-                    {/* Stencil / Target example (Showing what's scanned, matching EAP225 from video) */}
-                    <div className="bg-white border border-[#e6e2d3] rounded-2xl p-4 text-stone-900 space-y-3 flex flex-col justify-between">
-                      <div className="border-b border-stone-200 pb-1.5">
-                        <span className="text-[10px] font-black uppercase text-indigo-600">STIKA YA MAJARIBIO (Reference Label)</span>
+                    {/* View 2: Direct Entry of Real Device */}
+                    <div className="bg-stone-950 border border-stone-800 rounded-2xl p-5 space-y-3">
+                      <div className="border-b border-stone-800 pb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                          Taarifa za Kifaa Chako Halisi
+                        </span>
+                        <p className="text-[10px] text-stone-500 mt-0.5">Andika kama zinavyoonekana kwenye kifaa:</p>
                       </div>
-                      
-                      <div className="space-y-1.5 font-mono text-[9px] text-stone-800 bg-stone-50 p-3 rounded-lg border border-stone-200">
-                        <p className="font-bold text-stone-950">Model: {wizardExtractedDetails.model}</p>
-                        <p>S/N: {wizardExtractedDetails.serialNumber}</p>
-                        <p>MAC: {wizardExtractedDetails.macAddress}</p>
-                        <p>Device Key: {wizardExtractedDetails.deviceKey}</p>
-                        
-                        <div className="flex justify-between items-center pt-1 border-t border-stone-200 mt-2">
-                          <span className="text-[8px] text-stone-500 font-sans">Soma QR na Maelezo kiotomatiki</span>
-                          <span className="text-xl">🔲</span>
+
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px] text-stone-400 block font-bold mb-0.5">Chapa & Modeli:</label>
+                          <input
+                            type="text"
+                            value={wizardExtractedDetails.model}
+                            onChange={(e) => setWizardExtractedDetails({ ...wizardExtractedDetails, model: e.target.value })}
+                            placeholder="mf. TP-Link Omada EAP772-Outdoor"
+                            className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-white text-xs font-sans"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-stone-400 block font-bold mb-0.5">MAC Address (Muhimu):</label>
+                          <input
+                            type="text"
+                            value={wizardExtractedDetails.macAddress}
+                            onChange={(e) => setWizardExtractedDetails({ ...wizardExtractedDetails, macAddress: e.target.value.toUpperCase() })}
+                            placeholder="mf. D4:D6:DF:0D:B3:A0"
+                            className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-amber-300 font-mono text-xs font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-stone-400 block font-bold mb-0.5">Serial Number (S/N):</label>
+                          <input
+                            type="text"
+                            value={wizardExtractedDetails.serialNumber}
+                            onChange={(e) => setWizardExtractedDetails({ ...wizardExtractedDetails, serialNumber: e.target.value.toUpperCase() })}
+                            placeholder="mf. 22771SK007720 (hiari)"
+                            className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-stone-300 font-mono text-xs"
+                          />
                         </div>
                       </div>
 
                       <button
                         onClick={() => {
-                          setCapturedStickerImg('demo-stika');
-                          setWizardStep('analyze');
-                          setWizardLogs([]);
-                          const logs = [
-                            '🔍 Identifying manufacturer...',
-                            '📍 Locating Serial Number...',
-                            '⚙️ Extracting Device Key & MAC...',
-                            '🔒 Verifying Cloud adoption handshake...',
-                            '⚡ Registering from sticker...',
-                            '⚙️ Controller preconfiguration...'
-                          ];
-                          let i = 0;
-                          const interval = setInterval(() => {
-                            if (i < logs.length) {
-                              setWizardLogs((prev) => [...prev, logs[i]]);
-                              i++;
-                            } else {
-                              clearInterval(interval);
-                              setTimeout(() => {
-                                setWizardStep('results');
-                              }, 800);
-                            }
-                          }, 750);
+                          if (!wizardExtractedDetails.macAddress?.trim()) {
+                            showToast('Kosa', 'Tafadhali weka MAC Address ya kifaa chako halisi.', 'warning');
+                            return;
+                          }
+                          setWizardStep('results');
                         }}
-                        className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-center cursor-pointer transition-colors block text-[11px]"
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-center cursor-pointer transition-colors block text-xs"
                       >
-                        Jaribu kwa Stika hii ya Majaribio ➔
+                        Thibitisha na Kuendelea ➔
                       </button>
                     </div>
                   </div>
@@ -6790,10 +6775,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                     <button
                       onClick={() => {
+                        if (!wizardExtractedDetails.macAddress?.trim()) {
+                          showToast('MAC Address Inahitajika', 'Tafadhali weka MAC Address halisi ya kifaa hiki kabla ya kukamilisha adoption.', 'error');
+                          setWizardStep('results');
+                          return;
+                        }
                         const newAp = {
-                          mac: wizardExtractedDetails.macAddress || '20:E1:5D:44:16:D2',
-                          model: wizardExtractedDetails.model || 'EAP225-Outdoor',
-                          site: 'Mshikamano Site',
+                          mac: wizardExtractedDetails.macAddress.trim().toUpperCase(),
+                          model: wizardExtractedDetails.model || 'Access Point',
+                          site: 'Mnara Mkuu / Site',
                           status: 'connected',
                           uptime: 'Hivi Sasa (Online)'
                         };
@@ -6802,7 +6792,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         setShowAiApWizard(false);
                         showToast(
                           'Adoption Imekamilika!', 
-                          `WiFi ya "${wizardNewSsid}" sasa ipo hai na inaongozwa na Lema AI Cloud Controller!`, 
+                          `WiFi ya "${wizardNewSsid}" (MAC: ${newAp.mac}) sasa ipo hai kwenye mfumo!`, 
                           'success'
                         );
                       }}

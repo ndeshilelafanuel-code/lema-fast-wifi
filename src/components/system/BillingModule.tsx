@@ -22,8 +22,6 @@ import {
 
 export const BillingModule: React.FC = () => {
   const { activeSessions, disconnectSession, settings } = useHotspot();
-  const [isRunning, setIsRunning] = useState<boolean>(true);
-  const [simulatedSessions, setSimulatedSessions] = useState<any[]>([]);
   const [omadaClients, setOmadaClients] = useState<any[]>([]);
   const [isAuthorizing, setIsAuthorizing] = useState<string | null>(null);
 
@@ -78,91 +76,14 @@ export const BillingModule: React.FC = () => {
   };
 
   // Expiry check interval simulation
-  useEffect(() => {
-    if (!isRunning) return;
 
-    const interval = setInterval(() => {
-      const now = new Date().toLocaleTimeString();
-      
-      setSimulatedSessions((prev) => {
-        let updatedLogs: string[] = [];
-        const checked = prev.map((s) => {
-          // Accelerate simulated time/balance drain
-          if (s.status === 'active') {
-            const nextMinutes = Math.max(0, s.timeLeftMinutes - 5);
-            const nextBalance = Math.max(0, s.balanceTsh - 50);
-            const isZero = nextBalance === 0 || nextMinutes === 0;
-
-            if (isZero) {
-              updatedLogs.push(`[WARN] Session ${s.mac} reached ZERO balance/time. Flagged for disconnection.`);
-              return { ...s, timeLeftMinutes: 0, balanceTsh: 0, status: 'pending_disconnect' };
-            }
-            return { ...s, timeLeftMinutes: nextMinutes, balanceTsh: nextBalance };
-          }
-          return s;
-        });
-
-        // Trigger auto-disconnect simulation for pending disconnects
-        const autoDisconnected = checked.map((s) => {
-          if (s.status === 'pending_disconnect') {
-            updatedLogs.push(`[AUTO-DISCONNECT] Zero balance detected for ${s.mac} (${s.phone}).`);
-            updatedLogs.push(`[COA-TRIGGER] Sending RFC 3576 Disconnect-Request to AP...`);
-            updatedLogs.push(`[OK] Client ${s.mac} disconnected successfully. Code marked as EXPIRED.`);
-            return { ...s, status: 'disconnected' };
-          }
-          return s;
-        });
-
-        if (updatedLogs.length > 0) {
-          setBillingLogs((prevLogs) => [
-            ...prevLogs,
-            ...updatedLogs.map(log => `[${now}] ${log}`)
-          ].slice(-50)); // Keep last 50 logs
-        } else {
-          setBillingLogs((prevLogs) => [
-            ...prevLogs,
-            `[${now}] [INFO] Billing engine checked active sessions. All balances healthy.`
-          ].slice(-50));
-        }
-
-        return autoDisconnected;
-      });
-
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [isRunning, settings]);
 
   const handleManualDisconnect = (mac: string) => {
-    const now = new Date().toLocaleTimeString();
-    setSimulatedSessions(prev => 
-      prev.map(s => s.mac === mac ? { ...s, status: 'disconnected', balanceTsh: 0, timeLeftMinutes: 0 } : s)
-    );
+    disconnectSession(mac);
     setBillingLogs(prev => [
       ...prev,
-      `[${now}] [MANUAL-DISCONNECT] Operator manually terminated session for ${mac}.`,
-      `[${now}] [COA-TRIGGER] Sent Disconnect packet to Access Point.`
+      `[${new Date().toLocaleTimeString()}] [MANUAL-DISCONNECT] Operator manually terminated session for ${mac}.`
     ].slice(-50));
-  };
-
-  const handleAccelerateTimer = () => {
-    const now = new Date().toLocaleTimeString();
-    setSimulatedSessions(prev => 
-      prev.map(s => s.status === 'active' ? { ...s, balanceTsh: 0, timeLeftMinutes: 0, status: 'pending_disconnect' } : s)
-    );
-    setBillingLogs(prev => [
-      ...prev,
-      `[${now}] [ACTION] Accelerated expiration timer triggered by administrator.`
-    ].slice(-50));
-  };
-
-  const handleResetSimulation = () => {
-    const now = new Date().toLocaleTimeString();
-    setSimulatedSessions([]);
-    setBillingLogs([
-      `[${now}] [INFO] Active session monitoring active.`,
-      `[${now}] [INFO] Waiting for customer sessions.`
-    ]);
   };
 
   return (
@@ -173,47 +94,24 @@ export const BillingModule: React.FC = () => {
       {/* Module Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-5">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
             <Cpu className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} />
-            <span>Kazi Kiotomatiki (Automatic Expiry Loop)</span>
+            <span>Kazi Kiotomatiki (Live Automatic Expiry Engine)</span>
           </div>
           <h3 className="text-xl font-black text-white flex items-center gap-2.5">
-            <span>Automated Expiry & Billing Simulation</span>
+            <span>Automated Expiry & Real-Time Billing</span>
           </h3>
           <p className="text-xs text-stone-400 max-w-xl">
-            Tazama injini ya kiotomatiki inayofanya kazi na router mtaani kukata wateja mara moja masaa yao au bando lao likiisha au salio kufikia sifuri.
+            Injini hii inafanya kazi moja kwa moja na router/AP kukata wateja mara moja muda wao au bando lao likiisha.
           </p>
         </div>
 
-        {/* Engine Controls */}
+        {/* Engine Status Badge */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsRunning(!isRunning)}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
-              isRunning 
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30' 
-                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
-            }`}
-          >
-            {isRunning ? (
-              <>
-                <Pause className="w-3.5 h-3.5" />
-                <span>Simamisha Loop</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5" />
-                <span>Washa Loop</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleResetSimulation}
-            className="px-3 py-1.5 rounded-xl font-semibold text-xs text-stone-300 bg-stone-800 hover:bg-stone-700 border border-stone-750 transition-colors cursor-pointer"
-          >
-            Reset
-          </button>
+          <div className="px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Loop Inafanya Kazi (Active)</span>
+          </div>
         </div>
       </div>
 
@@ -311,83 +209,78 @@ export const BillingModule: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-stone-400 uppercase tracking-wider block">Wateja Wanaofuatiliwa (Active Monitor)</span>
-            <button
-              onClick={handleAccelerateTimer}
-              className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
-              title="Maliza salio la wateja wote ili uone auto-disconnect"
-            >
-              <Zap className="w-3.5 h-3.5 animate-bounce" />
-              <span>Harakisha Malipo/Muda (Trigger Expiry)</span>
-            </button>
+            <span className="text-xs font-bold text-stone-400 uppercase tracking-wider block">Wateja Wanaofuatiliwa (Active Sessions: {activeSessions.length})</span>
+            <div className="text-[11px] text-stone-400">
+              Ufuatiliaji wa Moja kwa Moja
+            </div>
           </div>
 
           <div className="space-y-3">
-            {simulatedSessions.length > 0 ? (
-              simulatedSessions.map((s) => (
-                <div 
-                  key={s.id}
-                  className="p-4 bg-stone-950 border border-stone-850 rounded-2xl flex items-center justify-between gap-4 font-mono text-xs"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2.5 rounded-xl mt-1 shrink-0 border ${
-                      s.status === 'active'
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        : s.status === 'pending_disconnect'
-                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                        : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                    }`}>
-                      <Radio className="w-4 h-4" />
-                    </div>
+            {activeSessions.length > 0 ? (
+              activeSessions.map((s) => {
+                const expiresMs = new Date(s.expiresAt).getTime();
+                const timeLeftMin = Math.max(0, Math.floor((expiresMs - Date.now()) / 60000));
+                const isExpired = timeLeftMin <= 0;
 
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <strong className="text-white text-xs font-sans font-bold">{s.phone}</strong>
-                        <span className="text-[10px] text-stone-400 font-sans">({s.mac})</span>
-                        
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-sans font-semibold uppercase border ${
-                          s.status === 'active'
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                            : s.status === 'pending_disconnect'
-                            ? 'bg-amber-500/20 border-amber-500/30 text-amber-300 animate-pulse'
-                            : 'bg-stone-800 border-stone-750 text-stone-400'
-                        }`}>
-                          {s.status === 'pending_disconnect' ? 'ZERO BALANCE' : s.status}
-                        </span>
+                return (
+                  <div 
+                    key={s.id}
+                    className="p-4 bg-stone-950 border border-stone-850 rounded-2xl flex items-center justify-between gap-4 font-mono text-xs"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2.5 rounded-xl mt-1 shrink-0 border ${
+                        !isExpired
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      }`}>
+                        <Radio className="w-4 h-4" />
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400 font-sans">
-                        <span>Pakiti: <strong className="text-white">{s.packageName}</strong></span>
-                        <span className="flex items-center gap-1">
-                          Salio: 
-                          <strong className={`font-mono ${s.balanceTsh === 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                            Tsh {s.balanceTsh}
-                          </strong>
-                        </span>
-                        <span className="flex items-center gap-1">
-                          Muda uliobaki: 
-                          <strong className={`font-mono ${s.timeLeftMinutes === 0 ? 'text-rose-400 animate-pulse' : 'text-white'}`}>
-                            {s.timeLeftMinutes} min
-                          </strong>
-                        </span>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <strong className="text-white text-xs font-sans font-bold">{s.phoneNumber || 'Mteja wa Vocha'}</strong>
+                          <span className="text-[10px] text-stone-400 font-sans">({s.macAddress || s.ipAddress})</span>
+                          
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-sans font-semibold uppercase border ${
+                            !isExpired
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : 'bg-rose-500/20 border-rose-500/30 text-rose-300 animate-pulse'
+                          }`}>
+                            {!isExpired ? 'ACTIVE' : 'EXPIRED'}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-400 font-sans">
+                          <span>Pakiti: <strong className="text-white">{s.packageName}</strong></span>
+                          <span className="flex items-center gap-1">
+                            Vocha: <strong className="text-amber-400 font-mono">{s.voucherCode}</strong>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            Data: <strong className="text-emerald-400 font-mono">{((s.bytesDown + s.bytesUp) / 1024 / 1024).toFixed(1)} MB</strong>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            Muda uliobaki: 
+                            <strong className={`font-mono ${isExpired ? 'text-rose-400 animate-pulse' : 'text-white'}`}>
+                              {timeLeftMin} min
+                            </strong>
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {s.status !== 'disconnected' && (
                     <button
-                      onClick={() => handleManualDisconnect(s.mac)}
+                      onClick={() => handleManualDisconnect(s.id)}
                       className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl transition-all cursor-pointer font-sans font-bold text-[10px]"
                     >
                       KATA LIVE
                     </button>
-                  )}
-                </div>
-              ))
+                  </div>
+                );
+              })
             ) : (
               <div className="p-8 text-center bg-stone-950 border border-stone-850 rounded-2xl text-stone-500 font-sans text-xs space-y-1">
                 <p className="font-bold text-stone-400">Hakuna mteja anayefuatiliwa kwa sasa.</p>
-                <p>Injini hii inafuatilia wateja kiotomatiki mara tu wanapounganishwa mtandaoni.</p>
+                <p>Injini hii inafuatilia wateja kiotomatiki mara tu wanapounganishwa mtandaoni au kununua vocha.</p>
               </div>
             )}
           </div>

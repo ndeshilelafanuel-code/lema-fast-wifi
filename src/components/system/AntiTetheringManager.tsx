@@ -74,101 +74,23 @@ export const AntiTetheringManager: React.FC<AntiTetheringManagerProps> = ({
   const [selfTransferAllowed, setSelfTransferAllowed] = useState<boolean>(true);
   const [testNotificationSent, setTestNotificationSent] = useState<boolean>(false);
 
-  // Simulated incidents list (Real-world cases in Tanzania street hotspots)
-  const [incidents, setIncidents] = useState<TetheringIncident[]>([
-    {
-      id: 'inc-101',
-      time: 'Dakika 2 zilizopita',
-      primaryDevice: 'Samsung Galaxy A14 (Mteja)',
-      primaryMac: '58:9C:FC:72:09:A4',
-      ipAddress: '192.168.88.42',
-      voucherCode: 'V-98214',
-      detectedSecondaryDevices: 3,
-      detectedSecondaryTypes: ['Tecno Spark 10', 'Infinix Hot 30', 'HP Laptop'],
-      ttlPattern: 'TTL=63 & TTL=127 detected behind IP',
-      status: 'blocked',
-      riskScore: 98,
-    },
-    {
-      id: 'inc-102',
-      time: 'Dakika 18 zilizopita',
-      primaryDevice: 'Redmi Note 12 Pro',
-      primaryMac: '84:C7:EA:18:2B:F1',
-      ipAddress: '192.168.88.67',
-      voucherCode: 'V-44109',
-      detectedSecondaryDevices: 2,
-      detectedSecondaryTypes: ['iPhone 11', 'Smart TV Box'],
-      ttlPattern: 'Mixed User-Agents (Darwin/iOS + Android WebKit)',
-      status: 'throttled',
-      riskScore: 84,
-    },
-    {
-      id: 'inc-103',
-      time: 'Saa 1 lililopita',
-      primaryDevice: 'Itel A60',
-      primaryMac: 'A0:B3:CC:89:12:44',
-      ipAddress: '192.168.88.112',
-      voucherCode: 'V-11029',
-      detectedSecondaryDevices: 1,
-      detectedSecondaryTypes: ['Tecno Pop 7'],
-      ttlPattern: 'TTL decrement jump from 64 to 63',
-      status: 'blocked',
-      riskScore: 92,
-    },
-    {
-      id: 'inc-104',
-      time: 'Saa 2 zilizopita',
-      primaryDevice: 'Infinix Smart 8',
-      primaryMac: '1C:69:20:99:A1:EE',
-      ipAddress: '192.168.88.88',
-      voucherCode: 'V-77401',
-      detectedSecondaryDevices: 4,
-      detectedSecondaryTypes: ['Dell Latitude', 'Samsung A04', 'Tecno Spark', 'PlayStation 4'],
-      ttlPattern: 'Multiple TCP window variations on single session',
-      status: 'blocked',
-      riskScore: 99,
-    },
-  ]);
+  // Active Tethering Incidents (Real runtime detection)
+  const [incidents, setIncidents] = useState<TetheringIncident[]>(() => {
+    try {
+      const saved = localStorage.getItem('wifi_tethering_incidents');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
 
-  // Fingerprint database simulation
-  const [fingerprintRecords, setFingerprintRecords] = useState([
-    {
-      id: 'fp-1',
-      deviceModel: 'Samsung Galaxy A14 5G',
-      realVendor: 'Samsung Electronics',
-      macAddress: '58:9C:FC:72:09:A4',
-      isMacRandomized: false,
-      hardwareHash: 'FP-SHA256: 8a4f...39e1',
-      canvasHash: '98d41a',
-      webglRenderer: 'Mali-G68 MP2',
-      boundVoucher: 'V-98214',
-      status: 'Flagged (Tethering Host)',
-    },
-    {
-      id: 'fp-2',
-      deviceModel: 'iPhone 13 (iOS 17.4)',
-      realVendor: 'Apple Inc.',
-      macAddress: 'DA:12:88:FF:42:19',
-      isMacRandomized: true, // Apple Private Wi-Fi Address!
-      hardwareHash: 'FP-SHA256: c32a...91d2',
-      canvasHash: '42b109',
-      webglRenderer: 'Apple A15 GPU',
-      boundVoucher: 'V-55102',
-      status: 'Clean (Single Device Bound)',
-    },
-    {
-      id: 'fp-3',
-      deviceModel: 'Tecno Camon 20 Pro',
-      realVendor: 'Transsion Holdings',
-      macAddress: 'E4:A7:C5:10:99:66',
-      isMacRandomized: true,
-      hardwareHash: 'FP-SHA256: 7f12...44a0',
-      canvasHash: '11e998',
-      webglRenderer: 'Mali-G77 MC9',
-      boundVoucher: 'V-31092',
-      status: 'Clean (Single Device Bound)',
-    },
-  ]);
+  // Fingerprint database records (Real connected client devices)
+  const [fingerprintRecords, setFingerprintRecords] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('wifi_fingerprint_records');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
 
   const handleCopy = (code: string, label: string) => {
     navigator.clipboard.writeText(code);
@@ -465,88 +387,96 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {incidents.map((inc) => (
-                    <tr key={inc.id} className="hover:bg-amber-50/30 transition-colors">
-                      {/* Time & Voucher */}
-                      <td className="p-3.5 font-mono">
-                        <strong className="text-stone-800 text-xs block">{inc.voucherCode}</strong>
-                        <span className="text-[10px] text-stone-400 font-sans">{inc.time}</span>
-                      </td>
+                  {incidents.length > 0 ? (
+                    incidents.map((inc) => (
+                      <tr key={inc.id} className="hover:bg-amber-50/30 transition-colors">
+                        {/* Time & Voucher */}
+                        <td className="p-3.5 font-mono">
+                          <strong className="text-stone-800 text-xs block">{inc.voucherCode}</strong>
+                          <span className="text-[10px] text-stone-400 font-sans">{inc.time}</span>
+                        </td>
 
-                      {/* Primary Device */}
-                      <td className="p-3.5">
-                        <div className="space-y-0.5">
-                          <strong className="text-stone-800 text-xs block font-sans">{inc.primaryDevice}</strong>
-                          <div className="flex items-center gap-2 font-mono text-[10px] text-stone-500">
-                            <span>{inc.ipAddress}</span>
-                            <span>·</span>
-                            <span className="uppercase text-amber-700">{inc.primaryMac}</span>
+                        {/* Primary Device */}
+                        <td className="p-3.5">
+                          <div className="space-y-0.5">
+                            <strong className="text-stone-800 text-xs block font-sans">{inc.primaryDevice}</strong>
+                            <div className="flex items-center gap-2 font-mono text-[10px] text-stone-500">
+                              <span>{inc.ipAddress}</span>
+                              <span>·</span>
+                              <span className="uppercase text-amber-700">{inc.primaryMac}</span>
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Detected secondary devices */}
-                      <td className="p-3.5">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                              {inc.detectedSecondaryDevices} Simu Zilizogundulika
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-stone-600 flex flex-wrap gap-1">
-                            {inc.detectedSecondaryTypes.map((t, idx) => (
-                              <span key={idx} className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-700">
-                                {t}
+                        {/* Detected secondary devices */}
+                        <td className="p-3.5">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                                {inc.detectedSecondaryDevices} Simu Zilizogundulika
                               </span>
-                            ))}
+                            </div>
+                            <div className="text-[10px] text-stone-600 flex flex-wrap gap-1">
+                              {inc.detectedSecondaryTypes.map((t, idx) => (
+                                <span key={idx} className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-700">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Technical Evidence */}
-                      <td className="p-3.5 font-mono text-[10px] text-rose-600 font-semibold max-w-[200px]">
-                        <div className="p-1.5 bg-rose-50 border border-rose-100 rounded-lg">
-                          {inc.ttlPattern}
-                        </div>
-                      </td>
+                        {/* Technical Evidence */}
+                        <td className="p-3.5 font-mono text-[10px] text-rose-600 font-semibold max-w-[200px]">
+                          <div className="p-1.5 bg-rose-50 border border-rose-100 rounded-lg">
+                            {inc.ttlPattern}
+                          </div>
+                        </td>
 
-                      {/* System action */}
-                      <td className="p-3.5 text-center">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${
-                            inc.status === 'blocked'
-                              ? 'bg-rose-500 text-white shadow-xs'
-                              : inc.status === 'throttled'
-                              ? 'bg-amber-500 text-white'
-                              : 'bg-stone-200 text-stone-700'
-                          }`}
-                        >
-                          {inc.status === 'blocked' ? 'Imefungwa (Blocked)' : 'Imepunguzwa Kasi (Throttled)'}
-                        </span>
-                      </td>
+                        {/* System action */}
+                        <td className="p-3.5 text-center">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${
+                              inc.status === 'blocked'
+                                ? 'bg-rose-500 text-white shadow-xs'
+                                : inc.status === 'throttled'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-stone-200 text-stone-700'
+                            }`}
+                          >
+                            {inc.status === 'blocked' ? 'Imefungwa (Blocked)' : 'Imepunguzwa Kasi (Throttled)'}
+                          </span>
+                        </td>
 
-                      {/* Admin action */}
-                      <td className="p-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {inc.status === 'blocked' ? (
-                            <button
-                              onClick={() => handleResolveIncident(inc.id, 'allow')}
-                              className="px-2.5 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
-                            >
-                              Fungulia
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleResolveIncident(inc.id, 'block')}
-                              className="px-2.5 py-1 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
-                            >
-                              Kata Mara Moja
-                            </button>
-                          )}
-                        </div>
+                        {/* Admin action */}
+                        <td className="p-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {inc.status === 'blocked' ? (
+                              <button
+                                onClick={() => handleResolveIncident(inc.id, 'allow')}
+                                className="px-2.5 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Fungulia
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleResolveIncident(inc.id, 'block')}
+                                className="px-2.5 py-1 text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Kata Mara Moja
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-stone-500 font-sans text-xs">
+                        Hakuna tukio lolote la wizi wa bando au hotspot tethering lililogunduliwa kwa sasa. Mfumo upo salama.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
