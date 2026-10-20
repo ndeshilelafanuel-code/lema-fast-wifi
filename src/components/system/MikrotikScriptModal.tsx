@@ -33,19 +33,19 @@ SURA YA 2: HATUA ZA KUSANIDI KWENYE OMADA CONTROLLER
    - Portal Name: ${settings.hotspotName} Portal
    - Applies To: Chagua SSID ya Wi-Fi ya wateja (mfano: "${settings.hotspotName}")
 
-2. CHAGUA PORTAL TYPE:
-   - Weka: "External Web Portal"
-   - Portal URL: https://wifi.mtaawifi.net/portal?merchant=${settings.merchantNumber}
-
 3. RADIUS PROFILE (KWA AJILI YA AUTOMATIC EXPIRATION & SPEED LIMITS):
    - Nenda: Authentication ➔ RADIUS Profile ➔ "+ Create New RADIUS Profile"
-   - Profile Name: Mtaa-WiFi-Radius
+   - Profile Name: Lema-WiFi-Radius
    - Authentication Server IP: 102.223.14.88
    - Authentication Port: 1812
    - Accounting Server IP: 102.223.14.88
    - Accounting Port: 1813
-   - RADIUS Password/Secret: mtaa_secret_${settings.merchantNumber.replace(/[^0-9]/g, '') || '849201'}
+   - RADIUS Password/Secret: lema_secret_${settings.merchantNumber.replace(/[^0-9]/g, '') || '849201'}
    - Interim Update Interval: 60 seconds (Inamkata mteja mara moja muda ukimalizika)
+
+2. CHAGUA PORTAL TYPE:
+   - Weka: "External Web Portal"
+   - Portal URL: https://www.lemawifi.online/portal?merchant=${settings.merchantNumber}
 
 4. PRE-AUTHENTICATION ACCESS (WALLED GARDEN - MALIPO YA M-PESA BILA VOCHA):
    Kwenye Hotspot Portal Settings, ongeza vikoa vifuatavyo kwenye "Pre-Authentication Access":
@@ -99,7 +99,7 @@ EOF
 cat << 'EOF' > /usr/bin/hotspot-expiry-sync.sh
 #!/bin/sh
 # Polls SaaS API for expired sessions and revokes access via opennds-cli
-EXPIRED_MACS=$(curl -s -X GET "https://api.mtaawifi.net/v1/sessions/expired?hotspot_id=${settings.merchantNumber}")
+EXPIRED_MACS=$(curl -s -X GET "https://www.lemawifi.online/api/v1/sessions/expired?hotspot_id=${settings.merchantNumber}")
 for mac in $EXPIRED_MACS; do
   openndsctl deauth "$mac"
   echo "[HOTSPOT] Expired & Deauthorized MAC: $mac"
@@ -169,7 +169,7 @@ add action=accept comment="DNS resolution for captive portal" dst-port=53 protoc
   "endpoints": {
     "1_authorize_user": {
       "method": "POST",
-      "url": "https://api.mtaawifi.net/v1/gateway/authorize",
+      "url": "https://www.lemawifi.online/api/v1/gateway/authorize",
       "headers": { "Authorization": "Bearer YOUR_HOTSPOT_SECRET_KEY" },
       "request_body": {
         "voucher_code": "8492",
@@ -186,14 +186,14 @@ add action=accept comment="DNS resolution for captive portal" dst-port=53 protoc
     },
     "2_poll_expired_sessions": {
       "method": "GET",
-      "url": "https://api.mtaawifi.net/v1/gateway/expired-sessions",
+      "url": "https://www.lemawifi.online/api/v1/gateway/expired-sessions",
       "response": {
         "expired_macs": ["AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"]
       }
     },
     "3_gateway_heartbeat": {
       "method": "POST",
-      "url": "https://api.mtaawifi.net/v1/gateway/heartbeat",
+      "url": "https://www.lemawifi.online/api/v1/gateway/heartbeat",
       "request_body": {
         "active_clients_count": 14,
         "uptime_seconds": 86400,

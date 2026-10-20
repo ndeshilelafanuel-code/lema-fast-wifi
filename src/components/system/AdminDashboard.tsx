@@ -548,7 +548,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newRouterType, setNewRouterType] = useState<'omada' | 'mikrotik' | 'openwrt'>('omada');
   const [newRouterName, setNewRouterName] = useState<string>('');
   const [newRouterSite, setNewRouterSite] = useState<string>('Sokoni Area');
-  const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>('https://omada.mtaawifi.net');
+  const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>('https://omada.lemawifi.online');
   const [newRouterNasIp, setNewRouterNasIp] = useState<string>('');
   const [isFindingSites, setIsFindingSites] = useState<boolean>(false);
   const [siteFound, setSiteFound] = useState<boolean>(false);
@@ -1528,15 +1528,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* MODULE: TOWER MANAGEMENT */}
-        {activeTab === 'towers' && (
-          <TowerManagementModule onOpenGisMap={() => setActiveTab('gis_map')} />
-        )}
-
-        {/* MODULE: GIS LIVE MAP VIEW */}
-        {activeTab === 'gis_map' && (
-          <GisMapModule />
-        )}
 
         {/* 1. MODULE: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (

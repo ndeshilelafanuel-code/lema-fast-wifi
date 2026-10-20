@@ -78,6 +78,12 @@ export const SaasResellerModule: React.FC<SaasResellerModuleProps> = ({
   // Calculator State
   const [calcClients, setCalcClients] = useState<number>(20);
   const [calcMonthlyFee, setCalcMonthlyFee] = useState<number>(50000); // 50k TZS/mo
+
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
   const [calcVpsCost, setCalcVpsCost] = useState<number>(25000); // 25k TZS/mo VPS (Hetzner/DO)
   const [calcSmsCostPerClient, setCalcSmsCostPerClient] = useState<number>(3000); // 3k TZS SMS
 
@@ -115,7 +121,7 @@ export const SaasResellerModule: React.FC<SaasResellerModuleProps> = ({
   const handleCreateTenant = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBizName.trim() || !newOwnerName.trim() || !newOwnerPhone.trim()) {
-      alert('Tafadhali jaza jina la biashara, jina la mmiliki na namba ya simu.');
+      showToast('Tafadhali jaza jina la biashara, jina la mmiliki na namba ya simu.', 'error');
       return;
     }
 
@@ -304,6 +310,30 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between gap-3 shadow-lg animate-fadeIn ${
+            toast.type === 'error'
+              ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+              : toast.type === 'info'
+              ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+              : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <span>{toast.type === 'error' ? '⚠️' : '✅'}</span>
+            <span>{toast.message}</span>
+          </div>
+          <button
+            onClick={() => setToast(null)}
+            className="text-stone-400 hover:text-white px-2 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 2. Top-Level MRR & Business Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -684,7 +714,7 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
                           onClick={() => {
                             if (renewTenantSubscription) {
                               renewTenantSubscription(tenant.id, 1);
-                              alert(`Malipo ya mwezi yamerekodiwa kwa ${tenant.businessName}! Leseni imeongezwa siku 30 mbele.`);
+                              showToast(`Malipo ya mwezi yamerekodiwa kwa ${tenant.businessName}! Leseni imeongezwa siku 30 mbele.`, 'success');
                             }
                           }}
                           title="Rekodi malipo ya ada ya mwezi"

@@ -1630,16 +1630,15 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const telUrl = `https://wa.me/${current.phone}?text=Habari+${encodeURIComponent(current.customerName)}+kutoka+${encodeURIComponent(settings.hotspotName || 'Lema Fast WiFi')}`;
-                          window.open(telUrl, '_blank');
-                        }}
+                      <a
+                        href={`https://wa.me/${current.phone}?text=Habari+${encodeURIComponent(current.customerName)}+kutoka+${encodeURIComponent(settings.hotspotName || 'Lema Fast WiFi')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         <span>Fungua WhatsApp Yake</span>
-                      </button>
+                      </a>
                     </div>
                   </div>
 

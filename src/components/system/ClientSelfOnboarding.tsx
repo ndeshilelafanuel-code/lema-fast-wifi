@@ -52,11 +52,14 @@ export const ClientSelfOnboarding: React.FC<ClientSelfOnboardingProps> = ({
   const [createdTenantData, setCreatedTenantData] = useState<any>(null);
   const [copiedScript, setCopiedScript] = useState(false);
 
+  const [formError, setFormError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
     if (!businessName.trim() || !ownerName.trim() || !ownerPhone.trim()) {
-      alert('Tafadhali jaza jina la biashara, jina lako, na namba ya simu/WhatsApp.');
+      setFormError('Tafadhali jaza jina la biashara, jina lako, na namba ya simu/WhatsApp.');
       return;
     }
 
@@ -200,6 +203,12 @@ add address=cloud.lemawifi.co.tz authentication-port=1812 accounting-port=1813 \
 
             {/* Registration Form */}
             <form onSubmit={handleSubmit} className="bg-stone-900 border border-stone-800 rounded-3xl p-6 sm:p-8 space-y-8 shadow-2xl">
+              {formError && (
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
+                  <span className="text-base">⚠️</span>
+                  <span>{formError}</span>
+                </div>
+              )}
               {/* SECTION 1: BUSINESS & OWNER INFO */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-amber-400 border-b border-stone-800 pb-2">

@@ -135,7 +135,17 @@ export const SpeedTestWidget: React.FC<SpeedTestWidgetProps> = ({
       `🌐 *Tovuti:* https://lemawifi.online\n\n` +
       `Mtandao huu ni wa kasi kubwa, unawezesha kuangalia video za 4K YouTube na simu za video bila kukwama! 🔥`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    try {
+      const a = document.createElement('a');
+      a.href = `https://wa.me/?text=${text}`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      showToast('Imeshindikana kufungua WhatsApp moja kwa moja.');
+    }
   };
 
   // Calculate needle angle for Gauge (0 to 100 Mbps mapping to -120deg to +120deg)

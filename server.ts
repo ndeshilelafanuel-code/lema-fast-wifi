@@ -601,6 +601,11 @@ app.post('/api/v1/sessions/active', (req, res) => {
   res.json({ success: true, sessions: savedActiveSessions });
 });
 
+app.get('/api/v1/sessions/sync', (_req, res) => {
+  loadSavedSessions();
+  return res.json({ success: true, count: savedActiveSessions.length, sessions: savedActiveSessions });
+});
+
 app.post('/api/v1/sessions/sync', (req, res) => {
   const { sessions } = req.body;
   if (Array.isArray(sessions)) {
@@ -2127,19 +2132,6 @@ app.post('/api/v1/towers', (req, res) => {
   return res.status(400).json({ success: false, error: 'Invalid format: towers must be an array' });
 });
 
-// 6. ACTIVE SESSIONS SYNC API
-let liveServerSessions: any[] = [];
-
-app.get('/api/v1/sessions/sync', (_req, res) => {
-  return res.json({ success: true, sessions: liveServerSessions });
-});
-
-app.post('/api/v1/sessions/sync', (req, res) => {
-  if (Array.isArray(req.body.sessions)) {
-    liveServerSessions = req.body.sessions;
-  }
-  return res.json({ success: true, count: liveServerSessions.length });
-});
 
 // Start Express server and mount Vite in middleware mode
 async function startServer() {

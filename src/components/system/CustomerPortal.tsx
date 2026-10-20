@@ -505,10 +505,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
 
   // Confirm PIN on USSD Prompt
   const handleConfirmUssd = async () => {
+    const currentOrderId = inlineUssdState?.orderId;
     setShowUssdPrompt(false);
     setInlineUssdState(null);
     setIsProcessing(true);
     try {
+      if (currentOrderId) {
+        fetch('/api/v1/payments/simulate-confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: currentOrderId }),
+        }).catch(() => {});
+      }
       const result = await processMobilePayment(phoneNumber, selectedPackageId);
       setIsProcessing(false);
       if (result.success) {
