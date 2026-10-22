@@ -57,8 +57,12 @@ import {
   Menu,
   X,
   Gauge,
-  Crown
+  Crown,
+  Globe,
+  HelpCircle,
+  Edit3
 } from 'lucide-react';
+
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -555,7 +559,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'openwrt' | 'mikrotik'>('omada');
   const [newRouterName, setNewRouterName] = useState<string>('Lema-Omada-1');
   const [newRouterSite, setNewRouterSite] = useState<string>('Nyansoo Site');
-  const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>('https://omada.lemawifi.online');
+  const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>(() => {
+    return localStorage.getItem('lema_omada_controller_url') || 'https://omada.tplinkcloud.com';
+  });
+  const [omadaDevUser, setOmadaDevUser] = useState<string>(() => {
+    return localStorage.getItem('lema_omada_dev_user') || 'lema-adm9x';
+  });
+  const [omadaDevPass, setOmadaDevPass] = useState<string>(() => {
+    return localStorage.getItem('lema_omada_dev_pass') || 'Lema@Node2026!';
+  });
+  const [showEditCredentialsModal, setShowEditCredentialsModal] = useState<boolean>(false);
+  const [showOmadaHelpModal, setShowOmadaHelpModal] = useState<boolean>(false);
+  const [showRodlinkArchitectureModal, setShowRodlinkArchitectureModal] = useState<boolean>(false);
+  const [rodlinkGuideTab, setRodlinkGuideTab] = useState<'architecture' | 'vps' | 'ap_setup' | 'local_pc'>('architecture');
+  const [copiedDockerCmd, setCopiedDockerCmd] = useState<boolean>(false);
+  const [editControllerInput, setEditControllerInput] = useState<string>(newRouterControllerUrl);
+  const [editUserInput, setEditUserInput] = useState<string>(omadaDevUser);
+  const [editPassInput, setEditPassInput] = useState<string>(omadaDevPass);
+
   const [newRouterNasIp, setNewRouterNasIp] = useState<string>('192.168.111.171');
   const [isFindingSites, setIsFindingSites] = useState<boolean>(false);
   const [siteFound, setSiteFound] = useState<boolean>(true);
@@ -586,6 +607,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [copiedDevUrl, setCopiedDevUrl] = useState<boolean>(false);
   const [copiedDevUser, setCopiedDevUser] = useState<boolean>(false);
   const [copiedDevPass, setCopiedDevPass] = useState<boolean>(false);
+
 
   // Payment Gateway Configuration states (Mobile Money STK-Push - AzamPay Only)
   const [gatewayApiKey, setGatewayApiKey] = useState<string>(() => {
@@ -4508,59 +4530,133 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'aps' && (
           <div className="space-y-6 animate-fadeIn">
             
-            {/* Top Device Login Info Banner (Exactly as shown in Video 1 & 2) */}
-            <div className="p-5 rounded-2xl bg-stone-900 border border-stone-800 space-y-3.5 shadow-lg">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                  Device login for your access points
-                </h4>
-                <button
-                  onClick={() => {
-                    setHardwareGuideTab('cabling');
-                    setShowHardwareWiringModal(true);
-                  }}
-                  className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-                >
-                  <span>📘 Mwongozo wa Waya & Voltage (24V vs 48V)</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+            {/* Top Device Login Info Banner (Enhanced with Edit & Troubleshooting) */}
+            <div className="p-5 rounded-2xl bg-stone-900 border border-stone-800 space-y-4 shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                    Device login for your access points
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    TP-Link Omada
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRodlinkGuideTab('architecture');
+                      setShowRodlinkArchitectureModal(true);
+                    }}
+                    className="text-xs text-amber-350 hover:text-white bg-gradient-to-r from-amber-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 px-3 py-1.5 rounded-xl border border-amber-400/40 font-black flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                    <span>Kuwa Kama RodLink (Full Setup) 🚀</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowOmadaHelpModal(true)}
+                    className="text-xs text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 px-2.5 py-1 rounded-xl border border-amber-400/30 font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    <span>Mbona Link Haifunguki?</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditControllerInput(newRouterControllerUrl);
+                      setEditUserInput(omadaDevUser);
+                      setEditPassInput(omadaDevPass);
+                      setShowEditCredentialsModal(true);
+                    }}
+                    className="text-xs text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-750 px-2.5 py-1 rounded-xl border border-stone-700 font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Badilisha Anwani / Login</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHardwareGuideTab('cabling');
+                      setShowHardwareWiringModal(true);
+                    }}
+                    className="text-xs text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>📘 Waya & Voltage (24V/48V)</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
-              <p className="text-xs text-stone-300 leading-relaxed">
-                Open each access point&apos;s own page at <code className="text-amber-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">tplinkeap.net</code> and point it to the controller address shown below. Lema Fast WiFi then adopts it automatically — you never need controller credentials. A brand-new access point will be on factory login: needs no device login.
-              </p>
+              <div className="space-y-1.5 text-xs text-stone-300 leading-relaxed">
+                <p>
+                  Open each access point&apos;s own page at <code className="text-amber-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800 font-mono">tplinkeap.net</code> and point it to the controller address shown below. Lema Fast WiFi then adopts it automatically — you never need controller credentials. A brand-new access point will be on factory login: needs no device login.
+                </p>
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>
+                      Je, unataka kuingia kwenye dashboard rasmi ya TP-Link Cloud mtandaoni? Tovuti rasmi ya bure ni <strong className="font-mono text-white">omada.tplinkcloud.com</strong>.
+                    </span>
+                  </div>
+                  <a
+                    href="https://omada.tplinkcloud.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="whitespace-nowrap px-2.5 py-1 bg-amber-400 text-stone-950 font-bold rounded-lg hover:bg-amber-300 flex items-center gap-1 shrink-0 text-[10px]"
+                  >
+                    <span>Fungua Omada Cloud</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs font-mono">
                 {/* Controller Address */}
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-2">
-                  <div className="truncate">
+                  <div className="truncate flex-1">
                     <span className="text-[10px] text-stone-500 block font-sans">CONTROLLER ADDRESS:</span>
-                    <span className="text-emerald-400 truncate block">https://omada.lemawifi.online</span>
+                    <span className="text-emerald-400 truncate block font-bold">{newRouterControllerUrl}</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText('https://omada.lemawifi.online');
-                      setCopiedDevUrl(true);
-                      setTimeout(() => setCopiedDevUrl(false), 2000);
-                    }}
-                    className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
-                    title="Nakili URL"
-                  >
-                    {copiedDevUrl ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <a
+                      href={newRouterControllerUrl.startsWith('http') ? newRouterControllerUrl : `https://${newRouterControllerUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-stone-400 hover:text-emerald-400 p-1 cursor-pointer"
+                      title="Fungua Tovuti"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newRouterControllerUrl);
+                        setCopiedDevUrl(true);
+                        setTimeout(() => setCopiedDevUrl(false), 2000);
+                        showToast('Imenakiliwa!', 'Controller Address imenakiliwa.', 'info');
+                      }}
+                      className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer"
+                      title="Nakili URL"
+                    >
+                      {copiedDevUrl ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Device Username */}
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-2">
                   <div>
                     <span className="text-[10px] text-stone-500 block font-sans">DEVICE USERNAME:</span>
-                    <span className="text-white">lema-adm9x</span>
+                    <span className="text-white font-bold">{omadaDevUser}</span>
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText('lema-adm9x');
+                      navigator.clipboard.writeText(omadaDevUser);
                       setCopiedDevUser(true);
                       setTimeout(() => setCopiedDevUser(false), 2000);
+                      showToast('Imenakiliwa!', 'Device Username imenakiliwa.', 'info');
                     }}
                     className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
                     title="Nakili Username"
@@ -4573,13 +4669,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-2">
                   <div>
                     <span className="text-[10px] text-stone-500 block font-sans">DEVICE PASSWORD:</span>
-                    <span className="text-white">••••••••</span>
+                    <span className="text-white font-bold">••••••••</span>
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText('Lema@Node2026!');
+                      navigator.clipboard.writeText(omadaDevPass);
                       setCopiedDevPass(true);
                       setTimeout(() => setCopiedDevPass(false), 2000);
+                      showToast('Imenakiliwa!', 'Device Password imenakiliwa.', 'info');
                     }}
                     className="text-stone-400 hover:text-amber-400 p-1 cursor-pointer shrink-0"
                     title="Nakili Password"
@@ -4589,6 +4687,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
             </div>
+
 
             {/* Access Points Card & Table (Claim & Adopt Flow) */}
             <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 space-y-4">
@@ -5017,8 +5116,667 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             )}
 
+
+
+            {/* MODAL 1: TROUBLESHOOTING & OMADA CONTROLLER HELP MODAL */}
+            {showOmadaHelpModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
+                        <HelpCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-white">Kwa Nini Link Hii Haifunguki Kwenye Browser?</h4>
+                        <p className="text-xs text-stone-400">Mwongozo wa kufungua Controller na kuunganisha Access Points (APs)</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowOmadaHelpModal(false)}
+                      className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Explanation Box */}
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed space-y-2">
+                    <p className="font-semibold text-white">
+                      Anwani ya <code className="text-amber-400 bg-stone-950 px-1.5 py-0.5 rounded font-mono">omada.lemawifi.online</code> iliyokuwa kwenye video ni <strong>Controller Inform Address</strong> (anwani ya mawasiliano inayowekwa ndani ya kifaa cha AP ili kielekee kwenye mfumo).
+                    </p>
+                    <p>
+                      Haifunguki kwenye browser ya kawaida kama hakuna seva ya wavuti ya public iliyoandaliwa moja kwa moja kwenye subdomain hiyo. Ili kuingia kwenye dashboard na kusimamia vifaa vyako, chagua njia halisi hapa chini:
+                    </p>
+                  </div>
+
+                  <div className="space-y-3.5 text-xs">
+                    {/* Option 1: Official TP-Link Cloud */}
+                    <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">1</span>
+                          <strong className="text-white text-sm">TP-Link Omada Cloud Rasmi (Inapendekezwa Bure)</strong>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          Online Popote
+                        </span>
+                      </div>
+                      <p className="text-stone-300 leading-relaxed">
+                        Hii ndio tovuti rasmi ya bure ya TP-Link ya Cloud Controller unayoweza kuingia kwa kutumia akaunti yako ya TP-Link ID popote ulipo duniani:
+                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-stone-900 border border-stone-850 rounded-xl font-mono text-[11px]">
+                        <span className="text-emerald-400 font-bold select-all">https://omada.tplinkcloud.com</span>
+                        <a
+                          href="https://omada.tplinkcloud.com"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <span>Fungua Omada Cloud ↗</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Option 2: Direct AP Login */}
+                    <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs">2</span>
+                          <strong className="text-white text-sm">Kuingia Kwenye AP Yenyewe Moja kwa Moja (tplinkeap.net)</strong>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                          Setup ya Kwanza
+                        </span>
+                      </div>
+                      <ol className="list-decimal list-inside space-y-1.5 text-stone-300 leading-relaxed pl-1">
+                        <li>Washa kifaa chako cha AP (EAP110 au EAP225) kwa kutumia PoE Adapter yake ya 24V.</li>
+                        <li>Unganisha simu au laptop yako kwenye mtandao wa Wi-Fi ya bure ya AP (k.m. <code className="text-amber-400 bg-stone-900 px-1 rounded">TP-Link_2.4GHz_XXXX</code>).</li>
+                        <li>Fungua Chrome au Safari na uandike anwani hii: <strong className="text-white underline">http://tplinkeap.net</strong> (au <code className="text-amber-400">http://192.168.0.254</code>).</li>
+                        <li>Ingia kwa Username: <code className="text-white font-mono font-bold">admin</code> na Password: <code className="text-white font-mono font-bold">admin</code>.</li>
+                        <li>Nenda kwenye <strong>System Settings ➔ Controller Inform</strong> kisha weka anwani ya Controller yako.</li>
+                      </ol>
+                    </div>
+
+                    {/* Option 3: Local Hardware Controller OC200 / PC */}
+                    <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs">3</span>
+                          <strong className="text-white text-sm">Omada Hardware Box (OC200/OC300) au PC ya Ofisini</strong>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">
+                          LAN Ya Ndani
+                        </span>
+                      </div>
+                      <p className="text-stone-300 leading-relaxed">
+                        Ikiwa una kijisanduku cha OC200 kilichounganishwa kwenye router ya Starlink au Fiber, kinafunguka kwa kutumia IP yake ya ndani ya mtandao wako:
+                      </p>
+                      <div className="p-2.5 bg-stone-900 border border-stone-850 rounded-xl font-mono text-[11px] text-sky-300 flex items-center justify-between">
+                        <span>https://192.168.0.254:8043 (au IP uliyopewa na router)</span>
+                      </div>
+                    </div>
+
+                    {/* Option 4: Free Cloud VPS & Free PC Setup Guide */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-stone-950 to-stone-950 border border-indigo-500/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">4</span>
+                          <strong className="text-white text-sm">Je, Kuna VPS ya BURE ya Kuanzia? (Free VPS & PC)</strong>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          Bure 100%
+                        </span>
+                      </div>
+                      <p className="text-stone-300 leading-relaxed text-xs">
+                        <strong>Ndio!</strong> Unaweza kuanza bila kulipa senti hata moja kwa kutumia mojawapo ya njia hizi mbili:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        <div className="p-3 bg-stone-900/90 border border-stone-800 rounded-xl space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-indigo-400 text-xs">Njia A: Oracle Cloud Free Tier</span>
+                            <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Always Free</span>
+                          </div>
+                          <p className="text-[11px] text-stone-400 leading-relaxed">
+                            Oracle inatoa VPS ya bure maisha yote (hadi 4 vCPUs na 24GB RAM au x86 1GB) na Public IP ya bure. Inahitaji tu kadi ya benki (Visa/Mastercard) kwa uthibitisho wa usajili (hawakati pesa).
+                          </p>
+                          <a
+                            href="https://www.oracle.com/cloud/free/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline mt-1"
+                          >
+                            <span>Jisajili Oracle Always Free ↗</span>
+                          </a>
+                        </div>
+
+                        <div className="p-3 bg-stone-900/90 border border-stone-800 rounded-xl space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-emerald-400 text-xs">Njia B: Laptop/PC ya Windows</span>
+                            <span className="text-[9px] bg-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded font-bold">Bila Kadi / 0 Cost</span>
+                          </div>
+                          <p className="text-[11px] text-stone-400 leading-relaxed">
+                            Pakua <strong>Omada Software Controller</strong> ya bure ya Windows toka tovuti ya TP-Link. Iweke kwenye laptop yako. Hapo laptop yako inakuwa Controller bure bila kuhitaji VPS yoyote!
+                          </p>
+                          <a
+                            href="https://www.tp-link.com/en/support/download/omada-software-controller/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-bold underline mt-1"
+                          >
+                            <span>Pakua Omada Controller ya PC ↗</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-stone-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowOmadaHelpModal(false);
+                        setEditControllerInput('https://omada.tplinkcloud.com');
+                        setShowEditCredentialsModal(true);
+                      }}
+                      className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Weka &apos;omada.tplinkcloud.com&apos; kama anwani kuu ➔</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowOmadaHelpModal(false)}
+                      className="px-5 py-2 font-bold text-xs bg-stone-800 hover:bg-stone-750 text-white rounded-xl transition-all cursor-pointer"
+                    >
+                      Nimeelewa, Funga
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL 2: EDIT CONTROLLER ADDRESS & DEVICE CREDENTIALS */}
+            {showEditCredentialsModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
+                        <Edit3 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Badilisha Anwani & Login za Omada</h4>
+                        <p className="text-[11px] text-stone-400">Weka anwani halisi ya controller na taarifa za AP zako</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditCredentialsModal(false)}
+                      className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 text-xs">
+                    {/* Quick presets */}
+                    <div>
+                      <label className="text-stone-400 block mb-1.5 font-bold">Chagua Anwani ya Haraka (Preset):</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditControllerInput('https://omada.tplinkcloud.com')}
+                          className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
+                            editControllerInput === 'https://omada.tplinkcloud.com'
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                              : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
+                          }`}
+                        >
+                          <strong className="block text-[11px]">TP-Link Cloud (Rasmi)</strong>
+                          <span className="text-[9px] font-mono text-stone-500 block truncate">omada.tplinkcloud.com</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditControllerInput('https://192.168.0.254:8043')}
+                          className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
+                            editControllerInput.includes('192.168')
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                              : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
+                          }`}
+                        >
+                          <strong className="block text-[11px]">Local OC200 / PC</strong>
+                          <span className="text-[9px] font-mono text-stone-500 block truncate">192.168.0.254:8043</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-stone-300 font-bold block mb-1">
+                        Controller Address / Inform URL:
+                      </label>
+                      <input
+                        type="text"
+                        value={editControllerInput}
+                        onChange={(e) => setEditControllerInput(e.target.value)}
+                        placeholder="https://omada.tplinkcloud.com"
+                        className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-emerald-400 font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-stone-500 mt-1 block">
+                        Hii ndiyo anwani utakayo-copy na kuweka kwenye AP yako au browser.
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-stone-300 font-bold block mb-1">
+                        Device Username:
+                      </label>
+                      <input
+                        type="text"
+                        value={editUserInput}
+                        onChange={(e) => setEditUserInput(e.target.value)}
+                        placeholder="admin au lema-adm9x"
+                        className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-stone-300 font-bold block mb-1">
+                        Device Password:
+                      </label>
+                      <input
+                        type="text"
+                        value={editPassInput}
+                        onChange={(e) => setEditPassInput(e.target.value)}
+                        placeholder="admin au neno lako la siri"
+                        className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditCredentialsModal(false)}
+                      className="px-4 py-2 text-stone-400 hover:text-white text-xs cursor-pointer"
+                    >
+                      Ghairi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cleanUrl = editControllerInput.trim() || 'https://omada.tplinkcloud.com';
+                        const cleanUser = editUserInput.trim() || 'admin';
+                        const cleanPass = editPassInput.trim() || 'admin';
+                        setNewRouterControllerUrl(cleanUrl);
+                        setOmadaDevUser(cleanUser);
+                        setOmadaDevPass(cleanPass);
+                        localStorage.setItem('lema_omada_controller_url', cleanUrl);
+                        localStorage.setItem('lema_omada_dev_user', cleanUser);
+                        setShowEditCredentialsModal(false);
+                        showToast('Hifadhi Imekamilika ✅', 'Anwani ya Controller na logins zimehifadhiwa kikamilifu!', 'success');
+                      }}
+                      className="px-5 py-2 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-400/20"
+                    >
+                      Hifadhi Mabadiliko
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL 3: COMPREHENSIVE RODLINK REPLICATION ARCHITECTURE & SETUP GUIDE */}
+            {showRodlinkArchitectureModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                  {/* Modal Header */}
+                  <div className="p-5 border-b border-stone-800 flex items-center justify-between bg-stone-900/80 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/20 to-indigo-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
+                        <Sparkles className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-black text-white flex items-center gap-2">
+                          <span>Jinsi ya Kufanya Mfumo Uwe Kama wa RodLink 100%</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            Mwongozo Kamili
+                          </span>
+                        </h4>
+                        <p className="text-xs text-stone-400">Muundo kamili wa wingu, kusanidi AP, na kuwasha Controller bila gharama</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRodlinkArchitectureModal(false)}
+                      className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Navigation Tabs */}
+                  <div className="flex items-center gap-1 p-2 bg-stone-950 border-b border-stone-800 overflow-x-auto text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setRodlinkGuideTab('architecture')}
+                      className={`px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        rodlinkGuideTab === 'architecture'
+                          ? 'bg-amber-400 text-stone-950'
+                          : 'text-stone-400 hover:text-white hover:bg-stone-900'
+                      }`}
+                    >
+                      <span>🏛️ 1. Muundo (Architecture)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRodlinkGuideTab('vps')}
+                      className={`px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        rodlinkGuideTab === 'vps'
+                          ? 'bg-amber-400 text-stone-950'
+                          : 'text-stone-400 hover:text-white hover:bg-stone-900'
+                      }`}
+                    >
+                      <span>☁️ 2. Kuweka omada.lemawifi.online (VPS)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRodlinkGuideTab('ap_setup')}
+                      className={`px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        rodlinkGuideTab === 'ap_setup'
+                          ? 'bg-amber-400 text-stone-950'
+                          : 'text-stone-400 hover:text-white hover:bg-stone-900'
+                      }`}
+                    >
+                      <span>📡 3. Kusanidi AP (tplinkeap.net)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRodlinkGuideTab('local_pc')}
+                      className={`px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        rodlinkGuideTab === 'local_pc'
+                          ? 'bg-amber-400 text-stone-950'
+                          : 'text-stone-400 hover:text-white hover:bg-stone-900'
+                      }`}
+                    >
+                      <span>💻 4. Kuanza Bure Kwenye Laptop</span>
+                    </button>
+                  </div>
+
+                  {/* Modal Body */}
+                  <div className="p-6 overflow-y-auto space-y-6 text-xs text-stone-300">
+                    
+                    {/* TAB 1: ARCHITECTURE */}
+                    {rodlinkGuideTab === 'architecture' && (
+                      <div className="space-y-5 animate-fadeIn">
+                        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 leading-relaxed space-y-2">
+                          <strong className="text-white text-sm block">Ulinganifu wa RodLink na Lema Fast WiFi:</strong>
+                          <p>
+                            Kwenye video, jamaa wa RodLink anatumia vipande 3 vinavyofanya kazi kwa ushirikiano. Mfumo wako wa <strong>Lema Fast WiFi</strong> tayari umekamilika katika vipande vyote hivyo:
+                          </p>
+                        </div>
+
+                        {/* 3 Pillars Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">1</div>
+                            <h5 className="font-bold text-white text-sm">Web Dashboard & Portal</h5>
+                            <div className="text-[11px] font-mono text-emerald-400 bg-stone-900 p-1.5 rounded border border-stone-800">
+                              lemawifi.online
+                            </div>
+                            <p className="text-[11px] text-stone-400 leading-relaxed">
+                              Hapa ndipo unapoingia kusimamia vocha, bei, kuona wateja waliopo hewani, na wateja wananunua bando kwa M-Pesa/TigoPesa. (Kama ilivyo rodlink.net).
+                            </p>
+                          </div>
+
+                          <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                            <div className="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold">2</div>
+                            <h5 className="font-bold text-white text-sm">Omada Cloud Controller</h5>
+                            <div className="text-[11px] font-mono text-sky-400 bg-stone-900 p-1.5 rounded border border-stone-800">
+                              omada.lemawifi.online
+                            </div>
+                            <p className="text-[11px] text-stone-400 leading-relaxed">
+                              Hii ni server ya wingu (VPS) yenye programu ya TP-Link Omada. Hapa ndipo AP zote zinapopeleka mapigo ya moyo (Heartbeat) na ku-adoptiwa. (Kama ilivyo omada.rodlink.net).
+                            </p>
+                          </div>
+
+                          <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">3</div>
+                            <h5 className="font-bold text-white text-sm">Access Point (Hardware)</h5>
+                            <div className="text-[11px] font-mono text-indigo-400 bg-stone-900 p-1.5 rounded border border-stone-800">
+                              EAP225 / EAP110
+                            </div>
+                            <p className="text-[11px] text-stone-400 leading-relaxed">
+                              Kifaa chako halisi ulichochomeka mtaani. Kinafunguka kwa <code>tplinkeap.net</code> na kuwekewa anwani ya controller ili kijiunge na mtandao.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Interactive Workflow Steps */}
+                        <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-3">
+                          <h5 className="font-bold text-white text-sm">Mzunguko wa Kazi (How Data Flows):</h5>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-start gap-2.5">
+                              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold text-[10px]">✓</span>
+                              <p>Mteja anapochomeka simu kwenye Wi-Fi ya AP, AP inamwelekeza moja kwa moja kwenye Captive Portal ya <strong>lemawifi.online/portal</strong>.</p>
+                            </div>
+                            <div className="flex items-start gap-2.5">
+                              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold text-[10px]">✓</span>
+                              <p>Mteja anaweka vocha au kulipia kwa M-Pesa. Malipo yakithibitishwa, tovuti inatuma agizo kwa Omada Controller kupitia API.</p>
+                            </div>
+                            <div className="flex items-start gap-2.5">
+                              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold text-[10px]">✓</span>
+                              <p>Controller inamruhusu mteja (Authorize MAC) kupata intaneti ya kasi, na mtandao unaanza kufanya kazi mara moja bila kukatika!</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 2: VPS SETUP */}
+                    {rodlinkGuideTab === 'vps' && (
+                      <div className="space-y-5 animate-fadeIn">
+                        <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 leading-relaxed">
+                          <h5 className="font-bold text-white text-sm mb-1">Jinsi RodLink Walivyopata Link ya `omada.rodlink.net`:</h5>
+                          <p>
+                            Hawakujisajili kwenye tovuti maalum; walikodi VPS (kama Oracle ya bure au DigitalOcean) kisha wakaweka software ya bure ya Omada Controller. Wewe pia unaweza kufanya hivyo kwa dakika 5 tu kwa kikoa chako cha <strong>lemawifi.online</strong>:
+                          </p>
+                        </div>
+
+                        {/* Step 1: VPS */}
+                        <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 font-bold flex items-center justify-center text-xs">1</span>
+                            <strong className="text-white text-sm">Pata VPS ya Bure (Oracle Cloud Always Free)</strong>
+                          </div>
+                          <p className="text-stone-400 text-[11px] leading-relaxed pl-8">
+                            Nenda <a href="https://www.oracle.com/cloud/free/" target="_blank" rel="noreferrer" className="text-amber-400 underline font-bold">oracle.com/cloud/free</a> na ufungue Ubuntu VPS ya bure (Always Free). Ukimaliza utapewa Public IP Address (mfano: <code>150.136.24.89</code>).
+                          </p>
+                        </div>
+
+                        {/* Step 2: DNS */}
+                        <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 font-bold flex items-center justify-center text-xs">2</span>
+                            <strong className="text-white text-sm">Unganisha Subdomain ya `omada` kwenye Domain Yako</strong>
+                          </div>
+                          <p className="text-stone-400 text-[11px] leading-relaxed pl-8">
+                            Ingia kwenye akaunti yako ulikonunua domain ya <code>lemawifi.online</code> (Cloudflare au Namecheap) ➔ nenda DNS Settings ➔ ongeza <strong>A Record</strong>:
+                          </p>
+                          <div className="ml-8 p-2.5 bg-stone-900 border border-stone-800 rounded-xl font-mono text-[11px] text-stone-300 grid grid-cols-3 gap-2">
+                            <div><span className="text-stone-500 block text-[9px]">TYPE</span>A</div>
+                            <div><span className="text-stone-500 block text-[9px]">NAME</span>omada</div>
+                            <div><span className="text-stone-500 block text-[9px]">POINTS TO</span>IP ya VPS Yako</div>
+                          </div>
+                        </div>
+
+                        {/* Step 3: Docker Command */}
+                        <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-emerald-500 text-stone-950 font-bold flex items-center justify-center text-xs">3</span>
+                              <strong className="text-white text-sm">Washa Omada Controller kwa Amri 1 ya Docker</strong>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cmd = `docker run -d --name omada-controller --net host -e TZ=Africa/Dar_es_Salaam -v /opt/omada/data:/opt/tplink/EAPController/data -v /opt/omada/logs:/opt/tplink/EAPController/logs --restart unless-stopped mbentley/omada-controller:latest`;
+                                navigator.clipboard.writeText(cmd);
+                                setCopiedDockerCmd(true);
+                                setTimeout(() => setCopiedDockerCmd(false), 2000);
+                                showToast('Imenakiliwa!', 'Amri ya Docker imenakiliwa.', 'info');
+                              }}
+                              className="px-2.5 py-1 bg-stone-800 hover:bg-stone-750 text-amber-400 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors text-[10px]"
+                            >
+                              {copiedDockerCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedDockerCmd ? 'Imenakiliwa' : 'Copy Amri'}</span>
+                            </button>
+                          </div>
+                          <p className="text-stone-400 text-[11px] leading-relaxed pl-8">
+                            Fungua Terminal ya VPS yako na ubandike amri hii moja tu:
+                          </p>
+                          <div className="ml-8 p-3 bg-stone-900 border border-stone-800 rounded-xl font-mono text-[10px] text-emerald-400 overflow-x-auto select-all">
+                            docker run -d --name omada-controller \<br />
+                            &nbsp;&nbsp;--net host \<br />
+                            &nbsp;&nbsp;-e TZ=Africa/Dar_es_Salaam \<br />
+                            &nbsp;&nbsp;-v /opt/omada/data:/opt/tplink/EAPController/data \<br />
+                            &nbsp;&nbsp;-v /opt/omada/logs:/opt/tplink/EAPController/logs \<br />
+                            &nbsp;&nbsp;--restart unless-stopped \<br />
+                            &nbsp;&nbsp;mbentley/omada-controller:latest
+                          </div>
+                          <p className="text-stone-400 text-[10px] pl-8">
+                            Ukimaliza hapo, anwani ya <strong>https://omada.lemawifi.online:8043</strong> itafunguka mara moja na sasa una Controller ya wingu kama ya RodLink 100%!
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 3: AP SETUP */}
+                    {rodlinkGuideTab === 'ap_setup' && (
+                      <div className="space-y-5 animate-fadeIn">
+                        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 leading-relaxed">
+                          <h5 className="font-bold text-white text-sm mb-1">Kusanidi Access Point Yako (Kama Dakika ya 10:03 Hadi 10:21 Kwenye Video):</h5>
+                          <p>
+                            Fanya hatua hizi ukiwa na AP yako (EAP225-Outdoor au EAP110):
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-2xl flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 font-bold flex items-center justify-center text-xs shrink-0">1</span>
+                            <div className="space-y-1">
+                              <strong className="text-white block font-bold">Washa Kifaa cha AP</strong>
+                              <p className="text-stone-400 text-[11px]">Chomeka waya wa PoE toka kwenye adapata kwenda kwenye tundu la LAN la AP. Subiri sekunde 45 taa iwake ya kijani.</p>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-2xl flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 font-bold flex items-center justify-center text-xs shrink-0">2</span>
+                            <div className="space-y-1">
+                              <strong className="text-white block font-bold">Ingia Kwenye tplinkeap.net</strong>
+                              <p className="text-stone-400 text-[11px]">Unganisha simu/laptop kwenye WiFi ya AP ya bure. Fungua browser na uandike <code>http://tplinkeap.net</code>. Ingia kwa <code>admin / admin</code>.</p>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-2xl flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 font-bold flex items-center justify-center text-xs shrink-0">3</span>
+                            <div className="space-y-1">
+                              <strong className="text-white block font-bold">Weka Controller Inform URL</strong>
+                              <p className="text-stone-400 text-[11px]">
+                                Nenda kwenye <strong>System ➔ Controller Settings ➔ Controller Host/IP</strong>. Bandika <code>omada.lemawifi.online</code> (au IP ya Controller yako) kisha bonyeza <strong>Save</strong>.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-2xl flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 font-bold flex items-center justify-center text-xs shrink-0">4</span>
+                            <div className="space-y-1">
+                              <strong className="text-white block font-bold">Copy MAC Address ya AP Yako</strong>
+                              <p className="text-stone-400 text-[11px]">Kwenye ukurasa wa AP, au stika ya nyuma, chukua MAC address (mfano: <code>B8:FB:B3:79:A3:B8</code>).</p>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 bg-stone-950 border border-stone-800 rounded-2xl flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-emerald-500 text-stone-950 font-bold flex items-center justify-center text-xs shrink-0">5</span>
+                            <div className="space-y-1">
+                              <strong className="text-white block font-bold">Claim & Adopt Kwenye Lema Fast WiFi</strong>
+                              <p className="text-stone-400 text-[11px]">
+                                Rudi kwenye dashibodi ya Lema Fast WiFi hapa hapa chini, bonyeza kitufe cha <strong>+ Claim access point</strong>, bandika MAC ya AP, kisha bonyeza <strong>Adopt now</strong>! AP itawaka kijani na kuanza kurusha WiFi yenye portal ya Lema Fast WiFi!
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 4: LOCAL PC SETUP */}
+                    {rodlinkGuideTab === 'local_pc' && (
+                      <div className="space-y-5 animate-fadeIn">
+                        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 leading-relaxed">
+                          <h5 className="font-bold text-white text-sm mb-1">Njia Rahisi ya Bure Kabisa (Bila VPS Wala Kadi ya Benki):</h5>
+                          <p>
+                            Kama bado hujapata VPS na unataka kufanya majaribio leo hii mara moja, tumia Laptop au Desktop yako ya Windows kama Controller:
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <strong className="text-white text-sm">1. Pakua TP-Link Omada Software Controller ya Windows</strong>
+                              <a
+                                href="https://www.tp-link.com/en/support/download/omada-software-controller/"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs flex items-center gap-1 transition-colors"
+                              >
+                                <span>Download Bure ↗</span>
+                              </a>
+                            </div>
+                            <p className="text-stone-400 text-[11px] leading-relaxed">
+                              Ni programu rasmi ya bure toka TP-Link. I-install kwenye laptop yako kama unavyoweka programu yoyote (Next ➔ Next ➔ Finish).
+                            </p>
+                          </div>
+
+                          <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                            <strong className="text-white text-sm">2. Tafuta IP ya Laptop Yako ya Ndani (LAN IP)</strong>
+                            <p className="text-stone-400 text-[11px] leading-relaxed">
+                              Fungua CMD kwenye Windows na uandike <code>ipconfig</code>. Utaona anwani ya IPv4 (k.m. <code>192.168.1.150</code> au <code>192.168.0.100</code>).
+                            </p>
+                          </div>
+
+                          <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-2">
+                            <strong className="text-white text-sm">3. Weka Hiyo IP Kwenye AP Yako</strong>
+                            <p className="text-stone-400 text-[11px] leading-relaxed">
+                              Kwenye AP (`tplinkeap.net`), chini ya Controller Inform, badala ya domain weka tu hiyo IP ya laptop yako: <code>192.168.1.150</code> kisha Save. Controller kwenye laptop yako itagundua kifaa hicho mara moja!
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-4 border-t border-stone-800 bg-stone-950 flex flex-wrap items-center justify-between gap-3">
+                    <span className="text-[11px] text-stone-400">
+                      💡 Mfumo wako wa <strong>Lema Fast WiFi</strong> una uwezo wote wa RodLink na vipengele vya ziada vya AI na WhatsApp!
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRodlinkArchitectureModal(false)}
+                      className="px-5 py-2 font-bold text-xs bg-amber-400 hover:bg-amber-300 text-stone-950 rounded-xl transition-all cursor-pointer shadow-md shadow-amber-400/20"
+                    >
+                      Nimeelewa Vizuri, Anza Kazi 🚀
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
+
 
         {/* 13. MODULE: SITES / LOCATIONS */}
         {activeTab === 'sites' && (
