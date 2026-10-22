@@ -21,7 +21,9 @@ import {
   ExternalLink,
   ShieldCheck,
   MapPin,
-  Clock
+  Clock,
+  Wifi,
+  X
 } from 'lucide-react';
 
 interface InventoryModuleProps {
@@ -42,6 +44,62 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeviceForQr, setSelectedDeviceForQr] = useState<ScannedEquipment | null>(null);
+
+  // Manual Add Modal State
+  const [showManualModal, setShowManualModal] = useState<boolean>(false);
+  const [manualForm, setManualForm] = useState({
+    name: 'AP Kariakoo 01',
+    category: 'ap' as ScannedEquipment['category'],
+    manufacturer: 'TP-Link',
+    model: 'Omada EAP Series',
+    serialNumber: '',
+    macAddress: 'D4-D6-DF-0D-B3-A0',
+    ipAddress: '192.168.1.153',
+    site: 'Kariakoo',
+    status: 'online' as ScannedEquipment['status'],
+  });
+
+  const handleApplyPresetOmada = () => {
+    setManualForm({
+      name: 'AP Kariakoo 01 (Omada)',
+      category: 'ap',
+      manufacturer: 'TP-Link',
+      model: 'Omada Outdoor EAP',
+      serialNumber: 'SN-OMADA-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      macAddress: 'D4-D6-DF-0D-B3-A0',
+      ipAddress: '192.168.1.153',
+      site: 'Kariakoo',
+      status: 'online',
+    });
+  };
+
+  const handleSubmitManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualForm.macAddress.trim()) {
+      showToast('Kosa', 'Tafadhali ingiza MAC address ya kifaa.', 'warning');
+      return;
+    }
+    const cleanMac = manualForm.macAddress.trim().toUpperCase();
+    const newEquipment: ScannedEquipment = {
+      id: `eq-${Date.now()}`,
+      name: manualForm.name.trim() || `Kifaa cha ${manualForm.site || 'Mtandao'}`,
+      category: manualForm.category,
+      manufacturer: manualForm.manufacturer.trim() || 'TP-Link',
+      model: manualForm.model.trim() || 'Omada EAP',
+      serialNumber: manualForm.serialNumber.trim() || cleanMac.replace(/[^A-Z0-9]/g, ''),
+      macAddress: cleanMac,
+      deviceKey: `KEY-${cleanMac.slice(-6)}`,
+      site: manualForm.site.trim() || 'Kariakoo',
+      ipAddress: manualForm.ipAddress.trim() || '192.168.1.153',
+      poeVoltage: '24V Passive / 802.3af',
+      status: manualForm.status,
+      registeredAt: new Date().toISOString(),
+      autoProvisioned: true,
+    };
+
+    onAddManual(newEquipment);
+    setShowManualModal(false);
+  };
 
   // Filtered devices
   const filteredItems = inventory.filter((item) => {
@@ -129,11 +187,19 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
+              onClick={() => setShowManualModal(true)}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-emerald-100" />
+              <span>+ Ongeza Kifaa kwa Mkono</span>
+            </button>
+
+            <button
               onClick={onOpenScanner}
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
               <QrCode className="w-4 h-4 text-yellow-300" />
-              <span>Skani QR ya Kifaa Sasa</span>
+              <span>Skani QR ya Kifaa</span>
             </button>
 
             <button
@@ -245,9 +311,32 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
             <tbody className="divide-y divide-stone-850">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-stone-500">
-                    <p className="font-bold text-sm">Hakuna kifaa kilichopatikana kwenye kichujio hiki.</p>
-                    <p className="text-xs mt-1">Bonyeza "Skani QR ya Kifaa Sasa" kuongeza kifaa kipya.</p>
+                  <td colSpan={7} className="p-10 text-center text-stone-500">
+                    <div className="max-w-md mx-auto space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-stone-950 border border-stone-800 flex items-center justify-center mx-auto text-xl">
+                        📡
+                      </div>
+                      <p className="font-bold text-white text-sm">Hakuna kifaa kilichosajiliwa bado.</p>
+                      <p className="text-xs text-stone-400">
+                        Sajili Access Point yako (kama TP-Link Omada uliyonayo) au Router kwenye mfumo ili data zihifadhiwe moja kwa moja kwenye PostgreSQL ya Render.
+                      </p>
+                      <div className="flex items-center justify-center gap-2.5 pt-2">
+                        <button
+                          onClick={() => setShowManualModal(true)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Ongeza Kifaa kwa Mkono</span>
+                        </button>
+                        <button
+                          onClick={onOpenScanner}
+                          className="px-4 py-2 bg-stone-850 hover:bg-stone-800 text-stone-300 text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer border border-stone-750 transition-all"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Skani QR ya Kifaa</span>
+                        </button>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -403,6 +492,185 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                 Funga
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* POPUP: Manual Hardware Registration Modal */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 bg-stone-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-stone-900 border border-stone-800 text-stone-200 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-6 shadow-2xl relative my-8 animate-fadeIn">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowManualModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-stone-950 text-stone-400 hover:text-white border border-stone-800 hover:border-stone-700 cursor-pointer transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                <Wifi className="w-3 h-3" />
+                <span>PostgreSQL Cloud Database Sync</span>
+              </div>
+              <h3 className="font-black text-xl text-white">Sajili Kifaa kwa Mkono</h3>
+              <p className="text-xs text-stone-400">
+                Weka taarifa za Access Point, Router au Switch ili zihifadhiwe moja kwa moja kwenye Render.
+              </p>
+            </div>
+
+            {/* Preset 1-Click Button for Omada TP-Link */}
+            <div className="p-3.5 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="text-[11px] font-bold text-indigo-300 block">
+                  💡 Umefungua TP-Link Omada (Kariakoo)?
+                </span>
+                <span className="text-[10px] text-stone-400 block font-mono">
+                  MAC: D4-D6-DF-0D-B3-A0 · IP: 192.168.1.153
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleApplyPresetOmada}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl whitespace-nowrap cursor-pointer transition-colors shrink-0 shadow-sm"
+              >
+                Jaza Haraka ⚡
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmitManual} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-300">Jina la Kifaa (Device Name) *</label>
+                <input
+                  type="text"
+                  required
+                  value={manualForm.name}
+                  onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
+                  placeholder="mfano: AP Kariakoo 01"
+                  className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-300">Aina ya Kifaa (Category)</label>
+                  <select
+                    value={manualForm.category}
+                    onChange={(e) => setManualForm({ ...manualForm, category: e.target.value as any })}
+                    className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  >
+                    <option value="ap">📡 Access Point (AP / Antena)</option>
+                    <option value="router">⚡ Router / Gateway (MikroTik)</option>
+                    <option value="switch">🔌 PoE Switch</option>
+                    <option value="starlink">🛰️ Starlink Kit</option>
+                    <option value="power">🔋 Solar / UPS Backup</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-300">Kituo / Eneo (Site) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={manualForm.site}
+                    onChange={(e) => setManualForm({ ...manualForm, site: e.target.value })}
+                    placeholder="mfano: Kariakoo"
+                    className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-300">Mtengenezaji (Brand)</label>
+                  <input
+                    type="text"
+                    value={manualForm.manufacturer}
+                    onChange={(e) => setManualForm({ ...manualForm, manufacturer: e.target.value })}
+                    placeholder="TP-Link, MikroTik, Ubiquiti"
+                    className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-300">Modeli (Model)</label>
+                  <input
+                    type="text"
+                    value={manualForm.model}
+                    onChange={(e) => setManualForm({ ...manualForm, model: e.target.value })}
+                    placeholder="EAP110-Outdoor, EAP225, nk."
+                    className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-300">MAC Address *</label>
+                  <input
+                    type="text"
+                    required
+                    value={manualForm.macAddress}
+                    onChange={(e) => setManualForm({ ...manualForm, macAddress: e.target.value })}
+                    placeholder="D4-D6-DF-0D-B3-A0"
+                    className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-emerald-400 font-mono text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-300">IP Address</label>
+                  <input
+                    type="text"
+                    value={manualForm.ipAddress}
+                    onChange={(e) => setManualForm({ ...manualForm, ipAddress: e.target.value })}
+                    placeholder="192.168.1.153"
+                    className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-stone-300">Hali ya Kifaa (Status)</label>
+                <div className="flex gap-2">
+                  {[
+                    { id: 'online', label: '🟢 Online (Kiko Hewani)' },
+                    { id: 'standby', label: '🟡 Standby (Kipo Stoo)' },
+                    { id: 'offline', label: '🔴 Offline' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, status: s.id as any })}
+                      className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer ${
+                        manualForm.status === s.id
+                          ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400'
+                          : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => setShowManualModal(false)}
+                  className="px-4 py-2.5 bg-stone-800 hover:bg-stone-750 text-stone-300 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+                >
+                  Ghairi
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/30 transition-all"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Hifadhi Kwenye PostgreSQL</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -513,14 +513,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               if (saved) {
                 const localItems = JSON.parse(saved);
                 if (Array.isArray(localItems) && localItems.length > 0) {
-                  for (const item of localItems) {
+                  const realItems = localItems.filter(
+                    (item: any) =>
+                      item &&
+                      item.macAddress &&
+                      !item.name?.toLowerCase().includes('golani') &&
+                      !item.site?.toLowerCase().includes('golani') &&
+                      item.id !== 'eq-1'
+                  );
+                  for (const item of realItems) {
                     await fetch('/api/v1/hardware/register', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(item),
                     });
                   }
-                  console.log('[Hardware Sync] Pushed local phone APs to server database.');
+                  if (realItems.length > 0) {
+                    console.log('[Hardware Sync] Pushed real APs to server database.');
+                  }
                 }
               }
             }
