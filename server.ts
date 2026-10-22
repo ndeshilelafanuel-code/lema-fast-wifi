@@ -517,12 +517,28 @@ async function processApOutageAlert(params: {
     saveHardwareToDisk();
   }
 
-  // Update towers-data.json
-  const towers = loadSavedTowers();
-  const tower = towers.find((t: any) => t.ipAddress === targetIp || t.macAddress === apMac);
+  // Persist status change to PostgreSQL database
+  try {
+    const dbStatus = status === 'down' ? 'offline' : 'online';
+    const lastSeenStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (apMac) {
+      await db.update(hardware).set({ status: dbStatus, lastSeen: lastSeenStr }).where(eq(hardware.macAddress, apMac.toUpperCase()));
+    } else if (foundDevice) {
+      await db.update(hardware).set({ status: dbStatus, lastSeen: lastSeenStr }).where(eq(hardware.id, foundDevice.id));
+    }
+  } catch (dbErr) {
+    console.warn('[PostgreSQL Hardware Outage Sync]:', dbErr);
+  }
+
+  // Update towers-data.json and PostgreSQL towers
+  const diskTowers = loadSavedTowers();
+  const tower = diskTowers.find((t: any) => t.ipAddress === targetIp || t.macAddress === apMac);
   if (tower) {
     tower.status = status === 'down' ? 'offline' : 'online';
-    saveTowersToFile(towers);
+    saveTowersToFile(diskTowers);
+    try {
+      await db.update(towers).set({ status: tower.status }).where(eq(towers.id, tower.id));
+    } catch (e) {}
   }
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -868,6 +884,99 @@ app.post('/api/v1/omada/client/authorize', (req, res) => {
   saveWifiClients();
 
   return res.json({ success: true, message: 'Mteja ameruhusiwa intaneti kikamilifu!', session: newSession });
+});
+
+// ==========================================
+// 🔗 TP-LINK OMADA CLOUD CONTROLLER WEBHOOK
+// ==========================================
+app.post('/api/v1/omada/webhook', async (req, res) => {
+  console.log('[Omada Webhook Received]:', JSON.stringify(req.body, null, 2));
+  const body = req.body || {};
+
+  const rawStatus = String(body.status || body.eventType || body.alertType || body.type || body.action || body.event || '').toLowerCase();
+  const alertText = String(body.text || body.message || body.msg || body.content || body.title || '').toLowerCase();
+
+  const isDown =
+    rawStatus.includes('disconnect') ||
+    rawStatus.includes('down') ||
+    rawStatus.includes('offline') ||
+    rawStatus === '0' ||
+    alertText.includes('disconnected') ||
+    alertText.includes('offline') ||
+    alertText.includes('imezima');
+
+  const incomingMac = (
+    body.mac ||
+    body.deviceMac ||
+    body.device_mac ||
+    body.macAddress ||
+    body.data?.mac ||
+    body.alert?.deviceMac ||
+    'D4-D6-DF-0D-B3-A0'
+  ).toUpperCase();
+
+  const incomingName = body.name || body.deviceName || body.device_name || body.data?.name || 'TP-Link Omada AP';
+  const incomingIp = body.ip || body.deviceIp || body.data?.ip || '192.168.1.153';
+  const site = body.site || body.siteName || 'Kariakoo';
+
+  const newStatus: 'online' | 'offline' = isDown ? 'offline' : 'online';
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // 1. Update memory & disk
+  loadSavedHardware();
+  const found = savedHardware.find((h) => h.macAddress.toUpperCase() === incomingMac);
+  if (found) {
+    found.status = newStatus;
+    found.lastSeen = timeStr;
+    saveHardwareToDisk();
+  }
+
+  // 2. Update PostgreSQL database in Render
+  try {
+    await db
+      .update(hardware)
+      .set({
+        status: newStatus,
+        lastSeen: timeStr,
+      })
+      .where(eq(hardware.macAddress, incomingMac));
+    console.log(`[Omada Webhook] ✅ PostgreSQL updated: ${incomingMac} -> ${newStatus.toUpperCase()}`);
+  } catch (err) {
+    console.error('[Omada Webhook] PostgreSQL update failed:', err);
+  }
+
+  // 3. Trigger WhatsApp & SMS Outage Notification if down or up
+  try {
+    await processApOutageAlert({
+      apName: incomingName,
+      apIp: incomingIp,
+      apMac: incomingMac,
+      site,
+      status: isDown ? 'down' : 'up',
+      adminPhone: '0653578184',
+    });
+  } catch (alertErr) {
+    console.warn('[Omada Alert Notice]:', alertErr);
+  }
+
+  return res.json({
+    success: true,
+    message: `Omada Webhook imechakatwa: AP (${incomingMac}) imewekwa ${newStatus.toUpperCase()}`,
+    device: {
+      mac: incomingMac,
+      status: newStatus,
+      lastSeen: timeStr,
+    },
+  });
+});
+
+app.get('/api/v1/omada/webhook-info', (_req, res) => {
+  return res.json({
+    success: true,
+    webhookUrl: 'https://lema-fast-wifi-bot.onrender.com/api/v1/omada/webhook',
+    events: ['Device Disconnected', 'Device Connected', 'Gateway / AP State Change'],
+    supportedDevices: ['TP-Link Omada EAP', 'Omada Cloud Controller', 'OC200', 'OC300', 'Software Controller'],
+  });
 });
 
 const clearWhatsAppLogs = (_req: express.Request, res: express.Response) => {
@@ -2338,6 +2447,14 @@ async function startServer() {
 
     if (hwUpdated) {
       saveHardwareToDisk();
+      for (const h of savedHardware) {
+        if (h.macAddress) {
+          db.update(hardware)
+            .set({ status: h.status, lastSeen: h.lastSeen || '' })
+            .where(eq(hardware.macAddress, h.macAddress.toUpperCase()))
+            .catch(() => {});
+        }
+      }
     }
 
     const towers = loadSavedTowers();

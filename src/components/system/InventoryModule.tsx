@@ -382,20 +382,48 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
 
                     {/* Status */}
                     <td className="p-4">
-                      {device.status === 'online' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                          <span>Online</span>
-                        </span>
-                      ) : device.status === 'standby' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                          <span>Standby / Stoo</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                          <span>Offline</span>
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const nextStatus = device.status === 'online' ? 'offline' : 'online';
+                          const updated = {
+                            ...device,
+                            status: nextStatus as any,
+                            lastSeen: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                          };
+                          onAddManual(updated);
+                          try {
+                            await fetch(
+                              `/api/v1/hardware/alert/outage?mac=${encodeURIComponent(device.macAddress)}&status=${nextStatus === 'online' ? 'up' : 'down'}&ip=${encodeURIComponent(device.ipAddress)}&name=${encodeURIComponent(device.name)}&site=${encodeURIComponent(device.site)}`
+                            );
+                          } catch (e) {}
+                          showToast(
+                            nextStatus === 'online' ? '🟢 AP Imewashwa (Online)' : '🔴 AP Imezimwa (Offline)',
+                            nextStatus === 'online'
+                              ? `${device.name} sasa iko hewani na inahifadhiwa kwenye PostgreSQL.`
+                              : `Kengele: ${device.name} imezimwa (Arifa ya dharura imetumwa).`,
+                            nextStatus === 'online' ? 'success' : 'warning'
+                          );
+                        }}
+                        title="Bofya hapa kubadilisha hali (Online / Offline) na kutuma kengele"
+                        className="cursor-pointer transition-transform active:scale-95 text-left"
+                      >
+                        {device.status === 'online' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            <span>🟢 Online (Bofya Kuzima)</span>
+                          </span>
+                        ) : device.status === 'standby' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            <span>🟡 Standby</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                            <span>🔴 Offline (Bofya Kuwasha)</span>
+                          </span>
+                        )}
+                      </button>
                     </td>
 
                     {/* Actions */}
@@ -403,18 +431,22 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => setSelectedDeviceForQr(device)}
-                          className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 hover:border-indigo-500/50 text-indigo-400 hover:text-white transition-colors"
+                          className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 hover:border-indigo-500/50 text-indigo-400 hover:text-white transition-colors cursor-pointer"
                           title="Tazama Lebo ya QR / Print Asset Label"
                         >
                           <QrCode className="w-3.5 h-3.5" />
                         </button>
 
                         <button
-                          onClick={() => {
-                            showToast('Ping Test', `Kifaa cha ${device.name} kinajibu kwa 4ms. Ubora wa mawimbi ni 100%.`, 'info');
+                          onClick={async () => {
+                            showToast(
+                              'Taarifa ya Mawasiliano',
+                              `Kifaa: ${device.name} (IP: ${device.ipAddress}). Hali kwenye Database: ${device.status.toUpperCase()}.`,
+                              'info'
+                            );
                           }}
-                          className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 hover:border-emerald-500/50 text-emerald-400 hover:text-white transition-colors"
-                          title="Pima Muunganisho (Ping Health)"
+                          className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 hover:border-emerald-500/50 text-emerald-400 hover:text-white transition-colors cursor-pointer"
+                          title="Kagua Taarifa za Kifaa"
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
                         </button>
@@ -438,6 +470,113 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+      {/* OMADA CLOUD CONTROLLER LIVE SYNC CARD */}
+      <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-indigo-950/30 border border-stone-800 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-lg">
+              🔗
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <span>TP-Link Omada Cloud Controller Live Link</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  Uhalisia wa AP 100%
+                </span>
+              </h3>
+              <p className="text-xs text-stone-400 mt-0.5">
+                Unganisha moja kwa moja na Omada Controller yako (<span className="text-indigo-300 font-mono">euw1-omada-cloud.tplinkcloud.com</span>) ili AP ikizima kule, mfumo utambue mara moja.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Step-by-step instructions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans">
+          <div className="p-4 bg-stone-950 border border-stone-850 rounded-2xl space-y-2">
+            <div className="flex items-center gap-2 text-indigo-400 font-bold">
+              <span className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[11px]">1</span>
+              <span>Kwenye Omada Cloud</span>
+            </div>
+            <p className="text-stone-400 text-[11px] leading-relaxed">
+              Kwenye skrini yako ya Omada, nenda chini kwenye <strong>Settings (⚙️) ➔ Controller / Maintenance ➔ Webhook Notification</strong> (au <strong>Alerts ➔ Webhook</strong>).
+            </p>
+          </div>
+
+          <div className="p-4 bg-stone-950 border border-stone-850 rounded-2xl space-y-2">
+            <div className="flex items-center gap-2 text-emerald-400 font-bold">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[11px]">2</span>
+              <span>Weka Webhook URL Hii</span>
+            </div>
+            <div className="p-2 bg-stone-900 border border-stone-800 rounded-xl font-mono text-[10px] text-emerald-300 break-all select-all">
+              https://lema-fast-wifi-bot.onrender.com/api/v1/omada/webhook
+            </div>
+            <p className="text-stone-400 text-[11px]">
+              Chagua arifa za: <strong>Device Disconnected</strong> na <strong>Device Connected</strong>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-stone-950 border border-stone-850 rounded-2xl space-y-2">
+            <div className="flex items-center gap-2 text-amber-400 font-bold">
+              <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[11px]">3</span>
+              <span>Pima Mara Moja Hapa</span>
+            </div>
+            <p className="text-stone-400 text-[11px]">
+              Unaweza kupima mara moja jinsi Omada inavyotuma taarifa AP ikizima au ikiwaka:
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch('/api/v1/omada/webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      eventType: 'device_disconnected',
+                      mac: 'D4-D6-DF-0D-B3-A0',
+                      name: 'AP Kariakoo 01 (Omada)',
+                      ip: '192.168.1.153',
+                      status: 'disconnected',
+                    }),
+                  });
+                  showToast(
+                    '🔴 Omada Alert: AP Imezima!',
+                    'Taarifa imepokelewa toka Omada: AP imewekwa OFFLINE na kengele imetumwa WhatsApp/SMS.',
+                    'warning'
+                  );
+                }}
+                className="flex-1 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 font-bold text-[11px] rounded-xl transition-all cursor-pointer"
+              >
+                Pima: AP Imezima
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await fetch('/api/v1/omada/webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      eventType: 'device_connected',
+                      mac: 'D4-D6-DF-0D-B3-A0',
+                      name: 'AP Kariakoo 01 (Omada)',
+                      ip: '192.168.1.153',
+                      status: 'connected',
+                    }),
+                  });
+                  showToast(
+                    '🟢 Omada Alert: AP Imewaka!',
+                    'Taarifa imepokelewa toka Omada: AP imerejea ONLINE kikamilifu.',
+                    'success'
+                  );
+                }}
+                className="flex-1 py-1.5 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-bold text-[11px] rounded-xl transition-all cursor-pointer"
+              >
+                Pima: AP Imewaka
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

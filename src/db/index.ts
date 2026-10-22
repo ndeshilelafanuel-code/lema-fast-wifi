@@ -9,7 +9,9 @@ declare global {
 
 export const createPool = () => {
   if (!global._postgresPool) {
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString =
+      process.env.DATABASE_URL ||
+      'postgresql://lema_admin:kicxWf6dpdrH9wFnZy8Tf696KUWGiFs0@dpg-dbcpaqdg1s2s73e2uhbg-a.frankfurt-postgres.render.com/lema_fast_wifi';
 
     if (connectionString) {
       global._postgresPool = new Pool({
