@@ -455,20 +455,31 @@ app.post('/api/v1/hardware/inventory', (req, res) => {
 // API: Delete hardware equipment
 app.delete('/api/v1/hardware/equipment/:id', async (req, res) => {
   const { id } = req.params;
+  const macQuery = req.query.mac ? String(req.query.mac).toUpperCase() : '';
   const targetId = id.toUpperCase();
-  savedHardware = savedHardware.filter((h) => h.id !== id && h.macAddress.toUpperCase() !== targetId);
+  savedHardware = savedHardware.filter(
+    (h) =>
+      h.id !== id &&
+      h.id.toUpperCase() !== targetId &&
+      h.macAddress.toUpperCase() !== targetId &&
+      (!macQuery || h.macAddress.toUpperCase() !== macQuery)
+  );
   saveHardwareToDisk();
 
   try {
     await db.delete(hardware).where(eq(hardware.macAddress, targetId));
+    if (macQuery) {
+      await db.delete(hardware).where(eq(hardware.macAddress, macQuery));
+    }
     await db.delete(hardware).where(eq(hardware.id, id));
-    console.log(`[Cloud SQL PostgreSQL] 🗑️ Kifaa kimeondolewa kwenye PostgreSQL: ${id}`);
+    console.log(`[Hardware Inventory] 🗑️ Kifaa kimeondolewa kwenye database na seva: ${id}`);
   } catch (dbErr) {
-    console.error('[Cloud SQL PostgreSQL] Hitilafu ya kufuta kifaa:', dbErr);
+    console.error('[Hardware Inventory] Hitilafu ya kufuta kifaa:', dbErr);
   }
 
-  res.json({ success: true, message: 'Kifaa kimeondolewa kwenye Cloud SQL na seva', inventory: savedHardware });
+  res.json({ success: true, message: 'Kifaa kimeondolewa kwenye seva kikamilifu', inventory: savedHardware });
 });
+
 
 // =========================================================================
 // AP OUTAGE WATCHDOG & INSTANT ALERTS (WHATSAPP + SMS NOTIFICATIONS)

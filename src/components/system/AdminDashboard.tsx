@@ -5129,11 +5129,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <InventoryModule
               inventory={equipmentInventory}
               onOpenScanner={() => setShowQrEquipmentModal(true)}
-              onRemoveEquipment={(id) => {
-                setEquipmentInventory((prev) => prev.filter((i) => i.id !== id));
-                fetch(`/api/v1/hardware/equipment/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-                showToast('Kifaa Kimeondolewa', 'Kifaa kimefutwa kwenye stoo ya vifaa.', 'info');
+              onRemoveEquipment={(id, macAddress) => {
+                const itemToRemove = equipmentInventory.find(
+                  (i) => i.id === id || (macAddress && i.macAddress.toUpperCase() === macAddress.toUpperCase())
+                );
+                const targetMac = (macAddress || itemToRemove?.macAddress || '').toUpperCase();
+
+                setEquipmentInventory((prev) =>
+                  prev.filter(
+                    (i) => i.id !== id && (!targetMac || i.macAddress.toUpperCase() !== targetMac)
+                  )
+                );
+
+                if (targetMac) {
+                  setAccessPoints((prev) =>
+                    prev.filter((ap) => (ap.mac || '').toUpperCase() !== targetMac)
+                  );
+                }
+
+                try {
+                  const saved = localStorage.getItem('lema_wifi_equipment_inventory');
+                  if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed)) {
+                      const updated = parsed.filter(
+                        (i: any) =>
+                          i.id !== id &&
+                          (!targetMac || (i.macAddress || '').toUpperCase() !== targetMac)
+                      );
+                      localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(updated));
+                    }
+                  }
+                } catch (e) {}
+
+                const deleteUrl = `/api/v1/hardware/equipment/${encodeURIComponent(id)}${
+                  targetMac ? `?mac=${encodeURIComponent(targetMac)}` : ''
+                }`;
+                fetch(deleteUrl, { method: 'DELETE' }).catch(() => {});
               }}
+
               onAddManual={(item) => {
                 setEquipmentInventory((prev) => [item, ...prev]);
                 fetch('/api/v1/hardware/register', {

@@ -29,7 +29,7 @@ import {
 interface InventoryModuleProps {
   inventory: ScannedEquipment[];
   onOpenScanner: () => void;
-  onRemoveEquipment: (id: string) => void;
+  onRemoveEquipment: (id: string, macAddress?: string) => void;
   onAddManual: (equipment: ScannedEquipment) => void;
   showToast: (title: string, desc: string, type?: 'success' | 'info' | 'warning') => void;
 }
@@ -44,9 +44,11 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeviceForQr, setSelectedDeviceForQr] = useState<ScannedEquipment | null>(null);
+  const [deviceToDelete, setDeviceToDelete] = useState<ScannedEquipment | null>(null);
 
   // Manual Add Modal State
   const [showManualModal, setShowManualModal] = useState<boolean>(false);
+
   const [manualForm, setManualForm] = useState({
     name: 'AP Kariakoo 01',
     category: 'ap' as ScannedEquipment['category'],
@@ -452,14 +454,10 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                         </button>
 
                         <button
-                          onClick={() => {
-                            if (confirm(`Je, una uhakika unataka kuondoa kifaa cha "${device.name}" kwenye stoo?`)) {
-                              onRemoveEquipment(device.id);
-                              showToast('Kifaa Kimeondolewa', `"${device.name}" kimefutwa kwenye stoo.`, 'warning');
-                            }
-                          }}
-                          className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 hover:border-rose-500/50 text-rose-400 hover:text-white transition-colors"
-                          title="Ondoa Kifaa"
+                          type="button"
+                          onClick={() => setDeviceToDelete(device)}
+                          className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 hover:border-rose-500/50 text-rose-400 hover:text-white transition-colors cursor-pointer"
+                          title="Ondoa Kifaa kwenye Stoo na Seva"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -467,6 +465,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                     </td>
                   </tr>
                 ))
+
               )}
             </tbody>
           </table>
@@ -813,6 +812,81 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL YA KUTHIBITISHA KUFUTA KIFAA (IN-APP MODAL - HAITUMII WINDOW.CONFIRM) */}
+      {deviceToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-stone-900 border border-rose-500/40 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl shadow-rose-950/40">
+            <div className="flex items-start justify-between border-b border-stone-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30 shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Thibitisha Kufuta Kifaa</h4>
+                  <p className="text-[11px] text-stone-400">Ondoa kifaa hiki kabisa kwenye mfumo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeviceToDelete(null)}
+                className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Jina la Kifaa:</span>
+                <span className="text-white font-bold">{deviceToDelete.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Aina / Mfano:</span>
+                <span className="text-stone-300 font-mono text-[11px]">{deviceToDelete.manufacturer} · {deviceToDelete.model}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">MAC Address:</span>
+                <span className="text-emerald-400 font-mono font-bold text-[11px]">{deviceToDelete.macAddress}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Kituo (Site):</span>
+                <span className="text-stone-300">{deviceToDelete.site || 'Kariakoo'}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-300 leading-relaxed">
+              Je, una uhakika unataka kuondoa <strong>{deviceToDelete.name}</strong>? Kifaa hiki kitafutwa mara moja kwenye stoo ya vifaa na seva.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-stone-800">
+              <button
+                type="button"
+                onClick={() => setDeviceToDelete(null)}
+                className="px-4 py-2.5 bg-stone-800 hover:bg-stone-750 text-stone-300 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+              >
+                Ghairi
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = deviceToDelete.id;
+                  const mac = deviceToDelete.macAddress;
+                  const name = deviceToDelete.name;
+                  setDeviceToDelete(null);
+                  onRemoveEquipment(id, mac);
+                  showToast('Kifaa Kimeondolewa', `"${name}" kimefutwa kwenye stoo na seva.`, 'warning');
+                }}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 cursor-pointer shadow-lg shadow-rose-600/30 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Ndio, Futa Kifaa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

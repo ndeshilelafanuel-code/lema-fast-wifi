@@ -1,9 +1,14 @@
 import { createPool } from './index.ts';
 
 export async function initDbTables() {
+  if (!process.env.DATABASE_URL) {
+    console.log('[PostgreSQL Auto-Init] No DATABASE_URL set — operating with local file-backed stores.');
+    return;
+  }
   const pool = createPool();
   try {
     const client = await pool.connect();
+
     try {
       console.log('[PostgreSQL Auto-Init] Checking and initializing database tables...');
       
