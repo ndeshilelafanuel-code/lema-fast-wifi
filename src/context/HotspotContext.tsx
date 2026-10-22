@@ -291,13 +291,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('wifi_hotspot_towers');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.filter((t: NetworkTower) => 
-          t.id !== 'tower-1' && 
-          t.id !== 'tower-sokoni-1' && 
-          !t.name?.toLowerCase().includes('town center') &&
-          !t.name?.toLowerCase().includes('sokoni') &&
-          !t.location?.toLowerCase().includes('sokoni')
-        );
+        return parsed;
       }
     } catch (e) {}
     return [];

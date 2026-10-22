@@ -442,16 +442,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const saved = localStorage.getItem('lema_wifi_aps');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        // Filter out legacy dummy APs
-        return parsed.filter((ap: any) => 
-          !ap.name?.toLowerCase().includes('ruijie') && 
-          !ap.model?.toLowerCase().includes('ruijie') &&
-          !ap.name?.toLowerCase().includes('sokoni') &&
-          !ap.site?.toLowerCase().includes('sokoni') &&
-          !ap.name?.toLowerCase().includes('smart wifi node') &&
-          ap.mac !== '50:C7:BF:70:E2:B0'
-        );
+        return JSON.parse(saved);
       }
     } catch (e) {}
     return [];
@@ -465,7 +456,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     localStorage.setItem('lema_wifi_aps', JSON.stringify(accessPoints));
   }, [accessPoints]);
 
-  // If selectedApFilter had the dummy Ruijie name, reset it to 'all'
+  // Reset selected AP filter if invalid
   useEffect(() => {
     if (selectedApFilter.toLowerCase().includes('ruijie') || selectedApFilter === '50:C7:BF:70:E2:B0') {
       setSelectedApFilter('all');
@@ -497,13 +488,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           if (data && Array.isArray(data.inventory)) {
             if (data.inventory.length > 0) {
               if (isMounted) {
-                const filteredInventory = data.inventory.filter((item: ScannedEquipment) => 
-                  !item.name?.toLowerCase().includes('sokoni') &&
-                  !item.site?.toLowerCase().includes('sokoni') &&
-                  !item.name?.toLowerCase().includes('smart wifi node')
-                );
-                setEquipmentInventory(filteredInventory);
-                const serverAps = filteredInventory
+                setEquipmentInventory(data.inventory);
+                const serverAps = data.inventory
                   .filter((item: ScannedEquipment) => item.category === 'ap')
                   .map((item: ScannedEquipment) => {
                     const isOnline = item.status === 'online';
@@ -519,8 +505,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   });
                 if (serverAps.length > 0) {
                   setAccessPoints(serverAps);
-                } else {
-                  setAccessPoints([]);
                 }
               }
             } else {

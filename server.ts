@@ -6,6 +6,10 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { db } from './src/db/index.ts';
+import { hardware, towers } from './src/db/schema.ts';
+import { eq } from 'drizzle-orm';
+import { initDbTables } from './src/db/init.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -317,18 +321,50 @@ function saveHardwareToDisk() {
 
 loadSavedHardware();
 
-// API: Get Hardware Inventory (synchronized across phone, PC, and all browsers)
-app.get('/api/v1/hardware/inventory', (_req, res) => {
+// API: Get Hardware Inventory (synchronized with Cloud SQL PostgreSQL & disk backup)
+app.get('/api/v1/hardware/inventory', async (_req, res) => {
+  try {
+    const rows = await db.select().from(hardware);
+    if (rows && rows.length > 0) {
+      const items: HardwareItem[] = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category as any,
+        manufacturer: r.manufacturer,
+        model: r.model,
+        serialNumber: r.serialNumber,
+        macAddress: r.macAddress,
+        deviceKey: r.deviceKey || '',
+        site: r.site || '',
+        ipAddress: r.ipAddress || '',
+        poeVoltage: r.poeVoltage || '',
+        status: r.status as any,
+        lastSeen: r.lastSeen || '',
+        scannedAt: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
+      }));
+      savedHardware = items;
+      return res.json({
+        success: true,
+        source: 'cloud_sql_postgresql',
+        count: items.length,
+        inventory: items,
+      });
+    }
+  } catch (dbErr) {
+    console.warn('[Cloud SQL] Database read failed, using disk fallback:', dbErr);
+  }
+
   loadSavedHardware();
   res.json({
     success: true,
+    source: 'disk_backup',
     count: savedHardware.length,
     inventory: savedHardware,
   });
 });
 
 // API: Register or update hardware equipment
-app.post('/api/v1/hardware/register', (req, res) => {
+app.post('/api/v1/hardware/register', async (req, res) => {
   const item: HardwareItem = req.body;
   if (!item || !item.macAddress) {
     return res.status(400).json({ success: false, error: 'MAC address inahitajika' });
@@ -356,11 +392,49 @@ app.post('/api/v1/hardware/register', (req, res) => {
   }
 
   saveHardwareToDisk();
-  console.log(`[Hardware Inventory] 📡 Kifaa kimesajiliwa kwenye seva: ${cleanItem.model} (${cleanItem.macAddress})`);
+
+  // Persist to Cloud SQL PostgreSQL
+  try {
+    await db.insert(hardware).values({
+      id: cleanItem.id,
+      name: cleanItem.name,
+      category: cleanItem.category,
+      manufacturer: cleanItem.manufacturer || '',
+      model: cleanItem.model || '',
+      serialNumber: cleanItem.serialNumber || '',
+      macAddress: cleanMac,
+      deviceKey: (cleanItem as any).deviceKey || '',
+      site: cleanItem.site || '',
+      ipAddress: cleanItem.ipAddress || '',
+      poeVoltage: (cleanItem as any).poeVoltage || '',
+      status: cleanItem.status || 'online',
+      lastSeen: cleanItem.lastSeen || '',
+      autoProvisioned: (cleanItem as any).autoProvisioned || false,
+    }).onConflictDoUpdate({
+      target: hardware.macAddress,
+      set: {
+        name: cleanItem.name,
+        category: cleanItem.category,
+        manufacturer: cleanItem.manufacturer || '',
+        model: cleanItem.model || '',
+        serialNumber: cleanItem.serialNumber || '',
+        deviceKey: (cleanItem as any).deviceKey || '',
+        site: cleanItem.site || '',
+        ipAddress: cleanItem.ipAddress || '',
+        poeVoltage: (cleanItem as any).poeVoltage || '',
+        status: cleanItem.status || 'online',
+        lastSeen: cleanItem.lastSeen || '',
+        autoProvisioned: (cleanItem as any).autoProvisioned || false,
+      }
+    });
+    console.log(`[Cloud SQL PostgreSQL] ✅ Kifaa kimehifadhiwa kwenye Cloud SQL: ${cleanItem.model} (${cleanMac})`);
+  } catch (dbErr) {
+    console.error('[Cloud SQL PostgreSQL] Hitilafu wakati wa kuhifadhi kifaa:', dbErr);
+  }
 
   res.json({
     success: true,
-    message: 'Kifaa kimehifadhiwa kwenye seva kikamilifu!',
+    message: 'Kifaa kimehifadhiwa kwenye Cloud SQL PostgreSQL kikamilifu!',
     device: cleanItem,
     inventory: savedHardware,
   });
@@ -378,13 +452,21 @@ app.post('/api/v1/hardware/inventory', (req, res) => {
 });
 
 // API: Delete hardware equipment
-app.delete('/api/v1/hardware/equipment/:id', (req, res) => {
+app.delete('/api/v1/hardware/equipment/:id', async (req, res) => {
   const { id } = req.params;
   const targetId = id.toUpperCase();
   savedHardware = savedHardware.filter((h) => h.id !== id && h.macAddress.toUpperCase() !== targetId);
   saveHardwareToDisk();
-  console.log(`[Hardware Inventory] 🗑️ Kifaa kimeondolewa kwenye seva: ${id}`);
-  res.json({ success: true, message: 'Kifaa kimeondolewa kwenye seva', inventory: savedHardware });
+
+  try {
+    await db.delete(hardware).where(eq(hardware.macAddress, targetId));
+    await db.delete(hardware).where(eq(hardware.id, id));
+    console.log(`[Cloud SQL PostgreSQL] 🗑️ Kifaa kimeondolewa kwenye PostgreSQL: ${id}`);
+  } catch (dbErr) {
+    console.error('[Cloud SQL PostgreSQL] Hitilafu ya kufuta kifaa:', dbErr);
+  }
+
+  res.json({ success: true, message: 'Kifaa kimeondolewa kwenye Cloud SQL na seva', inventory: savedHardware });
 });
 
 // =========================================================================
@@ -2158,15 +2240,64 @@ function saveTowersToFile(towers: any[]) {
   }
 }
 
-app.get('/api/v1/towers', (_req, res) => {
-  return res.json({ success: true, towers: loadSavedTowers() });
+app.get('/api/v1/towers', async (_req, res) => {
+  try {
+    const rows = await db.select().from(towers);
+    if (rows && rows.length > 0) {
+      const diskTowers = loadSavedTowers();
+      const diskMap = new Map(diskTowers.map((t: any) => [t.id, t]));
+      const mapped = rows.map((r) => {
+        const extra = diskMap.get(r.id) || {};
+        return {
+          ...extra,
+          id: r.id,
+          name: r.name,
+          location: r.location || '',
+          ipAddress: r.ipAddress || '',
+          macAddress: r.macAddress || '',
+          status: r.status,
+          lastPingMs: r.lastPingMs || 5,
+        };
+      });
+      return res.json({ success: true, towers: mapped, source: 'cloud_sql_postgresql' });
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Towers] Read fallback to disk:', err);
+  }
+  return res.json({ success: true, towers: loadSavedTowers(), source: 'disk_backup' });
 });
 
-app.post('/api/v1/towers', (req, res) => {
-  const { towers } = req.body;
-  if (Array.isArray(towers)) {
-    saveTowersToFile(towers);
-    return res.json({ success: true, count: towers.length });
+app.post('/api/v1/towers', async (req, res) => {
+  const { towers: incomingTowers } = req.body;
+  if (Array.isArray(incomingTowers)) {
+    saveTowersToFile(incomingTowers);
+    try {
+      for (const t of incomingTowers) {
+        if (!t.id || !t.name) continue;
+        await db.insert(towers).values({
+          id: t.id,
+          name: t.name,
+          location: t.location || '',
+          ipAddress: t.ipAddress || '',
+          macAddress: t.macAddress || '',
+          status: t.status || 'active',
+          lastPingMs: typeof t.lastPingMs === 'number' ? t.lastPingMs : 5,
+        }).onConflictDoUpdate({
+          target: towers.id,
+          set: {
+            name: t.name,
+            location: t.location || '',
+            ipAddress: t.ipAddress || '',
+            macAddress: t.macAddress || '',
+            status: t.status || 'active',
+            lastPingMs: typeof t.lastPingMs === 'number' ? t.lastPingMs : 5,
+          }
+        });
+      }
+    } catch (dbErr) {
+      console.warn('[PostgreSQL Towers] Sync to DB notice:', dbErr);
+    }
+    return res.json({ success: true, count: incomingTowers.length });
   }
   return res.status(400).json({ success: false, error: 'Invalid format: towers must be an array' });
 });
@@ -2175,6 +2306,11 @@ app.post('/api/v1/towers', (req, res) => {
 // Start Express server and mount Vite in middleware mode
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+
+  // Initialize DB tables if they don't exist
+  initDbTables().catch((err) => {
+    console.warn('[DB Init] Background table setup notice:', err?.message || err);
+  });
 
   // Background Watchdog: Mark APs offline if no heartbeat received for 30 seconds (Bila MikroTik)
   setInterval(() => {

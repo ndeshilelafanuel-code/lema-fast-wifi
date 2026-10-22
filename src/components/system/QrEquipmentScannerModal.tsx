@@ -60,15 +60,15 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
   const [scannedRawData, setScannedRawData] = useState<string | null>(null);
   
   // Manual input state (Real hardware registration)
-  const [manualModel, setManualModel] = useState<string>('TP-Link Omada EAP772-Outdoor (Wi-Fi 7)');
+  const [manualModel, setManualModel] = useState<string>('');
   const [manualMac, setManualMac] = useState<string>('');
   const [manualSerial, setManualSerial] = useState<string>('');
-  const [manualSite, setManualSite] = useState<string>('Mnara Mkuu wa Nje');
+  const [manualSite, setManualSite] = useState<string>('');
 
   // Parsed Equipment Form State
   const [parsedData, setParsedData] = useState<Partial<ScannedEquipment> | null>(null);
   const [assignedName, setAssignedName] = useState<string>('');
-  const [assignedSite, setAssignedSite] = useState<string>('Sokoni Ghorofani');
+  const [assignedSite, setAssignedSite] = useState<string>('');
   const [autoAdoptCloud, setAutoAdoptCloud] = useState<boolean>(true);
   const [autoSsidAssign, setAutoSsidAssign] = useState<boolean>(true);
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
@@ -186,14 +186,14 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
       const obj = JSON.parse(data);
       if (obj && (obj.serial || obj.model || obj.mac)) {
         return {
-          manufacturer: obj.mfr || obj.manufacturer || (obj.model?.includes('EAP') ? 'TP-Link' : 'Generic'),
-          model: obj.model || 'Unknown Model',
-          serialNumber: obj.serial || obj.serialNumber || 'SN-' + Math.floor(Math.random() * 1000000),
-          macAddress: obj.mac || obj.macAddress || '20:E1:5D:' + Math.floor(Math.random() * 89 + 10) + ':00',
-          deviceKey: obj.deviceKey || obj.key || 'KEY-9482',
-          category: obj.category || (obj.model?.toLowerCase().includes('ap') || obj.model?.toLowerCase().includes('eap') ? 'ap' : 'router'),
-          poeVoltage: obj.poe || '24V Passive PoE',
-          ipAddress: obj.ip || '192.168.88.' + Math.floor(Math.random() * 100 + 10),
+          manufacturer: obj.mfr || obj.manufacturer || '',
+          model: obj.model || '',
+          serialNumber: obj.serial || obj.serialNumber || '',
+          macAddress: obj.mac || obj.macAddress || '',
+          deviceKey: obj.deviceKey || obj.key || '',
+          category: obj.category || 'ap',
+          poeVoltage: obj.poe || '',
+          ipAddress: obj.ip || '',
         };
       }
     } catch {
@@ -216,9 +216,9 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
     const serialMatch = data.match(/(?:S\/N|SN|Serial)[:\s]*([A-Za-z0-9]+)/i) || data.match(/\b([A-Z0-9]{10,16})\b/);
     const serial = fields['SERIAL'] || fields['SN'] || fields['S/N'] || fields['S'] || (serialMatch ? (serialMatch[1] || serialMatch[0]) : '');
 
-    const model = fields['MODEL'] || fields['M'] || (data.match(/(?:Model)[:\s]*([A-Za-z0-9-]+)/i)?.[1]) || (data.includes('EAP772') ? 'EAP772-Outdoor' : data.includes('EAP225') ? 'EAP225-Outdoor' : 'Kifaa cha Mtandao');
+    const model = fields['MODEL'] || fields['M'] || (data.match(/(?:Model)[:\s]*([A-Za-z0-9-]+)/i)?.[1]) || '';
     const deviceKey = fields['KEY'] || fields['DEVICEKEY'] || fields['PIN'] || '';
-    const mfr = fields['MFR'] || fields['BRAND'] || (model.toLowerCase().includes('eap') ? 'TP-Link' : model.toLowerCase().includes('rap') ? 'Ruijie' : model.toLowerCase().includes('rb') ? 'MikroTik' : 'Network Hardware');
+    const mfr = fields['MFR'] || fields['BRAND'] || '';
 
     let category: 'ap' | 'router' | 'switch' | 'starlink' | 'power' = 'ap';
     if (model.toLowerCase().includes('hex') || model.toLowerCase().includes('router') || model.toLowerCase().includes('rb')) category = 'router';
@@ -226,12 +226,25 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
     if (model.toLowerCase().includes('starlink')) category = 'starlink';
     if (model.toLowerCase().includes('battery') || model.toLowerCase().includes('ups')) category = 'power';
 
+    const rawTrimmed = data.trim();
+    // If no prefix but string looks like a TP-Link Omada Device Key (e.g. 16 chars or XXXX-XXXX-XXXX-XXXX)
+    let finalDeviceKey = deviceKey;
+    let finalModel = model;
+    let finalMfr = mfr;
+    if (!finalDeviceKey) {
+      const isKeyFormat = /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(rawTrimmed) ||
+                         (rawTrimmed.length === 16 && /^[A-Za-z0-9]{16}$/.test(rawTrimmed));
+      if (isKeyFormat) {
+        finalDeviceKey = rawTrimmed.toUpperCase();
+      }
+    }
+
     return {
-      manufacturer: mfr,
-      model: model,
+      manufacturer: finalMfr,
+      model: finalModel,
       serialNumber: serial ? serial.toUpperCase() : '',
       macAddress: mac ? mac.toUpperCase() : '',
-      deviceKey: deviceKey,
+      deviceKey: finalDeviceKey,
       category: category,
       poeVoltage: category === 'ap' ? '24V/48V PoE' : '12V DC',
       ipAddress: '',
@@ -253,8 +266,10 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
     
     if (parsed.macAddress) {
       showToast('QR Code Imesomwa!', `Kifaa: ${parsed.manufacturer} ${parsed.model} (MAC: ${parsed.macAddress})`, 'success');
+    } else if (parsed.deviceKey) {
+      showToast('Device Key ya TP-Link Imesomwa!', 'Kodi ya QR ina Device Key. Unaweza kuandika MAC address (k.m. D4-D6-DF-0D-B3-A0) iliyo kwenye lebo.', 'info');
     } else {
-      showToast('Hakuna MAC Address!', 'Msimbo umesomwa lakini hakuna anwani ya MAC iliyogunduliwa. Tafadhali andika MAC address mwenyewe.', 'warning');
+      showToast('Msimbo Umesomwa!', 'Unaweza kuthibitisha au kuongeza taarifa za ziada za kifaa hapa chini.', 'info');
     }
   };
 
@@ -295,21 +310,30 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
   // Complete Registration
   const handleConfirmRegistration = () => {
     if (!parsedData) return;
+    const cleanMac = parsedData.macAddress?.trim().toUpperCase();
+    if (!cleanMac) {
+      showToast(
+        'MAC Address Inahitajika',
+        'Tafadhali weka MAC Address halisi ya kifaa chako kutoka kwenye stika kabla ya kukamilisha usajili.',
+        'warning'
+      );
+      return;
+    }
     setIsRegistering(true);
 
     setTimeout(() => {
       const completeItem: ScannedEquipment = {
         id: `eq-${Date.now()}`,
-        name: assignedName || `${parsedData.model} Node`,
+        name: assignedName.trim() || parsedData.model || 'Kifaa cha Mtandao',
         category: parsedData.category || 'ap',
-        manufacturer: parsedData.manufacturer || 'TP-Link',
-        model: parsedData.model || 'EAP225-Outdoor',
-        serialNumber: parsedData.serialNumber || '22611SK004068',
-        macAddress: parsedData.macAddress || '20:E1:5D:44:16:D2',
-        deviceKey: parsedData.deviceKey || '12BA-E1EF-7DAA',
+        manufacturer: parsedData.manufacturer || '',
+        model: parsedData.model || '',
+        serialNumber: parsedData.serialNumber?.trim().toUpperCase() || '',
+        macAddress: cleanMac,
+        deviceKey: parsedData.deviceKey?.trim() || '',
         site: assignedSite,
-        ipAddress: parsedData.ipAddress || '192.168.88.25',
-        poeVoltage: parsedData.poeVoltage || '24V PoE',
+        ipAddress: parsedData.ipAddress || '',
+        poeVoltage: parsedData.poeVoltage || '',
         status: 'online',
         registeredAt: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
         autoProvisioned: autoAdoptCloud,
@@ -319,11 +343,11 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
       setIsRegistering(false);
       showToast(
         'Kifaa Kimesajiliwa!',
-        `"${completeItem.name}" kimesakinishwa kwenye stoo na kimeunganishwa kwenye mtandao!`,
+        `"${completeItem.name}" (MAC: ${completeItem.macAddress}) kimesajiliwa kwa usahihi!`,
         'success'
       );
       onClose();
-    }, 900);
+    }, 400);
   };
 
   // Manage camera on tab/modal change
@@ -528,15 +552,15 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
                       return;
                     }
                     const cleanMac = manualMac.trim().toUpperCase();
-                    const cleanSerial = (manualSerial.trim() || 'SN' + Math.floor(Math.random() * 900000 + 100000)).toUpperCase();
-                    const payload = `MFR:TP-Link;MODEL:${manualModel};SN:${cleanSerial};MAC:${cleanMac};KEY:EAP772-PASS;SITE:${manualSite};`;
+                    const cleanSerial = manualSerial.trim().toUpperCase();
+                    const payload = `MFR:;MODEL:${manualModel.trim()};SN:${cleanSerial};MAC:${cleanMac};KEY:;SITE:${manualSite.trim()};`;
                     handleCodeDetected(payload);
                   }}
                   className="space-y-4 bg-stone-950 p-5 rounded-2xl border border-stone-850 text-xs"
                 >
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                    <span>Sajili TP-Link EAP 772 yako halisi moja kwa moja kwa kuandika taarifa zake kutoka kwenye stika:</span>
+                    <span>Sajili kifaa chako halisi moja kwa moja kwa kuandika taarifa zake kutoka kwenye stika:</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -643,16 +667,13 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
 
                   <div className="space-y-1">
                     <label className="text-stone-400 font-bold block">Kituo Kilichowekwa (Installed Site):</label>
-                    <select
+                    <input
+                      type="text"
                       value={assignedSite}
                       onChange={(e) => setAssignedSite(e.target.value)}
-                      className="w-full px-3 py-2 bg-stone-900 border border-stone-700 rounded-xl text-white font-bold text-xs focus:outline-none cursor-pointer"
-                    >
-                      <option value="Mnara / Kituo cha WiFi (Tower AP)">Mnara / Kituo cha WiFi (Tower AP)</option>
-                      <option value="Kituo Kikuu cha Mtandao">Kituo Kikuu cha Mtandao (HQ)</option>
-                      <option value="Mtaa / Eneo la Wateja">Mtaa / Eneo la Wateja</option>
-                      <option value="Stoo Kuu (Standby)">Stoo Kuu (Vifaa vya Akiba / Spares)</option>
-                    </select>
+                      placeholder="Andika jina la kituo/site (wazi)"
+                      className="w-full px-3 py-2 bg-stone-900 border border-stone-700 rounded-xl text-white font-bold text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
                   </div>
 
                   <div className="space-y-1">
@@ -664,24 +685,41 @@ export const QrEquipmentScannerModal: React.FC<QrEquipmentScannerModalProps> = (
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-stone-400 font-bold block">Serial Number (S/N):</label>
-                    <div className="px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-emerald-400 font-mono font-bold">
-                      {parsedData.serialNumber}
-                    </div>
+                    <label className="text-stone-400 font-bold block flex items-center justify-between">
+                      <span>Serial Number (S/N):</span>
+                      <span className="text-[10px] text-stone-500 font-normal">Kwenye stika pembeni ya barcode</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={parsedData.serialNumber || ''}
+                      onChange={(e) => setParsedData({ ...parsedData, serialNumber: e.target.value.toUpperCase() })}
+                      placeholder="mf. 224B663000889"
+                      className="w-full px-3 py-2 bg-stone-900 border border-stone-700 rounded-xl text-emerald-400 font-mono font-bold text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-stone-400 font-bold block">MAC Address ya Kifaa:</label>
-                    <div className="px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 font-mono">
-                      {parsedData.macAddress}
-                    </div>
+                    <label className="text-stone-400 font-bold block">
+                      MAC Address ya Kifaa (Inahitajika):
+                    </label>
+                    <input
+                      type="text"
+                      value={parsedData.macAddress || ''}
+                      onChange={(e) => setParsedData({ ...parsedData, macAddress: e.target.value.toUpperCase() })}
+                      placeholder="mf. D4-D6-DF-0D-B3-A0"
+                      className="w-full px-3 py-2 bg-stone-900 border border-stone-700 rounded-xl text-stone-200 font-mono text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-stone-400 font-bold block">Device Key (Provisioning Secret):</label>
-                    <div className="px-3 py-2 bg-stone-900 border border-stone-800 rounded-xl text-stone-200 font-mono truncate">
-                      {parsedData.deviceKey}
-                    </div>
+                    <input
+                      type="text"
+                      value={parsedData.deviceKey || ''}
+                      onChange={(e) => setParsedData({ ...parsedData, deviceKey: e.target.value })}
+                      placeholder="mf. 12BA-E1EF-7DAA"
+                      className="w-full px-3 py-2 bg-stone-900 border border-stone-700 rounded-xl text-stone-300 font-mono text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    />
                   </div>
                 </div>
 
