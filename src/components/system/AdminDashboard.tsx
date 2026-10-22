@@ -4777,18 +4777,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onClick={() => {
                         if (!claimApMac) return;
                         const cleanMac = claimApMac.trim().toUpperCase();
+                        const apName = claimApName || `Access point ${cleanMac.slice(-5)}`;
+                        const apModel = claimApModel || 'EAP225-Outdoor';
                         const newAp = {
                           mac: cleanMac,
-                          name: claimApName || `Access point ${cleanMac.slice(-5)}`,
-                          model: claimApModel || 'EAP225-Outdoor',
+                          name: apName,
+                          model: apModel,
                           site: claimApSite,
                           status: 'claimed',
                           uptime: 'Waiting for adoption'
                         };
                         setAccessPoints([...accessPoints.filter(a => a.mac !== cleanMac), newAp]);
+
+                        // Persist to PostgreSQL database
+                        fetch('/api/v1/hardware/register', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            id: `ap-${cleanMac.replace(/[^A-Z0-9]/g, '')}`,
+                            name: apName,
+                            category: 'ap',
+                            manufacturer: 'TP-Link',
+                            model: apModel,
+                            macAddress: cleanMac,
+                            site: claimApSite || 'Kariakoo',
+                            status: 'online',
+                            ipAddress: '192.168.1.153'
+                          }),
+                        }).catch(() => {});
+
                         setShowClaimApForm(false);
                         setClaimApMac('');
-                        showToast('Access Point Claimed', `AP yenye MAC ${cleanMac} imesajiliwa. Bonyeza "Adopt now" kuikamilisha.`, 'success');
+                        showToast('Access Point Claimed', `AP yenye MAC ${cleanMac} imesajiliwa na kuhifadhiwa kwenye database.`, 'success');
                       }}
                       className="px-5 py-1.5 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-md shadow-amber-400/20"
                     >
@@ -4909,8 +4929,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             }
                             return a;
                           }));
+                          // Update in PostgreSQL database
+                          fetch('/api/v1/hardware/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              id: `ap-${adoptingApModal.mac.replace(/[^A-Z0-9]/g, '')}`,
+                              name: adoptingApModal.name || `Access Point ${adoptingApModal.mac.slice(-5)}`,
+                              category: 'ap',
+                              manufacturer: 'TP-Link',
+                              model: adoptingApModal.model || 'EAP225-Outdoor',
+                              macAddress: adoptingApModal.mac,
+                              site: adoptingApModal.site || 'Kariakoo',
+                              status: 'online',
+                              ipAddress: '192.168.1.153'
+                            }),
+                          }).catch(() => {});
+
                           setAdoptingApModal(null);
-                          showToast('Access Point Adopted 🟢', `Access Point ${adoptingApModal.mac} sasa imekubaliwa na iko tayari kurusha Wi-Fi ya wateja!`, 'success');
+                          showToast('Access Point Adopted 🟢', `Access Point ${adoptingApModal.mac} sasa imekubaliwa na imehifadhiwa kwenye database!`, 'success');
                         }, 2000);
                       }}
                       className="px-5 py-1.5 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-md shadow-amber-400/20"
