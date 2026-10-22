@@ -1,3 +1,4 @@
+import 'dotenv/config';
 process.env.DISABLE_HMR = 'true';
 
 import express from 'express';
