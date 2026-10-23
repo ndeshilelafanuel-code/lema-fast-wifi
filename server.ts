@@ -752,6 +752,83 @@ app.get('/api/v1/hardware/outage-alerts', (_req, res) => {
   return res.json({ success: true, count: outageAlertsLog.length, alerts: outageAlertsLog });
 });
 
+// Dynamic download of Windows AP Watchdog BAT script with auto-configured server URL and IP
+app.get(['/download/lema-ap-watcher.bat', '/api/v1/download/watcher.bat'], (req, res) => {
+  const host = req.get('host') || '127.0.0.1:3000';
+  const protocol = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+  const currentOrigin = `${protocol}://${host}`;
+  const targetIp = (req.query.ip as string) || '192.168.88.115';
+  const targetMac = (req.query.mac as string) || 'D4-D6-DF-0D-B3-A0';
+
+  const batContent = `@echo off
+setlocal enabledelayedexpansion
+title LEMA FAST WIFI - AP REAL-TIME WATCHDOG MONITOR
+color 0A
+
+cls
+echo =====================================================================
+echo          LEMA FAST WIFI - SMART AP WATCHDOG DAEMON (AUTO)
+echo =====================================================================
+echo  Hii programu inachunguza uhalisia wa AP yako kila sekunde 5-8.
+echo  - Ukichomeka AP: Mfumo unabadilika kuwa ONLINE moja kwa moja!
+echo  - Ukichomoa AP:  Mfumo unabadilika kuwa OFFLINE na kutuma kengele!
+echo =====================================================================
+echo.
+
+set AP_IP=${targetIp}
+set AP_MAC=${targetMac}
+set CURRENT_SERVER=${currentOrigin}
+set PROD_SERVER=https://lemawifi.online
+
+echo [MIPANGILIO ILIYOCHAGULIWA]
+echo  - AP IP Target: %AP_IP%
+echo  - AP MAC:       %AP_MAC%
+echo  - Seva ya Moja kwa Moja: %CURRENT_SERVER%
+echo.
+echo Inaanza kuchunguza mawasiliano ya AP sasa... (Bonyeza Ctrl+C kusimamisha)
+echo =====================================================================
+echo.
+
+set LAST_STATE=unknown
+
+:loop
+ping -n 1 -w 1000 %AP_IP% >nul 2>&1
+if errorlevel 1 (
+    if not "!LAST_STATE!"=="offline" (
+        echo [!TIME!] 🔴 [OFFLINE] AP haijibu Ping kwa %AP_IP%! Imezima au imechomoka.
+        echo          Inatuma taarifa ya OFFLINE kwenye mfumo wa Lema Fast WiFi...
+        
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; try { Invoke-RestMethod -Uri '%CURRENT_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=down' -TimeoutSec 4 | Out-Null } catch {}; try { Invoke-RestMethod -Uri '%PROD_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=down' -TimeoutSec 4 | Out-Null } catch {}" >nul 2>&1
+        
+        echo          [OK] Hali imesasishwa: Mfumo sasa unaonyesha OFFLINE! Kengele imetumwa WhatsApp na SMS.
+        set LAST_STATE=offline
+    ) else (
+        echo [!TIME!] 🔴 AP bado haipatikani (%AP_IP% OFFLINE)...
+    )
+) else (
+    if not "!LAST_STATE!"=="online" (
+        echo [!TIME!] 🟢 [ONLINE] AP imepatikana kikamilifu kwenye %AP_IP%!
+        echo          Inatuma taarifa ya ONLINE kwenye mfumo wa Lema Fast WiFi...
+        
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; try { Invoke-RestMethod -Uri '%CURRENT_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=up' -TimeoutSec 4 | Out-Null; Invoke-RestMethod -Uri '%CURRENT_SERVER%/api/v1/hardware/heartbeat?ip=%AP_IP%&mac=%AP_MAC%' -TimeoutSec 4 | Out-Null } catch {}; try { Invoke-RestMethod -Uri '%PROD_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=up' -TimeoutSec 4 | Out-Null; Invoke-RestMethod -Uri '%PROD_SERVER%/api/v1/hardware/heartbeat?ip=%AP_IP%&mac=%AP_MAC%' -TimeoutSec 4 | Out-Null } catch {}" >nul 2>&1
+        
+        echo          [OK] Hali imesasishwa: Mfumo sasa unaonyesha ONLINE!
+        set LAST_STATE=online
+    ) else (
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; try { Invoke-RestMethod -Uri '%CURRENT_SERVER%/api/v1/hardware/heartbeat?ip=%AP_IP%&mac=%AP_MAC%' -TimeoutSec 3 | Out-Null } catch {}" >nul 2>&1
+        echo [!TIME!] 🟢 AP ipo hewani (%AP_IP% ONLINE) - Mawasiliano mazuri.
+    )
+)
+
+timeout /t 6 /nobreak >nul
+goto loop
+`;
+
+  res.setHeader('Content-Type', 'application/x-bat; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="lema-ap-watcher.bat"');
+  return res.send(batContent);
+});
+
 // =========================================================================
 // ACTIVE SESSIONS & CONNECTED USERS PERSISTENCE (Synced across PC & Mobile)
 // =========================================================================

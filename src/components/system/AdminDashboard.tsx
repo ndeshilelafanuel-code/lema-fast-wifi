@@ -4753,60 +4753,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <td className="py-3.5 px-4 text-stone-200 uppercase">{ap.mac}</td>
                             <td className="py-3.5 px-4 font-sans text-stone-300">{ap.site || 'Nyansoo Site'}</td>
                             <td className="py-3.5 px-4 font-sans">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const nextStatus = isConnected ? 'offline' : 'online';
-                                  const updatedAps = accessPoints.map((a) =>
-                                    a.mac === ap.mac ? { ...a, status: nextStatus === 'online' ? 'connected' : 'disconnected' } : a
-                                  );
-                                  setAccessPoints(updatedAps as any);
-
-                                  // Update equipmentInventory
-                                  const nextInv = equipmentInventory.map((eq) =>
-                                    eq.macAddress.toUpperCase() === ap.mac.toUpperCase()
-                                      ? {
-                                          ...eq,
-                                          status: nextStatus as any,
-                                          lastSeen: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                        }
-                                      : eq
-                                  );
-                                  setEquipmentInventory(nextInv);
-
-                                  try {
-                                    await fetch(
-                                      `/api/v1/hardware/alert/outage?mac=${encodeURIComponent(ap.mac)}&status=${nextStatus === 'online' ? 'up' : 'down'}&name=${encodeURIComponent(ap.name || ap.model || '')}&site=${encodeURIComponent(ap.site || '')}`
-                                    );
-                                  } catch (e) {}
-
-                                  showToast(
-                                    nextStatus === 'online' ? '🟢 AP Imewashwa (Online)' : '🔴 AP Imezimwa (Offline)',
-                                    nextStatus === 'online'
-                                      ? `Kifaa ${ap.name || ap.mac} kipo hewani na kimesasishwa kwenye mfumo.`
-                                      : `Kengele: Kifaa ${ap.name || ap.mac} kimezimwa na arifa imetumwa.`,
-                                    nextStatus === 'online' ? 'success' : 'warning'
-                                  );
-                                }}
-                                title="Bofya hapa kubadilisha hadhi ya AP (Online / Offline) na kutuma kengele"
-                                className="cursor-pointer transition-transform active:scale-95 text-left"
-                              >
-                                {isConnected ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-max">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    Connected 🟢 (Bofya Kuzima)
-                                  </span>
-                                ) : isClaimed ? (
-                                  <span className="text-[11px] text-amber-400 font-sans">
-                                    Claimed — waiting for controller to see it
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center gap-1 w-max">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                                    Offline 🔴 (Bofya Kuwasha)
-                                  </span>
-                                )}
-                              </button>
+                              {isConnected ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-max">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  Connected 🟢 (Kiotomatiki)
+                                </span>
+                              ) : isClaimed ? (
+                                <span className="text-[11px] text-amber-400 font-sans">
+                                  Claimed — waiting for controller to see it
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1 w-max">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                  Offline 🔴 (Kiotomatiki via Watchdog)
+                                </span>
+                              )}
                             </td>
                             <td className="py-3.5 px-4 font-sans">
                               {isConnected ? (
