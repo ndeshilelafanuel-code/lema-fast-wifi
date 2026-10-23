@@ -191,9 +191,59 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     return null;
   });
 
-  // Client Device Identity (Real Session Data)
-  const clientMac = currentClientSession?.macAddress || 'N/A';
-  const clientIp = currentClientSession?.ipAddress || 'N/A';
+  // Extract & Persist Omada Controller Captive Portal Query Parameters
+  const [omadaParams] = useState<{
+    clientMac: string;
+    apMac: string;
+    target: string;
+    clientIp: string;
+    ssidName: string;
+    authType: string;
+  }>(() => {
+    let mac = '';
+    let ap = '';
+    let tgt = '';
+    let ip = '';
+    let ssid = '';
+    let auth = '';
+
+    if (typeof window !== 'undefined') {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        mac = p.get('clientMac') || p.get('client_mac') || p.get('mac') || p.get('cid') || '';
+        ap = p.get('apMac') || p.get('ap_mac') || p.get('ap') || '';
+        tgt = p.get('target') || p.get('target_ap_ip') || p.get('originUrl') || p.get('target_url') || '';
+        ip = p.get('clientIp') || p.get('ip') || '';
+        ssid = p.get('ssidName') || p.get('ssid') || '';
+        auth = p.get('authType') || '';
+
+        if (mac) sessionStorage.setItem('omada_client_mac', mac);
+        if (ap) sessionStorage.setItem('omada_ap_mac', ap);
+        if (tgt) sessionStorage.setItem('omada_target', tgt);
+        if (ip) sessionStorage.setItem('omada_client_ip', ip);
+        if (ssid) sessionStorage.setItem('omada_ssid', ssid);
+
+        if (!mac) mac = sessionStorage.getItem('omada_client_mac') || localStorage.getItem('omada_client_mac') || '';
+        if (!ap) ap = sessionStorage.getItem('omada_ap_mac') || '';
+        if (!tgt) tgt = sessionStorage.getItem('omada_target') || '';
+        if (!ip) ip = sessionStorage.getItem('omada_client_ip') || '';
+        if (!ssid) ssid = sessionStorage.getItem('omada_ssid') || 'Omada 772 ou';
+      } catch (e) {}
+    }
+
+    return {
+      clientMac: mac.toUpperCase(),
+      apMac: ap.toUpperCase(),
+      target: tgt,
+      clientIp: ip || '192.168.88.129',
+      ssidName: ssid || 'Omada 772 ou',
+      authType: auth || '0',
+    };
+  });
+
+  // Client Device Identity (Real Session Data or Omada Hardware MAC)
+  const clientMac = currentClientSession?.macAddress || omadaParams.clientMac || '48:D7:05:85:16:83';
+  const clientIp = currentClientSession?.ipAddress || omadaParams.clientIp || '192.168.88.129';
 
   // 2. In-Portal QR Camera Scanner
   const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
@@ -248,8 +298,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   const handleAutoConnect = () => {
     if (!rememberedDevice) return;
-    const res = redeemVoucher(rememberedDevice.voucherCode, rememberedDevice.phone);
+    const res = redeemVoucher(rememberedDevice.voucherCode, rememberedDevice.phone, clientMac, clientIp);
     if (res.success) {
+      authorizeOmadaHardware(clientMac);
       setStatusMessage({
         type: 'success',
         text: `⚡ Umeunganishwa kiotomatiki kwa MAC Binding (${rememberedDevice.mac})!`
@@ -266,8 +317,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   const handleQrScannedCode = (scannedCode: string) => {
     setVoucherCode(scannedCode);
     setShowQrScanner(false);
-    const res = redeemVoucher(scannedCode, phoneNumber);
+    const res = redeemVoucher(scannedCode, phoneNumber, clientMac, clientIp);
     if (res.success) {
+      authorizeOmadaHardware(clientMac);
       // Save device for Auto-Login if checked
       if (rememberDeviceChecked) {
         const savedData = {
@@ -453,7 +505,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 clearInterval(pollInterval);
                 setShowUssdPrompt(false);
                 setInlineUssdState(null);
-                redeemVoucher(statusData.voucherCode, phoneNumber);
+                redeemVoucher(statusData.voucherCode, phoneNumber, clientMac, clientIp);
+                authorizeOmadaHardware(clientMac);
                 setStatusMessage({
                   type: 'success',
                   text: `Malipo ya Tsh ${selectedPkg.price.toLocaleString()} yamekamilika! Umeunganishwa mtandaoni kwa vocha: ${statusData.voucherCode}.`
@@ -495,9 +548,10 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
           body: JSON.stringify({ orderId: currentOrderId }),
         }).catch(() => {});
       }
-      const result = await processMobilePayment(phoneNumber, selectedPackageId);
+      const result = await processMobilePayment(phoneNumber, selectedPackageId, clientMac, clientIp);
       setIsProcessing(false);
       if (result.success) {
+        authorizeOmadaHardware(clientMac);
         setStatusMessage({ type: 'success', text: result.message });
         const vCode = result.voucher?.code || '9482';
 
@@ -535,10 +589,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   // Helper to trigger hardware internet authorization on TP-Link Omada
   const authorizeOmadaHardware = (targetMac?: string) => {
     try {
-      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const effectiveMac = targetMac || urlParams?.get('clientMac') || urlParams?.get('mac') || clientMac || '';
-      const apMac = urlParams?.get('apMac') || urlParams?.get('ap_mac') || '';
-      const targetUrl = urlParams?.get('target') || 'http://connectivitycheck.gstatic.com/generate_204';
+      const effectiveMac = (targetMac || omadaParams.clientMac || clientMac || '').trim().toUpperCase();
+      const apMac = (omadaParams.apMac || '').trim().toUpperCase();
+      const targetUrl = omadaParams.target || 'http://connectivitycheck.gstatic.com/generate_204';
 
       // 1. Notify Backend Database & Omada Webhook Handler
       fetch('/api/v1/omada/client/authorize', {
@@ -546,52 +599,76 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mac: effectiveMac,
+          apMac: apMac,
+          clientIp: clientIp,
           hours: 24,
-          planName: 'Lema Fast WiFi Bundle',
+          planName: 'Lema Fast WiFi Internet Access',
         }),
       }).catch(() => {});
 
       // 2. Client-Side HTTP Authorization to Omada Gateway / Controller
+      let customTargetHost = '';
+      if (omadaParams.target) {
+        try {
+          const parsed = new URL(omadaParams.target);
+          if (parsed.host) customTargetHost = parsed.host;
+        } catch {
+          if (omadaParams.target.includes(':')) customTargetHost = omadaParams.target;
+        }
+      }
+
       const candidateHosts = [
+        customTargetHost,
+        '192.168.88.1:8088',
+        '192.168.88.1:8043',
         '192.168.0.254:8088',
         '192.168.1.1:8088',
-        '192.168.88.1:8088',
         '192.168.0.1:8088',
-      ];
+      ].filter(Boolean);
+
+      // Ensure hidden iframe exists so form POST is NOT blocked by Android CaptivePortalLogin
+      let hiddenIframe = document.getElementById('omada_auth_iframe') as HTMLIFrameElement | null;
+      if (!hiddenIframe) {
+        hiddenIframe = document.createElement('iframe');
+        hiddenIframe.id = 'omada_auth_iframe';
+        hiddenIframe.name = 'omada_auth_iframe';
+        hiddenIframe.style.display = 'none';
+        document.body.appendChild(hiddenIframe);
+      }
 
       candidateHosts.forEach((host) => {
-        try {
-          const authUrl = `http://${host}/portal/auth`;
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = authUrl;
-          form.target = '_blank';
-          form.style.display = 'none';
+        // Dispatch combinations: authType 0 (No Auth), authType 1 (Simple Password 'lemawifi'), authType 4 (External Portal)
+        [
+          { authType: '0', password: '' },
+          { authType: '1', password: 'lemawifi' },
+          { authType: '4', password: '' },
+        ].forEach(({ authType, password }) => {
+          try {
+            const authUrl = `http://${host}/portal/auth`;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = authUrl;
+            form.target = 'omada_auth_iframe';
+            form.style.display = 'none';
 
-          const inputMac = document.createElement('input');
-          inputMac.name = 'clientMac';
-          inputMac.value = effectiveMac;
-          form.appendChild(inputMac);
+            const addField = (name: string, value: string) => {
+              const input = document.createElement('input');
+              input.name = name;
+              input.value = value;
+              form.appendChild(input);
+            };
 
-          const inputAp = document.createElement('input');
-          inputAp.name = 'apMac';
-          inputAp.value = apMac;
-          form.appendChild(inputAp);
+            addField('clientMac', effectiveMac);
+            if (apMac) addField('apMac', apMac);
+            addField('authType', authType);
+            if (password) addField('password', password);
+            addField('target', targetUrl);
 
-          const inputAuth = document.createElement('input');
-          inputAuth.name = 'authType';
-          inputAuth.value = '0'; // No Auth / Pass-Through
-          form.appendChild(inputAuth);
-
-          const inputTarget = document.createElement('input');
-          inputTarget.name = 'target';
-          inputTarget.value = targetUrl;
-          form.appendChild(inputTarget);
-
-          document.body.appendChild(form);
-          form.submit();
-          setTimeout(() => form.remove(), 800);
-        } catch (e) {}
+            document.body.appendChild(form);
+            form.submit();
+            setTimeout(() => form.remove(), 1200);
+          } catch (e) {}
+        });
       });
     } catch (err) {
       console.warn('Omada hardware authorization attempt:', err);
@@ -603,7 +680,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     e.preventDefault();
     if (!voucherCode.trim()) return;
     const trimmed = voucherCode.trim();
-    const result = redeemVoucher(trimmed, phoneNumber);
+    const result = redeemVoucher(trimmed, phoneNumber, clientMac, clientIp);
     if (result.success) {
       setStatusMessage({ type: 'success', text: result.message });
       authorizeOmadaHardware(clientMac);
@@ -653,7 +730,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       }),
     }).catch(() => {});
 
-    const result = redeemVoucher('7492', phoneNumber);
+    const result = redeemVoucher('7492', phoneNumber, clientMac, clientIp);
     if (result.success) {
       authorizeOmadaHardware(clientMac);
       // Bind MAC for trial as well
@@ -701,6 +778,19 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     }
     return () => clearTimeout(timer);
   }, [isWatchingAdModal, adWatchCountdown]);
+
+  // Handle direct window navigation for Android CaptivePortalLogin release
+  const handleOpenInternet = () => {
+    authorizeOmadaHardware(clientMac);
+    setStatusMessage({
+      type: 'success',
+      text: '🚀 Inafungua intaneti... Subiri sekunde 1 simu ithibitishe muunganisho.'
+    });
+    const targetUrl = omadaParams.target || 'http://connectivitycheck.gstatic.com/generate_204';
+    setTimeout(() => {
+      window.location.href = targetUrl;
+    }, 350);
+  };
 
   return (
     <div className="w-full min-h-screen bg-[#f7f5ee] flex flex-col items-center justify-start p-0 sm:py-6 sm:px-4">
@@ -947,15 +1037,14 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 Kifurushi Chako: <strong>{currentClientSession.packageName}</strong>
               </p>
               <div className="pt-2">
-                <a
-                  href="http://connectivitycheck.gstatic.com/generate_204"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-xs rounded-xl shadow-md transition-all uppercase tracking-wide cursor-pointer animate-pulse"
+                <button
+                  type="button"
+                  onClick={handleOpenInternet}
+                  className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-stone-950 font-black text-xs rounded-xl shadow-md transition-all uppercase tracking-wide cursor-pointer animate-pulse"
                 >
-                  <Zap className="w-4 h-4" />
+                  <Zap className="w-4 h-4 fill-stone-950" />
                   <span>Fungua Intaneti / Anza Kuvinjari ➔</span>
-                </a>
+                </button>
               </div>
             </div>
 
@@ -1037,9 +1126,16 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
             </div>
 
             {/* Session Info */}
-            <div className="flex items-center justify-between text-[11px] px-1 bg-stone-900/60 p-2 rounded-xl border border-stone-800">
-               <span className="text-stone-400">IP: {clientIp}</span>
-               <span className="text-stone-400">MAC: {clientMac}</span>
+            <div className="flex items-center justify-between text-[11px] px-2.5 bg-stone-900/80 p-2 rounded-xl border border-stone-800 text-stone-300">
+               <span>IP: <strong className="font-mono text-stone-200">{clientIp}</strong></span>
+               <div className="flex items-center gap-1.5">
+                 <span className="font-mono text-stone-200">MAC: {clientMac}</span>
+                 {omadaParams.clientMac && (
+                   <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">
+                     ✓ Omada
+                   </span>
+                 )}
+               </div>
             </div>
 
             {/* Data Usage Progress Bar */}

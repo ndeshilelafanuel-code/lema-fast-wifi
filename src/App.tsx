@@ -82,8 +82,9 @@ export default function App() {
         'guide': '/guide',
       };
       const newPath = urlMap[view] || '/';
-      if (window.location.pathname !== newPath && !window.location.pathname.includes('/api/')) {
-        window.history.pushState({ view }, '', newPath);
+      const fullUrl = newPath + (window.location.search || '');
+      if (window.location.pathname + window.location.search !== fullUrl && !window.location.pathname.includes('/api/')) {
+        window.history.pushState({ view }, '', fullUrl);
       }
     } catch (e) {}
   };

@@ -1169,18 +1169,37 @@ app.all('/api/v1/omada/client/connect', (req, res) => {
   return res.json({ success: true, client: wifiClients[0], total: wifiClients.length });
 });
 
-// POST Authorize client (Grant free access or voucher from Dashboard)
+// POST Authorize client (Grant free access or voucher from Portal / Dashboard)
 app.post('/api/v1/omada/client/authorize', (req, res) => {
-  const { mac, hours, planName } = req.body;
-  const target = wifiClients.find((c) => c.mac.toUpperCase() === String(mac).toUpperCase());
-  if (!target) {
-    return res.status(404).json({ error: 'Client not found' });
+  const { mac, hours, planName, apMac, clientIp } = req.body;
+  const cleanMac = String(mac || '').trim().toUpperCase();
+  if (!cleanMac) {
+    return res.status(400).json({ error: 'MAC address is required' });
   }
 
-  target.status = 'active_authorized';
+  loadSavedWifiClients();
+  let target = wifiClients.find((c) => c.mac.toUpperCase() === cleanMac);
+  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (!target) {
+    target = {
+      id: `cli-${Date.now()}`,
+      ip: clientIp || '192.168.88.129',
+      mac: cleanMac,
+      ssid: 'Omada 772 ou',
+      apName: 'TP-Link Omada AP',
+      connectedAt: nowStr,
+      status: 'active_authorized'
+    };
+    wifiClients.unshift(target);
+  } else {
+    target.status = 'active_authorized';
+  }
+
   target.voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
 
   // Also push to activeSessions
+  loadSavedSessions();
   const newSession = {
     id: `sess-${Date.now()}`,
     voucherCode: target.voucherCode,
@@ -1188,19 +1207,45 @@ app.post('/api/v1/omada/client/authorize', (req, res) => {
     ipAddress: target.ip,
     macAddress: target.mac,
     connectedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + (hours || 2) * 3600 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + (hours || 24) * 3600 * 1000).toISOString(),
     packageId: 'pkg-grant',
-    packageName: planName || 'Idhini ya Msimamizi (Admin Authorization)',
+    packageName: planName || 'Lema Fast WiFi Internet Access',
     speedLimit: '3.0M/1.5M',
     bytesDown: 1048576,
     bytesUp: 524288
   };
 
-  savedActiveSessions.unshift(newSession);
+  savedActiveSessions = [newSession, ...savedActiveSessions.filter((s: any) => s.macAddress !== cleanMac)];
   saveSessionsToDisk();
   saveWifiClients();
 
-  return res.json({ success: true, message: 'Mteja ameruhusiwa intaneti kikamilifu!', session: newSession });
+  // Record pending authorization for local Omada Agent / Script
+  pushPendingOmadaAuth({
+    mac: cleanMac,
+    apMac: apMac || '',
+    authType: 0,
+    timestamp: Date.now()
+  });
+
+  return res.json({
+    success: true,
+    message: `Mteja (${cleanMac}) ameruhusiwa intaneti kikamilifu!`,
+    session: newSession
+  });
+});
+
+// Pending authorizations store for Omada local agent script
+const pendingOmadaAuthorizations: Array<{ mac: string; apMac?: string; authType: number; timestamp: number }> = [];
+
+function pushPendingOmadaAuth(item: { mac: string; apMac?: string; authType: number; timestamp: number }) {
+  pendingOmadaAuthorizations.unshift(item);
+  if (pendingOmadaAuthorizations.length > 100) pendingOmadaAuthorizations.pop();
+}
+
+app.get('/api/v1/omada/pending-authorizations', (_req, res) => {
+  const cutoff = Date.now() - 3600 * 1000; // last 1 hour
+  const recent = pendingOmadaAuthorizations.filter((a) => a.timestamp > cutoff);
+  return res.json({ success: true, count: recent.length, authorizations: recent });
 });
 
 // ==========================================

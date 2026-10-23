@@ -29,10 +29,12 @@ interface HotspotContextType {
   recordAdClick: (id: string) => void;
   generateVouchers: (packageId: string, count: number) => Voucher[];
   deleteVoucher: (id: string) => void;
-  redeemVoucher: (code: string, phone?: string) => { success: boolean; message: string; session?: ActiveSession };
+  redeemVoucher: (code: string, phone?: string, realMac?: string, realIp?: string) => { success: boolean; message: string; session?: ActiveSession };
   processMobilePayment: (
     phone: string,
-    packageId: string
+    packageId: string,
+    realMac?: string,
+    realIp?: string
   ) => Promise<{ success: boolean; message: string; voucher?: Voucher; session?: ActiveSession }>;
   disconnectSession: (sessionId: string) => void;
   reconnectByReference: (refNo: string) => { success: boolean; message: string; session?: ActiveSession };
@@ -511,7 +513,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return newVouchers;
   };
 
-  const redeemVoucher = (code: string, phone?: string) => {
+  const redeemVoucher = (code: string, phone?: string, realMac?: string, realIp?: string) => {
     const trimmed = code.trim();
     let existing = vouchers.find((v) => v.code === trimmed);
 
@@ -519,7 +521,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     fetch('/api/v1/vouchers/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: trimmed, phone }),
+      body: JSON.stringify({ code: trimmed, phone, mac: realMac }),
     }).catch(() => {});
 
     // If not found in local browser state but matches numeric code (like 4018 from user's screen)
@@ -565,16 +567,28 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       )
     );
 
-    // Create session
-    const randomIp = `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
-    const randomMac = `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
+    // Determine actual client MAC from parameter, sessionStorage, or fallback
+    let savedMac = '';
+    try {
+      savedMac = sessionStorage.getItem('omada_client_mac') || localStorage.getItem('omada_client_mac') || '';
+    } catch {}
+
+    const resolvedMac = (realMac || savedMac || '').trim().toUpperCase() ||
+      `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
+
+    let savedIp = '';
+    try {
+      savedIp = sessionStorage.getItem('omada_client_ip') || '';
+    } catch {}
+
+    const resolvedIp = realIp || savedIp || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
 
     const newSession: ActiveSession = {
       id: `sess-${Date.now()}`,
       voucherCode: existing.code,
       phoneNumber: phone,
-      ipAddress: randomIp,
-      macAddress: randomMac,
+      ipAddress: resolvedIp,
+      macAddress: resolvedMac,
       connectedAt: now.toISOString(),
       expiresAt,
       packageId: existing.packageId,
