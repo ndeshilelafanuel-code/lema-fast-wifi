@@ -532,6 +532,72 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     }
   };
 
+  // Helper to trigger hardware internet authorization on TP-Link Omada
+  const authorizeOmadaHardware = (targetMac?: string) => {
+    try {
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const effectiveMac = targetMac || urlParams?.get('clientMac') || urlParams?.get('mac') || clientMac || '';
+      const apMac = urlParams?.get('apMac') || urlParams?.get('ap_mac') || '';
+      const targetUrl = urlParams?.get('target') || 'http://connectivitycheck.gstatic.com/generate_204';
+
+      // 1. Notify Backend Database & Omada Webhook Handler
+      fetch('/api/v1/omada/client/authorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mac: effectiveMac,
+          hours: 24,
+          planName: 'Lema Fast WiFi Bundle',
+        }),
+      }).catch(() => {});
+
+      // 2. Client-Side HTTP Authorization to Omada Gateway / Controller
+      const candidateHosts = [
+        '192.168.0.254:8088',
+        '192.168.1.1:8088',
+        '192.168.88.1:8088',
+        '192.168.0.1:8088',
+      ];
+
+      candidateHosts.forEach((host) => {
+        try {
+          const authUrl = `http://${host}/portal/auth`;
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = authUrl;
+          form.target = '_blank';
+          form.style.display = 'none';
+
+          const inputMac = document.createElement('input');
+          inputMac.name = 'clientMac';
+          inputMac.value = effectiveMac;
+          form.appendChild(inputMac);
+
+          const inputAp = document.createElement('input');
+          inputAp.name = 'apMac';
+          inputAp.value = apMac;
+          form.appendChild(inputAp);
+
+          const inputAuth = document.createElement('input');
+          inputAuth.name = 'authType';
+          inputAuth.value = '0'; // No Auth / Pass-Through
+          form.appendChild(inputAuth);
+
+          const inputTarget = document.createElement('input');
+          inputTarget.name = 'target';
+          inputTarget.value = targetUrl;
+          form.appendChild(inputTarget);
+
+          document.body.appendChild(form);
+          form.submit();
+          setTimeout(() => form.remove(), 800);
+        } catch (e) {}
+      });
+    } catch (err) {
+      console.warn('Omada hardware authorization attempt:', err);
+    }
+  };
+
   // Redeem manual voucher
   const handleRedeemVoucher = (e: React.FormEvent) => {
     e.preventDefault();
@@ -540,6 +606,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     const result = redeemVoucher(trimmed, phoneNumber);
     if (result.success) {
       setStatusMessage({ type: 'success', text: result.message });
+      authorizeOmadaHardware(clientMac);
       
       // Auto-save MAC Binding if checked
       if (rememberDeviceChecked) {
@@ -577,8 +644,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     localStorage.setItem('wifi_trial_last_used', Date.now().toString());
     setTrialCooldownRemainingSec((settings.trialCooldownHours || 24) * 3600);
 
+    fetch('/api/v1/vouchers/trial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: phoneNumber,
+        macAddress: clientMac,
+      }),
+    }).catch(() => {});
+
     const result = redeemVoucher('7492', phoneNumber);
     if (result.success) {
+      authorizeOmadaHardware(clientMac);
       // Bind MAC for trial as well
       if (rememberDeviceChecked) {
         const savedData = {
@@ -861,7 +938,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         {/* ACTIVE SESSION DASHBOARD (If User Is Connected) */}
         {currentClientSession ? (
           <div className="py-6 space-y-5">
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-1">
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
               <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
               <h3 className="text-sm font-bold text-white">
                 {lang === 'sw' ? 'Umeunganishwa Mtandaoni!' : 'You Are Online!'}
@@ -869,6 +946,17 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               <p className="text-xs text-emerald-300">
                 Kifurushi Chako: <strong>{currentClientSession.packageName}</strong>
               </p>
+              <div className="pt-2">
+                <a
+                  href="http://connectivitycheck.gstatic.com/generate_204"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black text-xs rounded-xl shadow-md transition-all uppercase tracking-wide cursor-pointer animate-pulse"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>Fungua Intaneti / Anza Kuvinjari ➔</span>
+                </a>
+              </div>
             </div>
 
             {/* EXPIRY ALERT & ONE-CLICK TOP-UP BANNER */}

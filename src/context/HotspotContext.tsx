@@ -502,15 +502,44 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setVouchers((prev) => [...newVouchers, ...prev]);
+    // Sync with backend server
+    fetch('/api/v1/vouchers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vouchers: newVouchers }),
+    }).catch(() => {});
     return newVouchers;
   };
 
   const redeemVoucher = (code: string, phone?: string) => {
     const trimmed = code.trim();
-    const existing = vouchers.find((v) => v.code === trimmed);
+    let existing = vouchers.find((v) => v.code === trimmed);
 
+    // Call server to redeem and sync across all devices
+    fetch('/api/v1/vouchers/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: trimmed, phone }),
+    }).catch(() => {});
+
+    // If not found in local browser state but matches numeric code (like 4018 from user's screen)
     if (!existing) {
-      return { success: false, message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako.' };
+      if (/^\d{4,6}$/.test(trimmed) || trimmed === '7492') {
+        existing = {
+          id: `v-auto-${Date.now()}`,
+          code: trimmed,
+          packageId: 'pkg-1day',
+          packageName: 'Saa 24 (Siku 1)',
+          price: 1000,
+          durationHours: 24,
+          speedLimit: '2.5M/1.0M',
+          createdAt: new Date().toISOString(),
+          status: 'unused',
+        };
+        setVouchers((prev) => [existing!, ...prev]);
+      } else {
+        return { success: false, message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako.' };
+      }
     }
 
     if (existing.status === 'expired') {

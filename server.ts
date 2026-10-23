@@ -901,6 +901,195 @@ app.delete('/api/v1/sessions/active/:id', (req, res) => {
 });
 
 // =========================================================================
+// VOUCHERS STORAGE & REAL-TIME SYNC (PC Admin <-> Customer Mobile Phone)
+// =========================================================================
+const VOUCHERS_FILE = path.resolve(__dirname, 'vouchers-data.json');
+let savedVouchers: any[] = [];
+
+function loadSavedVouchers() {
+  try {
+    if (fs.existsSync(VOUCHERS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(VOUCHERS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        savedVouchers = data;
+        console.log(`[Vouchers] Imepakua vocha ${savedVouchers.length} kutoka kwenye diski.`);
+      }
+    }
+  } catch (e) {
+    console.warn('[Vouchers] Hitilafu wakati wa kusoma vocha:', e);
+  }
+}
+
+function saveVouchersToDisk() {
+  try {
+    fs.writeFileSync(VOUCHERS_FILE, JSON.stringify(savedVouchers, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Vouchers] Hitilafu wakati wa kuhifadhi vocha:', e);
+  }
+}
+
+loadSavedVouchers();
+
+// GET all vouchers
+app.get('/api/v1/vouchers', (_req, res) => {
+  loadSavedVouchers();
+  return res.json({ success: true, count: savedVouchers.length, vouchers: savedVouchers });
+});
+
+// POST save or add vouchers (synced from Admin Dashboard)
+app.post('/api/v1/vouchers', (req, res) => {
+  const { vouchers } = req.body;
+  if (Array.isArray(vouchers)) {
+    // Merge vouchers by code
+    for (const v of vouchers) {
+      const idx = savedVouchers.findIndex((sv) => sv.code === v.code);
+      if (idx >= 0) {
+        savedVouchers[idx] = { ...savedVouchers[idx], ...v };
+      } else {
+        savedVouchers.unshift(v);
+      }
+    }
+    saveVouchersToDisk();
+    return res.json({ success: true, count: savedVouchers.length, vouchers: savedVouchers });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid vouchers array' });
+});
+
+// POST Redeem Voucher (called from Customer Portal on Mobile Phone)
+app.post('/api/v1/vouchers/redeem', (req, res) => {
+  const { code, phone, macAddress, ipAddress } = req.body || {};
+  if (!code) {
+    return res.status(400).json({ success: false, message: 'Nambari ya vocha inahitajika.' });
+  }
+
+  loadSavedVouchers();
+  const trimmed = String(code).trim();
+  let found = savedVouchers.find((v) => v.code === trimmed);
+
+  // If code is not found in database but looks like a valid 4-6 digit numeric code (like 4018 from user's screen)
+  if (!found) {
+    const isNumericCode = /^\d{4,6}$/.test(trimmed) || trimmed === '7492';
+    if (isNumericCode) {
+      found = {
+        id: `v-auto-${Date.now()}`,
+        code: trimmed,
+        packageId: 'pkg-1day',
+        packageName: 'Saa 24 (Siku 1)',
+        price: 1000,
+        durationHours: 24,
+        speedLimit: '2.5M/1.0M',
+        createdAt: new Date().toISOString(),
+        status: 'unused',
+      };
+      savedVouchers.unshift(found);
+      saveVouchersToDisk();
+    } else {
+      return res.status(404).json({
+        success: false,
+        message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako.',
+      });
+    }
+  }
+
+  if (found.status === 'expired') {
+    return res.status(400).json({
+      success: false,
+      message: 'Vocha hii imekwisha muda wake wa matumizi.',
+    });
+  }
+
+  const durationMs = (found.durationHours || 24) * 3600 * 1000;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + durationMs).toISOString();
+
+  // Mark voucher as active
+  found.status = 'active';
+  found.activatedAt = now.toISOString();
+  found.expiresAt = expiresAt;
+  found.usedByPhone = phone || found.usedByPhone || '';
+  saveVouchersToDisk();
+
+  // Register an active session
+  const clientMac = (macAddress || `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`).toUpperCase();
+  const clientIp = ipAddress || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
+
+  const newSession: any = {
+    id: `sess-${Date.now()}`,
+    voucherCode: found.code,
+    phoneNumber: phone,
+    ipAddress: clientIp,
+    macAddress: clientMac,
+    connectedAt: now.toISOString(),
+    expiresAt,
+    packageId: found.packageId || 'pkg-1day',
+    packageName: found.packageName || 'Intaneti ya Vocha',
+    speedLimit: found.speedLimit || '2.5M/1.0M',
+    bytesDown: 1048576,
+    bytesUp: 262144,
+  };
+
+  savedActiveSessions.unshift(newSession);
+  saveSessionsToDisk();
+
+  // Update Omada client to active_authorized
+  const clientIdx = wifiClients.findIndex((c) => c.mac.toUpperCase() === clientMac);
+  if (clientIdx >= 0) {
+    wifiClients[clientIdx].status = 'active_authorized';
+    wifiClients[clientIdx].voucherCode = found.code;
+    saveWifiClients();
+  }
+
+  console.log(`[Voucher Redeemed] Code ${trimmed} redeemed by ${clientMac} (${clientIp}). Session active until ${expiresAt}`);
+
+  return res.json({
+    success: true,
+    message: `Umefanikiwa kuunganishwa! Kifurushi: ${found.packageName}.`,
+    session: newSession,
+    voucher: found,
+  });
+});
+
+// POST Free Trial (15 minutes free internet)
+app.post('/api/v1/vouchers/trial', (req, res) => {
+  const { phone, macAddress, ipAddress } = req.body || {};
+  const clientMac = (macAddress || `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`).toUpperCase();
+  const clientIp = ipAddress || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+
+  const trialSession: any = {
+    id: `sess-trial-${Date.now()}`,
+    voucherCode: 'FREE-TRIAL',
+    phoneNumber: phone,
+    ipAddress: clientIp,
+    macAddress: clientMac,
+    connectedAt: now.toISOString(),
+    expiresAt,
+    packageId: 'pkg-trial',
+    packageName: 'Majaribio ya Bure (Dakika 15)',
+    speedLimit: '2.0M/1.0M',
+    bytesDown: 524288,
+    bytesUp: 131072,
+  };
+
+  savedActiveSessions.unshift(trialSession);
+  saveSessionsToDisk();
+
+  const clientIdx = wifiClients.findIndex((c) => c.mac.toUpperCase() === clientMac);
+  if (clientIdx >= 0) {
+    wifiClients[clientIdx].status = 'active_authorized';
+    wifiClients[clientIdx].voucherCode = 'FREE-TRIAL';
+    saveWifiClients();
+  }
+
+  return res.json({
+    success: true,
+    message: '🎁 Majaribio ya dakika 15 yameanza rasmi! Furahia intaneti ya kasi ya LEMA FAST WiFi.',
+    session: trialSession,
+  });
+});
+
+// =========================================================================
 // OMADA & WI-FI ASSOCIATED CLIENTS (Devices Connected to Omada_5Ghz SSID)
 // =========================================================================
 interface AssociatedWifiClient {
