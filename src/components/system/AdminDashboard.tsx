@@ -367,7 +367,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [selectedPkgForGen, setSelectedPkgForGen] = useState<string>(settings.packages[1]?.id || settings.packages[0]?.id);
   const [generateCount, setGenerateCount] = useState<number>(25);
-  const [voucherFilter, setVoucherFilter] = useState<'all' | 'unused' | 'active'>('all');
+  const [voucherFilter, setVoucherFilter] = useState<'all' | 'unused' | 'active' | 'expired'>('all');
   const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
   const [showScriptModal, setShowScriptModal] = useState<boolean>(false);
   const [showDailyReportModal, setShowDailyReportModal] = useState<boolean>(false);
@@ -2800,15 +2800,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                   <button
                     onClick={() => setVoucherFilter('unused')}
-                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${voucherFilter === 'unused' ? 'bg-amber-400 text-stone-950' : 'text-stone-400'}`}
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${voucherFilter === 'unused' ? 'bg-amber-400 text-stone-950 font-bold' : 'text-stone-400 hover:text-white'}`}
                   >
                     Hazijatumika ({vouchers.filter((v) => v.status === 'unused').length})
                   </button>
                   <button
                     onClick={() => setVoucherFilter('active')}
-                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${voucherFilter === 'active' ? 'bg-amber-400 text-stone-950' : 'text-stone-400'}`}
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${voucherFilter === 'active' ? 'bg-emerald-500 text-stone-950 font-bold' : 'text-stone-400 hover:text-white'}`}
                   >
                     Zilizo Active ({vouchers.filter((v) => v.status === 'active').length})
+                  </button>
+                  <button
+                    onClick={() => setVoucherFilter('expired')}
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${voucherFilter === 'expired' ? 'bg-rose-500 text-white font-bold' : 'text-stone-400 hover:text-white'}`}
+                  >
+                    Zilizotumika ({vouchers.filter((v) => v.status === 'expired').length})
                   </button>
                 </div>
               </div>
@@ -2835,18 +2841,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <td className="p-4 font-sans text-white font-bold">{v.packageName}</td>
                         <td className="p-4 text-emerald-400 font-bold">Tsh {v.price.toLocaleString()}</td>
                         <td className="p-4 font-sans text-stone-300">{v.durationHours} masaa</td>
-                        <td className="p-4 font-sans">{v.usedByPhone || '—'}</td>
-                        <td className="p-4 text-stone-400 font-sans">{v.expiresAt ? new Date(v.expiresAt).toLocaleTimeString() : '—'}</td>
-                        <td className="p-4 uppercase">{v.macAddress || '—'}</td>
+                        <td className="p-4 font-sans text-stone-200">{v.usedByPhone || '—'}</td>
+                        <td className="p-4 text-stone-300 font-sans">{v.expiresAt ? new Date(v.expiresAt).toLocaleTimeString() : '—'}</td>
+                        <td className="p-4 uppercase text-stone-300 font-mono">{v.macAddress || '—'}</td>
                         <td className="p-4">
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold border ${
                             v.status === 'unused'
                               ? 'bg-sky-500/10 border-sky-500/30 text-sky-400'
                               : v.status === 'active'
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                              : 'bg-stone-800 border-stone-700 text-stone-400'
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-bold animate-pulse'
+                              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                           }`}>
-                            {v.status.toUpperCase()}
+                            {v.status === 'expired' ? 'ZILIZOTUMIKA (EXPIRED)' : v.status.toUpperCase()}
                           </span>
                         </td>
                         <td className="p-4">

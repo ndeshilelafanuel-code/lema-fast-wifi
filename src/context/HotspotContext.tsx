@@ -246,15 +246,19 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.sessions)) {
-            if (data.sessions.length > 0 && isMounted) {
-              setActiveSessions(data.sessions);
-            } else if (activeSessions.length > 0) {
-              // Push local sessions to server if server is empty
-              fetch('/api/v1/sessions/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessions: activeSessions }),
-              }).catch(() => {});
+            // De-duplicate by MAC address to strictly enforce 1 Device = 1 Active Session
+            const map = new Map<string, ActiveSession>();
+            for (const s of data.sessions) {
+              const mac = (s.macAddress || '').trim().toUpperCase();
+              if (mac) {
+                if (!map.has(mac)) map.set(mac, s);
+              } else {
+                map.set(s.id || Math.random().toString(), s);
+              }
+            }
+            const uniqueSessions = Array.from(map.values());
+            if (isMounted) {
+              setActiveSessions(uniqueSessions);
             }
           }
         }
@@ -264,7 +268,53 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     fetchServerSessions();
-    const interval = setInterval(fetchServerSessions, 5000); // Poll every 5s for live connected users sync
+    const interval = setInterval(fetchServerSessions, 3500); // Poll every 3.5s for live connected users sync
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sync vouchers live with backend server so PC Admin Dashboard updates status (unused -> active -> expired) in real-time
+  useEffect(() => {
+    let isMounted = true;
+    const fetchServerVouchers = async () => {
+      try {
+        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+        const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+        const res = await fetch('/api/v1/vouchers', {
+          headers: {
+            'x-admin-key': adminKey,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Array.isArray(data.vouchers) && data.vouchers.length > 0 && isMounted) {
+            const mapped: Voucher[] = data.vouchers.map((v: any) => ({
+              id: v.id || `v-${v.code}`,
+              code: v.code,
+              packageId: v.packageId || 'pkg-custom',
+              packageName: v.packageName || 'Intaneti ya Vocha',
+              price: v.price || 1000,
+              durationHours: v.durationHours || 24,
+              speedLimit: v.speedLimit || '2.5M/1.0M',
+              status: v.status || 'unused',
+              createdAt: v.createdAt || new Date().toISOString(),
+              activatedAt: v.activatedAt,
+              expiresAt: v.expiresAt,
+              usedByPhone: v.usedByPhone,
+              macAddress: v.macAddress || v.boundMac || '',
+            }));
+            setVouchers(mapped);
+          }
+        }
+      } catch (e) {
+        // silent fallback
+      }
+    };
+
+    fetchServerVouchers();
+    const interval = setInterval(fetchServerVouchers, 3000); // Poll every 3s
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -283,12 +333,6 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(activeSessions));
-    // Also sync to server
-    fetch('/api/v1/sessions/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions: activeSessions }),
-    }).catch(() => {});
   }, [activeSessions]);
 
   // Client's currently active session in this browser
@@ -560,21 +604,6 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const now = new Date();
     const expiresAt = new Date(now.getTime() + durationMs).toISOString();
 
-    // Mark as active
-    setVouchers((prev) =>
-      prev.map((v) =>
-        v.id === existing.id
-          ? {
-              ...v,
-              status: 'active',
-              activatedAt: now.toISOString(),
-              expiresAt,
-              usedByPhone: phone || v.usedByPhone,
-            }
-          : v
-      )
-    );
-
     // Determine actual client MAC from parameter, sessionStorage, or fallback
     let savedMac = '';
     try {
@@ -591,6 +620,29 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const resolvedIp = realIp || savedIp || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
 
+    // Mark current voucher as active, and expire any previous voucher for this exact MAC address
+    setVouchers((prev) =>
+      prev.map((v) => {
+        if (v.id === existing.id || v.code === existing.code) {
+          return {
+            ...v,
+            status: 'active',
+            activatedAt: now.toISOString(),
+            expiresAt,
+            usedByPhone: phone || v.usedByPhone,
+            macAddress: resolvedMac,
+          };
+        }
+        if (v.macAddress?.toUpperCase() === resolvedMac && v.status === 'active') {
+          return {
+            ...v,
+            status: 'expired',
+          };
+        }
+        return v;
+      })
+    );
+
     const newSession: ActiveSession = {
       id: `sess-${Date.now()}`,
       voucherCode: existing.code,
@@ -606,7 +658,11 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       bytesUp: 262144,   // 256KB
     };
 
-    setActiveSessions((prev) => [newSession, ...prev]);
+    // Strictly enforce 1 device MAC = 1 active session: replace any prior session for this MAC
+    setActiveSessions((prev) => [
+      newSession,
+      ...prev.filter((s) => s.macAddress?.toUpperCase() !== resolvedMac.toUpperCase())
+    ]);
     setCurrentClientSession(newSession);
 
     return {
@@ -718,8 +774,49 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const disconnectSession = (sessionId: string) => {
-    setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    if (currentClientSession?.id === sessionId) {
+    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+    const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+
+    const targetSession = activeSessions.find(
+      (s) => s.id === sessionId || s.macAddress?.toUpperCase() === sessionId.toUpperCase()
+    );
+    const mac = targetSession?.macAddress || (sessionId.includes(':') || sessionId.includes('-') ? sessionId : '');
+    const vCode = targetSession?.voucherCode;
+
+    // Send DELETE to server API so Omada Controller is instructed to terminate internet access
+    fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}`, {
+      method: 'DELETE',
+      headers: {
+        'x-admin-key': adminKey,
+      },
+    }).catch((err) => console.error('[Disconnect Network Error]:', err));
+
+    // Update local vouchers list: mark voucher as expired (used)
+    if (vCode) {
+      setVouchers((prev) =>
+        prev.map((v) =>
+          v.code === vCode ? { ...v, status: 'expired' } : v
+        )
+      );
+    } else if (mac) {
+      setVouchers((prev) =>
+        prev.map((v) =>
+          v.macAddress?.toUpperCase() === mac.toUpperCase() && v.status === 'active'
+            ? { ...v, status: 'expired' }
+            : v
+        )
+      );
+    }
+
+    setActiveSessions((prev) =>
+      prev.filter(
+        (s) => s.id !== sessionId && s.macAddress?.toUpperCase() !== sessionId.toUpperCase()
+      )
+    );
+    if (
+      currentClientSession?.id === sessionId ||
+      (mac && currentClientSession?.macAddress?.toUpperCase() === mac.toUpperCase())
+    ) {
       setCurrentClientSession(null);
     }
   };

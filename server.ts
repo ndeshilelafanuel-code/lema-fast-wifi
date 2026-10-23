@@ -1,6 +1,13 @@
 import 'dotenv/config';
 process.env.DISABLE_HMR = 'true';
 
+process.on('uncaughtException', (err) => {
+  console.error('[Uncaught Exception Handled]:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Unhandled Rejection Handled]:', reason);
+});
+
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -11,7 +18,7 @@ import { db } from './src/db/index.ts';
 import { hardware, towers as towersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
-import { omadaAuthorize, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId } from './omada.ts';
+import { omadaAuthorize, omadaUnauthorize, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId } from './omada.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -898,6 +905,11 @@ app.post('/api/v1/sessions/active', (req, res) => {
   if (!session || !session.id) {
     return res.status(400).json({ success: false, error: 'Session ID inahitajika' });
   }
+  const cleanMac = (session.macAddress || session.mac || '').trim().toUpperCase();
+  loadSavedSessions();
+  if (cleanMac) {
+    savedActiveSessions = savedActiveSessions.filter((s) => (s.macAddress || s.mac || '').trim().toUpperCase() !== cleanMac);
+  }
   const existingIdx = savedActiveSessions.findIndex((s) => s.id === session.id);
   if (existingIdx >= 0) {
     savedActiveSessions[existingIdx] = { ...savedActiveSessions[existingIdx], ...session };
@@ -916,16 +928,88 @@ app.get('/api/v1/sessions/sync', (_req, res) => {
 app.post('/api/v1/sessions/sync', (req, res) => {
   const { sessions } = req.body;
   if (Array.isArray(sessions)) {
-    savedActiveSessions = sessions;
+    const map = new Map();
+    for (const s of sessions) {
+      const mac = (s.macAddress || s.mac || '').trim().toUpperCase();
+      if (mac) {
+        map.set(mac, s);
+      } else {
+        map.set(s.id || Math.random(), s);
+      }
+    }
+    savedActiveSessions = Array.from(map.values());
     saveSessionsToDisk();
     return res.json({ success: true, count: savedActiveSessions.length, sessions: savedActiveSessions });
   }
   res.status(400).json({ success: false, error: 'Invalid sessions array' });
 });
 
-app.delete('/api/v1/sessions/active/:id', (req, res) => {
+app.delete('/api/v1/sessions/active/:id', async (req, res) => {
   const { id } = req.params;
-  savedActiveSessions = savedActiveSessions.filter((s) => s.id !== id);
+  const queryMac = (req.query.mac ? String(req.query.mac) : '').trim().toUpperCase();
+  loadSavedSessions();
+  const targetId = id.trim().toUpperCase();
+  const sessionToDelete = savedActiveSessions.find(
+    (s) =>
+      s.id === id ||
+      s.id?.toUpperCase() === targetId ||
+      (s.macAddress || '').trim().toUpperCase() === targetId ||
+      (queryMac && (s.macAddress || '').trim().toUpperCase() === queryMac)
+  );
+
+  const clientMac =
+    sessionToDelete?.macAddress ||
+    sessionToDelete?.mac ||
+    queryMac ||
+    (targetId.includes(':') || targetId.includes('-') ? targetId : '');
+
+  if (clientMac) {
+    try {
+      await omadaUnauthorize(clientMac);
+      console.log(`[Omada Disconnect] Unauthorizing MAC ${clientMac}`);
+    } catch (err: any) {
+      console.warn('[Omada Disconnect Notice]:', err?.message);
+    }
+  }
+
+  // Update associated voucher to expired (it has been used)
+  const vCode = sessionToDelete?.voucherCode;
+  loadSavedVouchers();
+  if (vCode) {
+    const v = savedVouchers.find((v) => v.code === vCode);
+    if (v) {
+      v.status = 'expired';
+      v.macAddress = clientMac || v.macAddress;
+      saveVouchersToDisk();
+    }
+  } else if (clientMac) {
+    const v = savedVouchers.find(
+      (v) => (v.boundMac?.toUpperCase() === clientMac || v.macAddress?.toUpperCase() === clientMac) && v.status === 'active'
+    );
+    if (v) {
+      v.status = 'expired';
+      saveVouchersToDisk();
+    }
+  }
+
+  // Update Wi-Fi clients status to pending_login
+  if (clientMac) {
+    loadSavedWifiClients();
+    const wIdx = wifiClients.findIndex((c) => c.mac.toUpperCase() === clientMac.toUpperCase());
+    if (wIdx >= 0) {
+      wifiClients[wIdx].status = 'pending_login';
+      wifiClients[wIdx].voucherCode = undefined;
+      saveWifiClients();
+    }
+  }
+
+  savedActiveSessions = savedActiveSessions.filter(
+    (s) =>
+      s.id !== id &&
+      s.id?.toUpperCase() !== targetId &&
+      (s.macAddress || '').trim().toUpperCase() !== targetId &&
+      (!clientMac || (s.macAddress || '').trim().toUpperCase() !== clientMac)
+  );
   saveSessionsToDisk();
   res.json({ success: true, sessions: savedActiveSessions });
 });
@@ -963,7 +1047,12 @@ loadSavedVouchers();
 // GET all vouchers
 app.get('/api/v1/vouchers', (_req, res) => {
   loadSavedVouchers();
-  return res.json({ success: true, count: savedVouchers.length, vouchers: savedVouchers });
+  const normalized = savedVouchers.map((v) => ({
+    ...v,
+    macAddress: v.macAddress || v.boundMac || '',
+    boundMac: v.boundMac || v.macAddress || '',
+  }));
+  return res.json({ success: true, count: normalized.length, vouchers: normalized });
 });
 
 // POST save or add vouchers (synced from Admin Dashboard)
@@ -1087,10 +1176,20 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   }
 
   const expiresAt = new Date(expiresAtMs).toISOString();
+  const cleanMacNorm = normalizeMac(effectiveClientMac);
+
+  // If this device was already using another voucher, mark that previous voucher as expired!
+  savedVouchers.forEach((v: any) => {
+    if (v.code !== found.code && normalizeMac(v.boundMac || v.macAddress) === cleanMacNorm && v.status === 'active') {
+      v.status = 'expired';
+    }
+  });
+
   found.status = 'active';
   found.activatedAt = found.activatedAt || new Date(now).toISOString();
   found.expiresAt = expiresAt;
   found.boundMac = effectiveClientMac;
+  found.macAddress = effectiveClientMac;
   found.usedByPhone = phone || found.usedByPhone || '';
   saveVouchersToDisk();
 
@@ -1110,7 +1209,10 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   };
 
   loadSavedSessions();
-  savedActiveSessions = [session, ...savedActiveSessions.filter((s: any) => s.macAddress !== effectiveClientMac)];
+  savedActiveSessions = [
+    session,
+    ...savedActiveSessions.filter((s: any) => normalizeMac(s.macAddress || s.mac) !== cleanMacNorm)
+  ];
   saveSessionsToDisk();
 
   // Also update associated wifi client list
@@ -3034,7 +3136,11 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Lema Fast WiFi Server running on port ${PORT}`);
+  }).on('error', (err) => {
+    console.error('[Server Listen Error]:', err);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('[Server Start Critical Error]:', err);
+});

@@ -370,6 +370,37 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
 }
 
 /**
+ * Unauthorize (disconnect) client device from Omada Controller
+ * Route in Omada Controller v5.x / v6.x: POST /<controllerId>/api/v2/hotspot/extPortal/unauth
+ */
+export async function omadaUnauthorize(clientMac: string) {
+  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) return;
+  try {
+    const id = await resolveControllerId();
+    const clientMacFormatted = formatMac(clientMac);
+    const send = () =>
+      call(
+        'POST',
+        `/${id}/api/v2/hotspot/extPortal/unauth`,
+        { clientMac: clientMacFormatted },
+        { 'Csrf-Token': csrf }
+      );
+
+    if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
+      await omadaLogin();
+    }
+    let r = await send();
+    if (r.json?.errorCode !== 0 && (r.statusCode === 401 || r.statusCode === 403)) {
+      await omadaLogin();
+      r = await send();
+    }
+    console.log(`[Omada Controller] 🛑 Client ${clientMacFormatted} unauthorized (disconnected).`);
+  } catch (err: any) {
+    console.warn('[Omada Unauthorize Notice]:', err.message);
+  }
+}
+
+/**
  * Comprehensive connectivity check and operator test
  */
 export async function testOmadaConnection(): Promise<{ success: boolean; message: string; details?: any }> {
