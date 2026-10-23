@@ -513,8 +513,12 @@ async function processApOutageAlert(params: {
   
   // Find AP in inventory
   loadSavedHardware();
+  const cleanParamMac = (params.apMac || '').replace(/[:-]/g, '').toUpperCase();
   const foundDevice = savedHardware.find(
-    (h) => (h.ipAddress && h.ipAddress.includes(targetIp)) || (params.apMac && h.macAddress.toUpperCase() === params.apMac.toUpperCase())
+    (h) =>
+      (cleanParamMac && h.macAddress.replace(/[:-]/g, '').toUpperCase() === cleanParamMac) ||
+      (params.apIp && h.ipAddress && h.ipAddress.includes(params.apIp)) ||
+      (!cleanParamMac && !params.apIp && savedHardware.length === 1)
   );
   
   const apName = params.apName || foundDevice?.name || 'Smart WiFi AP';
@@ -525,6 +529,7 @@ async function processApOutageAlert(params: {
   if (foundDevice) {
     foundDevice.status = status === 'down' ? 'offline' : 'online';
     foundDevice.lastSeen = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    (foundDevice as any).lastHeartbeat = status === 'up' ? Date.now() : 0;
     saveHardwareToDisk();
   }
 
@@ -666,8 +671,12 @@ app.all('/api/v1/hardware/heartbeat', async (req, res) => {
   const targetMac = (query.mac || body.mac || '') as string;
 
   loadSavedHardware();
+  const cleanTargetMac = targetMac.replace(/[:-]/g, '').toUpperCase();
   const device = savedHardware.find(
-    (h) => (h.ipAddress && h.ipAddress.includes(targetIp)) || (targetMac && h.macAddress.toUpperCase() === targetMac.toUpperCase())
+    (h) =>
+      (cleanTargetMac && h.macAddress.replace(/[:-]/g, '').toUpperCase() === cleanTargetMac) ||
+      (targetIp && h.ipAddress && h.ipAddress.includes(targetIp)) ||
+      (!targetMac && savedHardware.length === 1)
   );
 
   const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2426,7 +2435,7 @@ app.post('/api/v1/towers', async (req, res) => {
 
 // Start Express server and mount Vite in middleware mode
 async function startServer() {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(__dirname, 'dist'));
 
   // Initialize DB tables if they don't exist
   initDbTables().catch((err) => {
