@@ -12,57 +12,61 @@ export const SmartApScriptModal: React.FC<SmartApScriptModalProps> = ({ settings
   const [activeTab, setActiveTab] = useState<'omada' | 'walled-garden' | 'openwrt' | 'saas-api' | 'architecture'>('omada');
   const [copied, setCopied] = useState<boolean>(false);
 
-  // 1. TP-Link Omada External Portal & Cloud Hotspot (Zero MikroTik)
+  // 1. TP-Link Omada External Portal & Cloud Hotspot (Omada Controller v6.3)
   const omadaScript = `# ==============================================================
-# LEMA FAST WIFI - TP-LINK OMADA CONTROLLER & ACCESS POINT SETUP
-# Hotspot Name: ${settings.hotspotName}
-# Works on: TP-Link EAP110-Outdoor, EAP225-Outdoor, EAP610-Outdoor, EAP772-Outdoor (Wi-Fi 7)
-# Physical Wiring: [ ISP Modem / Starlink ] ➔ [ PoE Injector ] ➔ [ TP-Link Omada AP ]
-# MUHIMU: HAPANA MIKROTIK INAYOHITAJIKA! (100% TP-LINK OMADA AP + ISP PEKEE)
+# LEMA FAST WIFI - TP-LINK OMADA CONTROLLER V6.3 & EAP SETUP
+# Jina la Mtandao (SSID): ${settings.hotspotName}
+# Inafaa: TP-Link EAP772 (Wi-Fi 7), EAP610, EAP225, EAP110
+# Hardware: [ ISP Modem / Starlink ] ➔ [ PoE Injector ] ➔ [ TP-Link EAP772 ]
 # ==============================================================
 
-SURA YA 1: JINSI INAVYOFANYA KAZI BILA MIKROTIK
-- Vifaa vya TP-Link Omada vina "External Web Portal" na "Cloud RADIUS" ya ndani.
-- Modemu ya ISP (Airtel 5G, Halotel, Starlink au Fiber) inatoa intaneti na IP address (DHCP) moja kwa moja.
-- Waya unatoka kwenye modemu ya ISP unachomekwa kwenye PoE Injector (LAN port).
-- Waya mwingine unatoka kwenye PoE Injector (PoE port) kwenda juu kwenye Smart AP ya TP-Link Omada.
-- Mfumo wetu wa Lema Fast WiFi Cloud Portal unawasiliana moja kwa moja na Omada AP.
-- Mteja akilipa M-Pesa, mfumo unamruhusu; masaa au siku zikimalizika, OMADA INAMKATA AUTOMATIC!
+SURA YA 1: MUUNDO NA MAELEKEZO YA OMADA CONTROLLER V6.3
+1. EAP772 inahitaji kuunganishwa (Adopt) kwenye Omada Controller (v6.3.0.1.1.1).
+   - Controller inaweza kuwa kwenye VPS yenye Public IP (inayofikiwa na server ya Render) au PC ya majaribio.
+   - Hakikisha AP inaonekana "Connected" kwenye tovuti ya Controller.
 
-SURA YA 2: HATUA ZA KUSANIDI KWENYE OMADA APP AU CONTROLLER
-1. FUNGUA OMADA APP (Simu ya Mkononi) AU OMADA CONTROLLER:
-   - Nenda: Settings ➔ Authentication ➔ Hotspot
-   - Bonyeza: "+ Create New Portal"
-   - Portal Name: ${settings.hotspotName} Cloud Portal
-   - Applies To: Chagua SSID ya Wi-Fi ya wateja (mfano: "${settings.hotspotName}")
+SURA YA 2: HATUA YA KWANZA - TENGENEZA HOTSPOT OPERATOR
+1. Kwenye Omada Controller v6.3:
+   - Nenda: Hotspot Manager (au Settings ➔ Authentication ➔ Hotspot)
+   - Chagua: "Operators" ➔ "+ Create New Operator"
+   - Operator Name: Weka jina (mfano: lema_operator)
+   - Password: Weka password kali
+   - Privilege / Site: Chagua Site ya wateja wako (mfano: Default)
 
-2. CHAGUA PORTAL TYPE:
-   - Weka: "External Web Portal"
-   - Portal URL: https://www.lemawifi.online/portal?merchant=${settings.merchantNumber}
+SURA YA 3: HATUA YA PILI - WEKA EXTERNAL PORTAL SERVER
+1. Kwenye Omada Controller:
+   - Nenda: Settings ➔ Authentication ➔ Portal ➔ "+ Create New Portal"
+   - Portal Name: ${settings.hotspotName} Portal
+   - Applies To: Chagua SSID ya wateja (mfano: "${settings.hotspotName}")
+   - Authentication Type: Chagua "External Portal Server"
+   - Portal URL: https://lemawifi.online/portal
+   - IP / Hostname: lemawifi.online
 
-3. RADIUS PROFILE (KWA AJILI YA AUTOMATIC EXPIRATION & SPEED LIMITS):
-   - Nenda: Authentication ➔ RADIUS Profile ➔ "+ Create New RADIUS Profile"
-   - Profile Name: Lema-WiFi-Cloud
-   - Authentication Server IP: 102.223.14.88
-   - Authentication Port: 1812
-   - Accounting Server IP: 102.223.14.88
-   - Accounting Port: 1813
-   - RADIUS Password/Secret: lema_secret_${settings.merchantNumber.replace(/[^0-9]/g, '') || '849201'}
-   - Interim Update Interval: 60 seconds (Inamkata mteja mara moja muda ukimalizika)
+2. PRE-AUTHENTICATION ACCESS (WALLED GARDEN):
+   - Washa (Enable) "Pre-Authentication Access"
+   - Ongeza:
+     - lemawifi.online
+     - fonts.googleapis.com
+     - fonts.gstatic.com
+     - cdn.jsdelivr.net
 
-4. PRE-AUTHENTICATION ACCESS (WALLED GARDEN - MALIPO YA M-PESA BILA VOCHA):
-   Kwenye Hotspot Portal Settings, ongeza vikoa vifuatavyo kwenye "Pre-Authentication Access":
-   - *.lemawifi.online
-   - *.vodacom.co.tz
-   - *.tigo.co.tz
-   - *.airtel.co.tz
-   - *.halotel.co.tz
-   - *.selcom.net
-   - *.paypack.co
-   - *.azampay.com
+SURA YA 4: HATUA YA TATU - NUKUU CONTROLLER ID NA ENVS ZA SEVA
+1. Ingia kwenye Controller yako kupitia kivinjari (https://IP-YA-CONTROLLER:8043).
+2. Baada ya kuingia, tazama URL kwenye kivinjari:
+   https://...:8043/<HERUFI 32 ZA CONTROLLER ID>/...
+3. Weka vigezo hivi kwenye Environment Variables za Seva yako (kwenye Render au .env):
+   OMADA_URL=https://omada.lemawifi.online:8043
+   OMADA_ID=<Herufi 32 ulizozinakili>
+   OMADA_OPERATOR=lema_operator
+   OMADA_OPERATOR_PASSWORD=<Password uliyoweka>
+   ADMIN_API_KEY=<Neno refu la siri la kulinda vocha>
+   PAYMENTS_ENABLED=0
 
-5. HONGERA!
-   - Ukiwa na Modemu yako ya ISP na AP ya TP-Link Omada, biashara inajiendesha 100% automatic bila gharama wala usumbufu wa kununua MikroTik!`;
+SURA YA 5: JINSI MFUMO UNAVYOFANYA KAZI AUTOMATIC
+1. Mteja akichomeka simu kwenye Wi-Fi, anapelekwa https://lemawifi.online/portal.
+2. Mteja akiingiza nambari ya vocha, seva inathibitisha vocha na kuita moja kwa moja:
+   POST /<OMADA_ID>/api/v2/hotspot/extPortal/auth
+3. Controller inamfungulia mtandao papo hapo na kuanza kuhesabu muda wake!`;
 
   // 2. Walled Garden Allowlist for Mobile Money
   const walledGardenScript = `# ==============================================================

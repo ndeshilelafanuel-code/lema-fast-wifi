@@ -11,6 +11,7 @@ import { db } from './src/db/index.ts';
 import { hardware, towers as towersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
+import { omadaAuthorize } from './omada.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,28 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 // Support JSON bodies for webhooks and APIs
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Malipo bado pending: zima API zote za malipo na trial iwapo PAYMENTS_ENABLED !== '1'
+app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
+  if (process.env.PAYMENTS_ENABLED === '1') return next();
+  return res.status(503).json({
+    success: false,
+    paymentsDisabled: true,
+    message: 'Malipo ya mtandaoni yamesitishwa kwa muda. Tafadhali tumia nambari ya vocha kujiunga na mtandao.'
+  });
+});
+
+// Kulinda vocha: kuunda au kusoma orodha yote ya vocha ni kwa Admin tu (isipokuwa /redeem)
+app.use('/api/v1/vouchers', (req, res, next) => {
+  if (req.path === '/redeem') return next();
+  const adminKey = req.get('x-admin-key') || (req.query && (req.query.adminKey as string));
+  const expectedKey = process.env.ADMIN_API_KEY;
+  if (expectedKey) {
+    if (adminKey && adminKey === expectedKey) return next();
+    return res.status(401).json({ success: false, message: 'Ruhusa imekataliwa (Unauthorized - x-admin-key inahitajika).' });
+  }
+  return next();
+});
 
 // In-memory store for WhatsApp messages & sessions
 interface StoredMessage {
@@ -955,97 +978,141 @@ app.post('/api/v1/vouchers', (req, res) => {
   return res.status(400).json({ success: false, error: 'Invalid vouchers array' });
 });
 
-// POST Redeem Voucher (called from Customer Portal on Mobile Phone)
-app.post('/api/v1/vouchers/redeem', (req, res) => {
-  const { code, phone, macAddress, ipAddress } = req.body || {};
-  if (!code) {
+function parseKbps(s?: string) {
+  const m = String(s || '').match(/([\d.]+)\s*([MK])\s*\/\s*([\d.]+)\s*([MK])/i);
+  if (!m) return { down: 0, up: 0 };
+  const k = (n: string, u: string) => Math.round(parseFloat(n) * (u.toUpperCase() === 'M' ? 1024 : 1));
+  return { down: k(m[1], m[2]), up: k(m[3], m[4]) };
+}
+
+// POST Redeem Voucher (called from Customer Portal on Mobile Phone with Omada v6.3)
+app.post('/api/v1/vouchers/redeem', async (req, res) => {
+  const { code, phone, clientMac, apMac, ssidName, radioId, clientIp, macAddress, ipAddress } = req.body || {};
+  const trimmed = String(code || '').trim();
+  if (!trimmed) {
     return res.status(400).json({ success: false, message: 'Nambari ya vocha inahitajika.' });
   }
 
-  loadSavedVouchers();
-  const trimmed = String(code).trim();
-  let found = savedVouchers.find((v) => v.code === trimmed);
+  const effectiveClientMac = String(clientMac || macAddress || '').trim().toUpperCase();
+  const effectiveApMac = String(apMac || '').trim().toUpperCase();
+  const effectiveClientIp = String(clientIp || ipAddress || '').trim();
 
-  // If code is not found in database but looks like a valid 4-6 digit numeric code (like 4018 from user's screen)
-  if (!found) {
-    const isNumericCode = /^\d{4,6}$/.test(trimmed) || trimmed === '7492';
-    if (isNumericCode) {
-      found = {
-        id: `v-auto-${Date.now()}`,
-        code: trimmed,
-        packageId: 'pkg-1day',
-        packageName: 'Saa 24 (Siku 1)',
-        price: 1000,
-        durationHours: 24,
-        speedLimit: '2.5M/1.0M',
-        createdAt: new Date().toISOString(),
-        status: 'unused',
-      };
-      savedVouchers.unshift(found);
-      saveVouchersToDisk();
-    } else {
-      return res.status(404).json({
-        success: false,
-        message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako.',
-      });
-    }
-  }
-
-  if (found.status === 'expired') {
+  if (!effectiveClientMac) {
     return res.status(400).json({
       success: false,
-      message: 'Vocha hii imekwisha muda wake wa matumizi.',
+      message: 'Fungua ukurasa huu kupitia mtandao wa Wi-Fi wa Lema (Anwani ya kifaa/MAC haijapatikana).'
     });
   }
 
-  const durationMs = (found.durationHours || 24) * 3600 * 1000;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + durationMs).toISOString();
+  loadSavedVouchers();
+  const found: any = savedVouchers.find((v) => v.code === trimmed);
+  if (!found) {
+    return res.status(404).json({
+      success: false,
+      message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako au nunua vocha mpya.'
+    });
+  }
 
-  // Mark voucher as active
+  const now = Date.now();
+  if (found.status === 'expired' || (found.expiresAt && new Date(found.expiresAt).getTime() <= now)) {
+    found.status = 'expired';
+    saveVouchersToDisk();
+    return res.status(400).json({ success: false, message: 'Vocha hii imekwisha muda wake wa matumizi.' });
+  }
+
+  // Bind to single device MAC: If already active and bound to another MAC, refuse!
+  if (found.status === 'active' && found.boundMac && found.boundMac !== effectiveClientMac) {
+    return res.status(403).json({
+      success: false,
+      message: `Vocha hii tayari inatumika kwenye kifaa kingine (${found.boundMac.slice(0, 8)}...). Vocha moja ni kwa kifaa kimoja tu.`
+    });
+  }
+
+  const durationHours = found.durationHours || 24;
+  const expiresAtMs = (found.status === 'active' && found.expiresAt)
+    ? new Date(found.expiresAt).getTime()
+    : now + durationHours * 3600 * 1000;
+  const remainingDurationMs = Math.max(expiresAtMs - now, 60 * 1000);
+
+  const { down, up } = parseKbps(found.speedLimit);
+
+  // If OMADA_URL is configured, trigger real Omada Controller v6.3 authorization
+  if (process.env.OMADA_URL && process.env.OMADA_OPERATOR) {
+    try {
+      await omadaAuthorize({
+        clientMac: effectiveClientMac,
+        apMac: effectiveApMac,
+        ssidName: String(ssidName || 'Lema Fast WiFi'),
+        radioId: radioId || 0,
+        clientIp: effectiveClientIp,
+        durationMs: remainingDurationMs,
+        downKbps: down,
+        upKbps: up,
+      });
+      console.log(`[Omada Controller v6.3] Successfully authorized ${effectiveClientMac} on AP ${effectiveApMac}`);
+    } catch (omadaErr: any) {
+      console.error('[Omada Controller Authorization Failed]:', omadaErr.message);
+      return res.status(502).json({
+        success: false,
+        message: `Mfumo umeshindwa kuruhusu intaneti kwenye Omada Controller: ${omadaErr.message}. Vocha haijatumika, jaribu tena baada ya sekunde chache.`
+      });
+    }
+  } else {
+    console.warn('[Omada] OMADA_URL/OMADA_OPERATOR haijawekwa kwenye env. Inaruhusu kimajaribio (dev/mock mode).');
+  }
+
+  const expiresAt = new Date(expiresAtMs).toISOString();
   found.status = 'active';
-  found.activatedAt = now.toISOString();
+  found.activatedAt = found.activatedAt || new Date(now).toISOString();
   found.expiresAt = expiresAt;
+  found.boundMac = effectiveClientMac;
   found.usedByPhone = phone || found.usedByPhone || '';
   saveVouchersToDisk();
 
-  // Register an active session
-  const clientMac = (macAddress || `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`).toUpperCase();
-  const clientIp = ipAddress || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
-
-  const newSession: any = {
-    id: `sess-${Date.now()}`,
+  const session: any = {
+    id: `sess-${now}`,
     voucherCode: found.code,
-    phoneNumber: phone,
-    ipAddress: clientIp,
-    macAddress: clientMac,
-    connectedAt: now.toISOString(),
+    phoneNumber: phone || '',
+    ipAddress: effectiveClientIp,
+    macAddress: effectiveClientMac,
+    connectedAt: new Date(now).toISOString(),
     expiresAt,
-    packageId: found.packageId || 'pkg-1day',
+    packageId: found.packageId || 'pkg-custom',
     packageName: found.packageName || 'Intaneti ya Vocha',
     speedLimit: found.speedLimit || '2.5M/1.0M',
     bytesDown: 1048576,
     bytesUp: 262144,
   };
 
-  savedActiveSessions.unshift(newSession);
+  loadSavedSessions();
+  savedActiveSessions = [session, ...savedActiveSessions.filter((s: any) => s.macAddress !== effectiveClientMac)];
   saveSessionsToDisk();
 
-  // Update Omada client to active_authorized
-  const clientIdx = wifiClients.findIndex((c) => c.mac.toUpperCase() === clientMac);
-  if (clientIdx >= 0) {
-    wifiClients[clientIdx].status = 'active_authorized';
-    wifiClients[clientIdx].voucherCode = found.code;
-    saveWifiClients();
+  // Also update associated wifi client list
+  loadSavedWifiClients();
+  const cIdx = wifiClients.findIndex((c) => c.mac.toUpperCase() === effectiveClientMac);
+  if (cIdx >= 0) {
+    wifiClients[cIdx].status = 'active_authorized';
+    wifiClients[cIdx].voucherCode = found.code;
+  } else {
+    wifiClients.unshift({
+      id: `cli-${now}`,
+      ip: effectiveClientIp,
+      mac: effectiveClientMac,
+      ssid: String(ssidName || 'Lema Fast WiFi'),
+      apName: effectiveApMac ? `Omada AP (${effectiveApMac})` : 'TP-Link Omada AP',
+      connectedAt: new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'active_authorized',
+      voucherCode: found.code,
+    });
   }
-
-  console.log(`[Voucher Redeemed] Code ${trimmed} redeemed by ${clientMac} (${clientIp}). Session active until ${expiresAt}`);
+  saveWifiClients();
 
   return res.json({
     success: true,
-    message: `Umefanikiwa kuunganishwa! Kifurushi: ${found.packageName}.`,
-    session: newSession,
-    voucher: found,
+    message: `Hongera! Umefanikiwa kuunganishwa kikamilifu. Kifurushi: ${found.packageName}.`,
+    session,
+    voucher: found
   });
 });
 
@@ -1169,34 +1236,61 @@ app.all('/api/v1/omada/client/connect', (req, res) => {
   return res.json({ success: true, client: wifiClients[0], total: wifiClients.length });
 });
 
-// POST Authorize client (Grant free access or voucher from Portal / Dashboard)
-app.post('/api/v1/omada/client/authorize', (req, res) => {
-  const { mac, hours, planName, apMac, clientIp } = req.body;
+// POST Authorize client (Grant access directly on Omada Controller v6.3 from Admin Dashboard)
+app.post('/api/v1/omada/client/authorize', async (req, res) => {
+  const { mac, hours, planName, apMac, clientIp, ssidName, radioId } = req.body || {};
   const cleanMac = String(mac || '').trim().toUpperCase();
   if (!cleanMac) {
     return res.status(400).json({ error: 'MAC address is required' });
   }
 
+  const durationHours = Number(hours) || 24;
+  const durationMs = durationHours * 3600 * 1000;
+
+  if (process.env.OMADA_URL && process.env.OMADA_OPERATOR) {
+    try {
+      await omadaAuthorize({
+        clientMac: cleanMac,
+        apMac: String(apMac || '').toUpperCase(),
+        ssidName: String(ssidName || 'Lema Fast WiFi'),
+        radioId: radioId || 0,
+        clientIp: clientIp || '',
+        durationMs,
+        downKbps: 3072,
+        upKbps: 1536,
+      });
+      console.log(`[Admin Grant] Authorized ${cleanMac} directly on Omada Controller`);
+    } catch (e: any) {
+      console.error('[Omada Controller Admin Grant Failed]:', e.message);
+      return res.status(502).json({
+        success: false,
+        message: `Hitilafu ya Omada Controller: ${e.message}`
+      });
+    }
+  }
+
   loadSavedWifiClients();
   let target = wifiClients.find((c) => c.mac.toUpperCase() === cleanMac);
   const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
 
   if (!target) {
     target = {
       id: `cli-${Date.now()}`,
       ip: clientIp || '192.168.88.129',
       mac: cleanMac,
-      ssid: 'Omada 772 ou',
-      apName: 'TP-Link Omada AP',
+      ssid: ssidName || 'Lema Fast WiFi',
+      apName: apMac ? `Omada AP (${apMac})` : 'TP-Link Omada AP',
       connectedAt: nowStr,
-      status: 'active_authorized'
+      status: 'active_authorized',
+      voucherCode
     };
     wifiClients.unshift(target);
   } else {
     target.status = 'active_authorized';
+    target.voucherCode = voucherCode;
   }
-
-  target.voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+  saveWifiClients();
 
   // Also push to activeSessions
   loadSavedSessions();
@@ -1207,7 +1301,7 @@ app.post('/api/v1/omada/client/authorize', (req, res) => {
     ipAddress: target.ip,
     macAddress: target.mac,
     connectedAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + (hours || 24) * 3600 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + durationMs).toISOString(),
     packageId: 'pkg-grant',
     packageName: planName || 'Lema Fast WiFi Internet Access',
     speedLimit: '3.0M/1.5M',
@@ -1217,35 +1311,12 @@ app.post('/api/v1/omada/client/authorize', (req, res) => {
 
   savedActiveSessions = [newSession, ...savedActiveSessions.filter((s: any) => s.macAddress !== cleanMac)];
   saveSessionsToDisk();
-  saveWifiClients();
-
-  // Record pending authorization for local Omada Agent / Script
-  pushPendingOmadaAuth({
-    mac: cleanMac,
-    apMac: apMac || '',
-    authType: 0,
-    timestamp: Date.now()
-  });
 
   return res.json({
     success: true,
-    message: `Mteja (${cleanMac}) ameruhusiwa intaneti kikamilifu!`,
+    message: `Mteja (${cleanMac}) ameruhusiwa intaneti kikamilifu kwenye Omada!`,
     session: newSession
   });
-});
-
-// Pending authorizations store for Omada local agent script
-const pendingOmadaAuthorizations: Array<{ mac: string; apMac?: string; authType: number; timestamp: number }> = [];
-
-function pushPendingOmadaAuth(item: { mac: string; apMac?: string; authType: number; timestamp: number }) {
-  pendingOmadaAuthorizations.unshift(item);
-  if (pendingOmadaAuthorizations.length > 100) pendingOmadaAuthorizations.pop();
-}
-
-app.get('/api/v1/omada/pending-authorizations', (_req, res) => {
-  const cutoff = Date.now() - 3600 * 1000; // last 1 hour
-  const recent = pendingOmadaAuthorizations.filter((a) => a.timestamp > cutoff);
-  return res.json({ success: true, count: recent.length, authorizations: recent });
 });
 
 // ==========================================

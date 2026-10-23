@@ -62,7 +62,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     recordAdClick,
   } = useHotspot();
 
-  const [activeTab, setActiveTab] = useState<'mobile-stk' | 'voucher' | 'reconnect' | 'trial'>('mobile-stk');
+  const [activeTab, setActiveTab] = useState<'mobile-stk' | 'voucher' | 'reconnect' | 'trial'>('voucher');
   const [selectedPackageId, setSelectedPackageId] = useState<string>(settings.packages[1]?.id || settings.packages[0]?.id);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [voucherCode, setVoucherCode] = useState<string>('');
@@ -199,6 +199,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     clientIp: string;
     ssidName: string;
     authType: string;
+    radioId: string;
+    site: string;
+    redirectUrl: string;
   }>(() => {
     let mac = '';
     let ap = '';
@@ -206,6 +209,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     let ip = '';
     let ssid = '';
     let auth = '';
+    let radio = '0';
+    let site = '';
+    let redir = '';
 
     if (typeof window !== 'undefined') {
       try {
@@ -215,19 +221,28 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         tgt = p.get('target') || p.get('target_ap_ip') || p.get('originUrl') || p.get('target_url') || '';
         ip = p.get('clientIp') || p.get('ip') || '';
         ssid = p.get('ssidName') || p.get('ssid') || '';
-        auth = p.get('authType') || '';
+        auth = p.get('authType') || '4';
+        radio = p.get('radioId') || '0';
+        site = p.get('site') || '';
+        redir = p.get('redirectUrl') || p.get('originUrl') || '';
 
         if (mac) sessionStorage.setItem('omada_client_mac', mac);
         if (ap) sessionStorage.setItem('omada_ap_mac', ap);
         if (tgt) sessionStorage.setItem('omada_target', tgt);
         if (ip) sessionStorage.setItem('omada_client_ip', ip);
         if (ssid) sessionStorage.setItem('omada_ssid', ssid);
+        if (radio) sessionStorage.setItem('omada_radio_id', radio);
+        if (site) sessionStorage.setItem('omada_site', site);
+        if (redir) sessionStorage.setItem('omada_redirect_url', redir);
 
         if (!mac) mac = sessionStorage.getItem('omada_client_mac') || localStorage.getItem('omada_client_mac') || '';
         if (!ap) ap = sessionStorage.getItem('omada_ap_mac') || '';
         if (!tgt) tgt = sessionStorage.getItem('omada_target') || '';
         if (!ip) ip = sessionStorage.getItem('omada_client_ip') || '';
-        if (!ssid) ssid = sessionStorage.getItem('omada_ssid') || 'Omada 772 ou';
+        if (!ssid) ssid = sessionStorage.getItem('omada_ssid') || 'Lema Fast WiFi';
+        if (!radio) radio = sessionStorage.getItem('omada_radio_id') || '0';
+        if (!site) site = sessionStorage.getItem('omada_site') || '';
+        if (!redir) redir = sessionStorage.getItem('omada_redirect_url') || '';
       } catch (e) {}
     }
 
@@ -235,15 +250,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       clientMac: mac.toUpperCase(),
       apMac: ap.toUpperCase(),
       target: tgt,
-      clientIp: ip || '192.168.88.129',
-      ssidName: ssid || 'Omada 772 ou',
-      authType: auth || '0',
+      clientIp: ip,
+      ssidName: ssid || 'Lema Fast WiFi',
+      authType: auth || '4',
+      radioId: radio || '0',
+      site: site || '',
+      redirectUrl: redir || '',
     };
   });
 
   // Client Device Identity (Real Session Data or Omada Hardware MAC)
-  const clientMac = currentClientSession?.macAddress || omadaParams.clientMac || '48:D7:05:85:16:83';
-  const clientIp = currentClientSession?.ipAddress || omadaParams.clientIp || '192.168.88.129';
+  const clientMac = currentClientSession?.macAddress || omadaParams.clientMac || '';
+  const clientIp = currentClientSession?.ipAddress || omadaParams.clientIp || '';
 
   // 2. In-Portal QR Camera Scanner
   const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
@@ -296,11 +314,69 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     });
   };
 
-  const handleAutoConnect = () => {
-    if (!rememberedDevice) return;
-    const res = redeemVoucher(rememberedDevice.voucherCode, rememberedDevice.phone, clientMac, clientIp);
+  const redeemOnServer = async (code: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const targetMac = (omadaParams.clientMac || clientMac || '').trim().toUpperCase();
+      const targetApMac = (omadaParams.apMac || '').trim().toUpperCase();
+
+      if (!targetMac) {
+        return {
+          success: false,
+          message: 'Tafadhali unganisha simu yako kwenye Wi-Fi ya Lema (Anwani ya kifaa/MAC haijatambuliwa kutoka kwenye AP).'
+        };
+      }
+
+      const res = await fetch('/api/v1/vouchers/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          phone: phoneNumber,
+          clientMac: targetMac,
+          apMac: targetApMac,
+          ssidName: omadaParams.ssidName,
+          radioId: omadaParams.radioId,
+          clientIp: omadaParams.clientIp || clientIp,
+          site: omadaParams.site,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        // Successful redemption and Omada authorization
+        const finalRedirect = omadaParams.redirectUrl || omadaParams.target || 'http://connectivitycheck.gstatic.com/generate_204';
+        setTimeout(() => {
+          try {
+            window.location.href = finalRedirect;
+          } catch (e) {}
+        }, 1500);
+        return { success: true, message: data.message || 'Umefanikiwa kuunganishwa! Furahia intaneti ya kasi.' };
+      }
+
+      return {
+        success: false,
+        message: data?.message || 'Vocha siyo sahihi au imeshindikana kuruhusiwa. Tafadhali jaribu tena.'
+      };
+    } catch {
+      return {
+        success: false,
+        message: 'Hakuna mawasiliano na seva ya Lema Fast WiFi. Tafadhali hakikisha umeunganishwa na Wi-Fi kisha jaribu tena.'
+      };
+    }
+  };
+
+  const handleAutoConnect = async () => {
+    if (!rememberedDevice || isProcessing) return;
+    setIsProcessing(true);
+    setStatusMessage({
+      type: 'success',
+      text: `Inathibitisha na kuunganisha kifaa chako kwenye Omada (${rememberedDevice.mac})...`
+    });
+
+    const res = await redeemOnServer(rememberedDevice.voucherCode);
+    setIsProcessing(false);
+
     if (res.success) {
-      authorizeOmadaHardware(clientMac);
       setStatusMessage({
         type: 'success',
         text: `⚡ Umeunganishwa kiotomatiki kwa MAC Binding (${rememberedDevice.mac})!`
@@ -309,32 +385,41 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       handleForgetDevice();
       setStatusMessage({
         type: 'error',
-        text: 'Vocha iliyohifadhiwa imekwisha muda wake. Tafadhali nunua kifurushi kipya.'
+        text: 'Vocha iliyohifadhiwa imekwisha muda wake au imekataliwa. Tafadhali weka vocha mpya.'
       });
     }
   };
 
-  const handleQrScannedCode = (scannedCode: string) => {
+  const handleQrScannedCode = async (scannedCode: string) => {
     setVoucherCode(scannedCode);
     setShowQrScanner(false);
-    const res = redeemVoucher(scannedCode, phoneNumber, clientMac, clientIp);
+    setIsProcessing(true);
+    setStatusMessage({
+      type: 'success',
+      text: `Inachakata vocha ya QR "${scannedCode}" kwenye Omada...`
+    });
+
+    const res = await redeemOnServer(scannedCode);
+    setIsProcessing(false);
+
     if (res.success) {
-      authorizeOmadaHardware(clientMac);
       // Save device for Auto-Login if checked
       if (rememberDeviceChecked) {
         const savedData = {
-          mac: clientMac,
+          mac: (omadaParams.clientMac || clientMac || '').toUpperCase(),
           voucherCode: scannedCode,
           packageName: 'Vocha ya QR',
           expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
           phone: phoneNumber || undefined
         };
-        localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
-        setRememberedDevice(savedData);
+        try {
+          localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
+          setRememberedDevice(savedData);
+        } catch (e) {}
       }
       setStatusMessage({
         type: 'success',
-        text: `📷 Vocha ya QR "${scannedCode}" imesomwa na mtandao umewashwa papo hapo!`
+        text: `📷 Vocha ya QR "${scannedCode}" imethibitishwa na mtandao umewashwa kwenye Omada!`
       });
     } else {
       setStatusMessage({ type: 'error', text: res.message });
@@ -586,124 +671,36 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     }
   };
 
-  // Helper to trigger hardware internet authorization on TP-Link Omada
-  const authorizeOmadaHardware = (targetMac?: string) => {
-    try {
-      const effectiveMac = (targetMac || omadaParams.clientMac || clientMac || '').trim().toUpperCase();
-      const apMac = (omadaParams.apMac || '').trim().toUpperCase();
-      const targetUrl = omadaParams.target || 'http://connectivitycheck.gstatic.com/generate_204';
-
-      // 1. Notify Backend Database & Omada Webhook Handler
-      fetch('/api/v1/omada/client/authorize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mac: effectiveMac,
-          apMac: apMac,
-          clientIp: clientIp,
-          hours: 24,
-          planName: 'Lema Fast WiFi Internet Access',
-        }),
-      }).catch(() => {});
-
-      // 2. Client-Side HTTP Authorization to Omada Gateway / Controller
-      let customTargetHost = '';
-      if (omadaParams.target) {
-        try {
-          const parsed = new URL(omadaParams.target);
-          if (parsed.host) customTargetHost = parsed.host;
-        } catch {
-          if (omadaParams.target.includes(':')) customTargetHost = omadaParams.target;
-        }
-      }
-
-      const dynamicSubnetGateway1 = clientIp && clientIp.includes('.') ? `${clientIp.replace(/\.\d+$/, '.1')}:8088` : '';
-      const dynamicSubnetGateway254 = clientIp && clientIp.includes('.') ? `${clientIp.replace(/\.\d+$/, '.254')}:8088` : '';
-      const dynamicSubnetGatewayHttps = clientIp && clientIp.includes('.') ? `${clientIp.replace(/\.\d+$/, '.1')}:8043` : '';
-
-      const candidateHosts = Array.from(new Set([
-        customTargetHost,
-        dynamicSubnetGateway1,
-        dynamicSubnetGateway254,
-        dynamicSubnetGatewayHttps,
-        '192.168.1.1:8088',
-        '192.168.1.1:8043',
-        '192.168.1.254:8088',
-        '192.168.0.254:8088',
-        '192.168.0.1:8088',
-        '192.168.88.1:8088',
-      ])).filter(Boolean);
-
-      // Ensure hidden iframe exists so form POST is NOT blocked by Android CaptivePortalLogin
-      let hiddenIframe = document.getElementById('omada_auth_iframe') as HTMLIFrameElement | null;
-      if (!hiddenIframe) {
-        hiddenIframe = document.createElement('iframe');
-        hiddenIframe.id = 'omada_auth_iframe';
-        hiddenIframe.name = 'omada_auth_iframe';
-        hiddenIframe.style.display = 'none';
-        document.body.appendChild(hiddenIframe);
-      }
-
-      candidateHosts.forEach((host) => {
-        // Dispatch combinations: authType 0 (No Auth), authType 1 (Simple Password 'lemawifi'), authType 4 (External Portal)
-        [
-          { authType: '0', password: '' },
-          { authType: '1', password: 'lemawifi' },
-          { authType: '4', password: '' },
-        ].forEach(({ authType, password }) => {
-          try {
-            const authUrl = `http://${host}/portal/auth`;
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = authUrl;
-            form.target = 'omada_auth_iframe';
-            form.style.display = 'none';
-
-            const addField = (name: string, value: string) => {
-              const input = document.createElement('input');
-              input.name = name;
-              input.value = value;
-              form.appendChild(input);
-            };
-
-            addField('clientMac', effectiveMac);
-            if (apMac) addField('apMac', apMac);
-            addField('authType', authType);
-            if (password) addField('password', password);
-            addField('target', targetUrl);
-
-            document.body.appendChild(form);
-            form.submit();
-            setTimeout(() => form.remove(), 1200);
-          } catch (e) {}
-        });
-      });
-    } catch (err) {
-      console.warn('Omada hardware authorization attempt:', err);
-    }
-  };
+  // Hardware authorization is handled server-side directly through Omada Controller v6.3 API (/api/v1/vouchers/redeem)
+  const authorizeOmadaHardware = (_targetMac?: string) => {};
 
   // Redeem manual voucher
-  const handleRedeemVoucher = (e: React.FormEvent) => {
+  const handleRedeemVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!voucherCode.trim()) return;
+    if (!voucherCode.trim() || isProcessing) return;
     const trimmed = voucherCode.trim();
-    const result = redeemVoucher(trimmed, phoneNumber, clientMac, clientIp);
+    setIsProcessing(true);
+    setStatusMessage({ type: 'success', text: 'Inathibitisha vocha kwenye Omada Controller v6.3...' });
+
+    const result = await redeemOnServer(trimmed);
+    setIsProcessing(false);
+
     if (result.success) {
       setStatusMessage({ type: 'success', text: result.message });
-      authorizeOmadaHardware(clientMac);
       
       // Auto-save MAC Binding if checked
       if (rememberDeviceChecked) {
         const savedData = {
-          mac: clientMac,
+          mac: (omadaParams.clientMac || clientMac || '').toUpperCase(),
           voucherCode: trimmed,
-          packageName: 'Vocha ya Karatasi',
+          packageName: 'Vocha ya Lema Fast WiFi',
           expiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
           phone: phoneNumber || undefined
         };
-        localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
-        setRememberedDevice(savedData);
+        try {
+          localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
+          setRememberedDevice(savedData);
+        } catch (e) {}
       }
       setVoucherCode('');
     } else {
@@ -711,53 +708,13 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     }
   };
 
-  // Smart Anti-Abuse Free trial with Cooldown & Device Fingerprint
+  // Smart Anti-Abuse Free trial (Disabled while payments are pending; redirects to voucher tab)
   const handleFreeTrial = () => {
-    const remainingCooldown = checkTrialCooldown();
-    if (remainingCooldown > 0) {
-      const hrs = Math.floor(remainingCooldown / 3600);
-      const mins = Math.floor((remainingCooldown % 3600) / 60);
-      setStatusMessage({
-        type: 'error',
-        text: `🔒 Majaribio ya bure yameshatumika kwenye kifaa hiki. Jaribio lijalo linapatikana baada ya Masaa ${hrs} na Dk ${mins} (Anti-Abuse Protection). Chagua kifurushi hapa chini kuendelea!`
-      });
-      setActiveTab('mobile-stk');
-      return;
-    }
-
-    // Record trial usage in device localStorage
-    localStorage.setItem('wifi_trial_last_used', Date.now().toString());
-    setTrialCooldownRemainingSec((settings.trialCooldownHours || 24) * 3600);
-
-    fetch('/api/v1/vouchers/trial', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: phoneNumber,
-        macAddress: clientMac,
-      }),
-    }).catch(() => {});
-
-    const result = redeemVoucher('7492', phoneNumber, clientMac, clientIp);
-    if (result.success) {
-      authorizeOmadaHardware(clientMac);
-      // Bind MAC for trial as well
-      if (rememberDeviceChecked) {
-        const savedData = {
-          mac: clientMac,
-          voucherCode: '7492',
-          packageName: 'Majaribio ya Bure (Dakika 15)',
-          expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
-          phone: phoneNumber || undefined
-        };
-        localStorage.setItem('wifi_remembered_device', JSON.stringify(savedData));
-        setRememberedDevice(savedData);
-      }
-      setStatusMessage({
-        type: 'success',
-        text: '🎁 Majaribio ya dakika 15 yameanza rasmi! Furahia intaneti ya kasi ya LEMA FAST WiFi.'
-      });
-    }
+    setStatusMessage({
+      type: 'error',
+      text: 'Majaribio ya bure yamesitishwa kwa sasa. Tafadhali tumia namba ya vocha kujiunga na mtandao.'
+    });
+    setActiveTab('voucher');
   };
 
   // Watch Ad to Unlock Free WiFi Access
@@ -1344,19 +1301,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               </div>
             )}
 
-            {/* Mode Switcher Tabs (4 Options: Lipa Simu, Vocha, Rudisha Mtandao, Trial) */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 border border-stone-200 rounded-2xl text-[11px] font-bold">
-              <button
-                type="button"
-                onClick={() => setActiveTab('mobile-stk')}
-                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
-                  activeTab === 'mobile-stk'
-                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
-                    : 'text-stone-600 hover:text-stone-900'
-                }`}
-              >
-                Lipa Simu
-              </button>
+            {/* Mode Switcher Tabs (Vocha Kwanza, Lipa Simu, Rudisha Mtandao) */}
+            <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 border border-stone-200 rounded-2xl text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setActiveTab('voucher')}
@@ -1366,7 +1312,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                Vocha
+                🎟️ Ingiza Vocha
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('mobile-stk')}
+                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
+                  activeTab === 'mobile-stk'
+                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                Lipa Simu (STK)
               </button>
               <button
                 type="button"
@@ -1377,24 +1334,22 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                Rudisha SMS
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('trial')}
-                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
-                  activeTab === 'trial'
-                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
-                    : 'text-stone-600 hover:text-stone-900'
-                }`}
-              >
-                Bure
+                Rudisha Mtandao
               </button>
             </div>
 
             {/* TAB 1: Mobile Money STK-Push */}
             {activeTab === 'mobile-stk' && (
               <form onSubmit={handleStartPayment} className="space-y-3">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Malipo ya Mtandaoni Yapo Pending:</strong>
+                    <span className="text-[11px] text-amber-800">
+                      Huduma ya malipo ya mtandaoni kwa simu ipo kwenye usanidi. Tafadhali tumia <strong>Vocha</strong> ya Lema Fast WiFi kujiunga mara moja.
+                    </span>
+                  </div>
+                </div>
                 {/* Compact Top Bar: Free Trial + Signal Quality */}
                 <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-stone-100 border border-stone-200 text-xs">
                   <div className="flex items-center gap-1.5 text-stone-700 min-w-0">

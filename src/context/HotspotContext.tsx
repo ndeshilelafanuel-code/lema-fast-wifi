@@ -504,10 +504,14 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     setVouchers((prev) => [...newVouchers, ...prev]);
-    // Sync with backend server
+    // Sync with backend server with admin authentication header
+    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
     fetch('/api/v1/vouchers', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(adminKey ? { 'x-admin-key': adminKey } : {})
+      },
       body: JSON.stringify({ vouchers: newVouchers }),
     }).catch(() => {});
     return newVouchers;
@@ -517,31 +521,16 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const trimmed = code.trim();
     let existing = vouchers.find((v) => v.code === trimmed);
 
-    // Call server to redeem and sync across all devices
+    // Call server to redeem and sync across all devices with standardized clientMac parameter
     fetch('/api/v1/vouchers/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: trimmed, phone, mac: realMac }),
+      body: JSON.stringify({ code: trimmed, phone, clientMac: realMac, clientIp: realIp }),
     }).catch(() => {});
 
-    // If not found in local browser state but matches numeric code (like 4018 from user's screen)
+    // If voucher does not exist in loaded vouchers, reject immediately
     if (!existing) {
-      if (/^\d{4,6}$/.test(trimmed) || trimmed === '7492') {
-        existing = {
-          id: `v-auto-${Date.now()}`,
-          code: trimmed,
-          packageId: 'pkg-1day',
-          packageName: 'Saa 24 (Siku 1)',
-          price: 1000,
-          durationHours: 24,
-          speedLimit: '2.5M/1.0M',
-          createdAt: new Date().toISOString(),
-          status: 'unused',
-        };
-        setVouchers((prev) => [existing!, ...prev]);
-      } else {
-        return { success: false, message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako.' };
-      }
+      return { success: false, message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako au nunua vocha mpya.' };
     }
 
     if (existing.status === 'expired') {
