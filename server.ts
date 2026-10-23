@@ -11,7 +11,7 @@ import { db } from './src/db/index.ts';
 import { hardware, towers as towersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
-import { omadaAuthorize } from './omada.ts';
+import { omadaAuthorize, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId } from './omada.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1012,7 +1012,8 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   }
 
   // AP MAC inahitajika iwapo mfumo umeunganishwa na Omada
-  if (process.env.OMADA_URL && !effectiveApMac) {
+  const omadaCfg = getOmadaConfig();
+  if (omadaCfg.omadaUrl && !effectiveApMac) {
     return res.status(400).json({
       success: false,
       message: 'Fungua ukurasa kupitia WiFi ya Lema (AP haijatambuliwa).'
@@ -1056,7 +1057,7 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   const { down, up } = parseKbps(found.speedLimit);
 
   // If OMADA_URL is configured, trigger real Omada Controller v6.3 authorization
-  if (process.env.OMADA_URL && process.env.OMADA_OPERATOR) {
+  if (omadaCfg.omadaUrl && omadaCfg.operatorUser) {
     try {
       await omadaAuthorize({
         clientMac: effectiveClientMac,
@@ -1082,7 +1083,7 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
       message: 'Mfumo bado haujaunganishwa na Omada Controller (OMADA_URL au OMADA_OPERATOR haijawekwa).'
     });
   } else {
-    console.warn('[Omada] OMADA_URL/OMADA_OPERATOR haijawekwa kwenye env. Inaruhusu kimajaribio (dev/mock mode).');
+    console.warn('[Omada] OMADA_URL/OMADA_OPERATOR haijawekwa. Inaruhusu kimajaribio (dev/mock mode).');
   }
 
   const expiresAt = new Date(expiresAtMs).toISOString();
@@ -1260,6 +1261,60 @@ app.all('/api/v1/omada/client/connect', (req, res) => {
   return res.json({ success: true, client: wifiClients[0], total: wifiClients.length });
 });
 
+// Omada Controller Settings & Connectivity APIs (Admin protected)
+app.get('/api/v1/omada/config', requireAdmin, (_req, res) => {
+  const cfg = getOmadaConfig();
+  return res.json({
+    success: true,
+    config: {
+      omadaUrl: cfg.omadaUrl,
+      controllerId: cfg.controllerId,
+      operatorUser: cfg.operatorUser,
+      hasPassword: Boolean(cfg.operatorPass),
+      strictTls: cfg.strictTls,
+    }
+  });
+});
+
+app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
+  const { omadaUrl, controllerId, operatorUser, operatorPass, strictTls } = req.body || {};
+  const patch: any = {};
+  if (omadaUrl !== undefined) patch.omadaUrl = String(omadaUrl).trim();
+  if (controllerId !== undefined) patch.controllerId = String(controllerId).trim();
+  if (operatorUser !== undefined) patch.operatorUser = String(operatorUser).trim();
+  if (operatorPass !== undefined && String(operatorPass).trim() !== '') {
+    patch.operatorPass = String(operatorPass).trim();
+  }
+  if (strictTls !== undefined) patch.strictTls = Boolean(strictTls);
+
+  const updated = updateOmadaConfig(patch);
+  return res.json({
+    success: true,
+    message: 'Mipangilio ya Omada imehifadhiwa kikamilifu!',
+    config: {
+      omadaUrl: updated.omadaUrl,
+      controllerId: updated.controllerId,
+      operatorUser: updated.operatorUser,
+      hasPassword: Boolean(updated.operatorPass),
+      strictTls: updated.strictTls,
+    }
+  });
+});
+
+app.post('/api/v1/omada/test-connection', requireAdmin, async (_req, res) => {
+  const result = await testOmadaConnection();
+  return res.json(result);
+});
+
+app.post('/api/v1/omada/detect-id', requireAdmin, async (_req, res) => {
+  try {
+    const id = await resolveControllerId();
+    return res.json({ success: true, controllerId: id, message: `Controller ID imetambuliwa: ${id}` });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+});
+
 // POST Authorize client (Grant access directly on Omada Controller v6.3 from Admin Dashboard - Protected by Admin Key)
 app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
   const { mac, hours, planName, apMac, clientIp, ssidName, radioId } = req.body || {};
@@ -1270,8 +1325,9 @@ app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
 
   const durationHours = Number(hours) || 24;
   const durationMs = durationHours * 3600 * 1000;
+  const omadaCfg = getOmadaConfig();
 
-  if (process.env.OMADA_URL && process.env.OMADA_OPERATOR) {
+  if (omadaCfg.omadaUrl && omadaCfg.operatorUser) {
     try {
       await omadaAuthorize({
         clientMac: cleanMac,
