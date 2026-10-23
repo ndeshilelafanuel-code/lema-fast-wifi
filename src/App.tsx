@@ -139,18 +139,20 @@ export default function App() {
 
   return (
     <HotspotProvider>
-      <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col font-sans selection:bg-amber-500/20 selection:text-amber-300">
-        {/* Top Bar Header */}
-        <Header
-          lang={lang}
-          systemMode={systemMode}
-          appView={appView}
-          onViewChange={setAppView}
-          onModeToggle={setSystemMode}
-          onLanguageToggle={setLang}
-          onScrollTo={scrollToSection}
-          onPrint={handlePrint}
-        />
+      <div className={`min-h-screen ${appView === 'customer-portal' ? 'bg-[#f7f5ee] text-stone-900' : 'bg-stone-900 text-stone-100'} flex flex-col font-sans selection:bg-amber-500/20 selection:text-amber-300`}>
+        {/* Top Bar Header (Only on landing, admin, saas, guide) */}
+        {appView !== 'customer-portal' && (
+          <Header
+            lang={lang}
+            systemMode={systemMode}
+            appView={appView}
+            onViewChange={setAppView}
+            onModeToggle={setSystemMode}
+            onLanguageToggle={setLang}
+            onScrollTo={scrollToSection}
+            onPrint={handlePrint}
+          />
+        )}
 
         {/* Dynamic Main Body based on appView */}
         <main className="flex-1">
@@ -182,7 +184,11 @@ export default function App() {
             ))}
 
           {appView === 'customer-portal' && (
-            <CustomerPortal lang={lang} />
+            <CustomerPortal
+              lang={lang}
+              onNavigateToAdmin={() => setAppView('admin-dashboard')}
+              onBackToHome={() => setAppView('landing')}
+            />
           )}
 
           {appView === 'super-admin' && (
@@ -250,12 +256,14 @@ export default function App() {
           )}
         </main>
 
-        {/* Footer */}
-        <Footer
-          lang={lang}
-          onPrint={handlePrint}
-          onScrollToTop={scrollToTop}
-        />
+        {/* Footer (Only on landing, admin, saas, guide) */}
+        {appView !== 'customer-portal' && (
+          <Footer
+            lang={lang}
+            onPrint={handlePrint}
+            onScrollToTop={scrollToTop}
+          />
+        )}
       </div>
     </HotspotProvider>
   );

@@ -41,9 +41,15 @@ import { VoiceGuideModal } from './VoiceGuideModal';
 
 interface CustomerPortalProps {
   lang: Language;
+  onNavigateToAdmin?: () => void;
+  onBackToHome?: () => void;
 }
 
-export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
+export const CustomerPortal: React.FC<CustomerPortalProps> = ({
+  lang,
+  onNavigateToAdmin,
+  onBackToHome,
+}) => {
   const {
     settings,
     processMobilePayment,
@@ -620,24 +626,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
   }, [isWatchingAdModal, adWatchCountdown]);
 
   return (
-    <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-      {/* Banner Notice */}
-      <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-200">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>
-            {lang === 'sw'
-              ? 'Huu ndio ukurasa halisi (Captive Portal) unaofunguka kwenye simu ya mteja anapounganisha WiFi yako!'
-              : 'This is the live customer-facing Captive Portal that automatically launches on client smartphones!'}
-          </span>
-        </div>
-        <span className="font-mono font-bold text-amber-400 uppercase">
-          {lang === 'sw' ? 'Mteja Kujihudumia' : 'Self-Service'}
-        </span>
-      </div>
-
-      {/* Main Simulated Phone / Portal Screen */}
-      <div className="max-w-md mx-auto bg-[#fcfaf2] border border-[#e6e2d3] rounded-[32px] p-6 sm:p-7 shadow-2xl relative overflow-hidden text-[#3a3431] ring-4 ring-[#e6e2d3]/50">
+    <div className="w-full min-h-screen bg-[#f7f5ee] flex flex-col items-center justify-start p-0 sm:py-6 sm:px-4">
+      {/* Main Real Captive Portal Screen */}
+      <div className="w-full max-w-md bg-[#fcfaf2] sm:border sm:border-[#e6e2d3] sm:rounded-[28px] p-4 sm:p-7 sm:shadow-2xl relative overflow-hidden text-[#3a3431] min-h-screen sm:min-h-0 flex flex-col justify-between">
         {/* USSD STK-Push Overlay Modal */}
         {showUssdPrompt && (
           <div className="absolute inset-0 bg-stone-950/85 backdrop-blur-xs flex items-center justify-center p-5 z-30 animate-in fade-in duration-200">
@@ -1801,6 +1792,20 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ lang }) => {
             <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
             <span>Msaada wa WhatsApp (w/ Device Info)</span>
           </a>
+        </div>
+
+        {/* Subtle Portal Footer & Admin Entry */}
+        <div className="pt-3 border-t border-stone-200/40 flex items-center justify-between text-[10px] text-stone-400">
+          <span>© {new Date().getFullYear()} {settings.hotspotName || 'Lema Fast WiFi'}</span>
+          {onNavigateToAdmin && (
+            <button
+              type="button"
+              onClick={onNavigateToAdmin}
+              className="text-stone-400 hover:text-stone-600 transition-colors cursor-pointer"
+            >
+              Msimamizi / Admin Login
+            </button>
+          )}
         </div>
       </div>
 
