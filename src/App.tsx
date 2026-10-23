@@ -44,7 +44,12 @@ export default function App() {
       path.includes('hotspot') ||
       path.includes('wateja') ||
       hash.includes('portal') ||
-      search.includes('portal')
+      search.includes('portal') ||
+      search.includes('clientmac') ||
+      search.includes('apmac') ||
+      search.includes('target=') ||
+      search.includes('gatewaymac') ||
+      search.includes('ssid')
     ) {
       return 'customer-portal';
     }
