@@ -58,11 +58,13 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showNetwatchModal, setShowNetwatchModal] = useState(false);
+  const [showWindowsWatcherModal, setShowWindowsWatcherModal] = useState(false);
   const [isSendingAlertTest, setIsSendingAlertTest] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
   const [isSyncingServer, setIsSyncingServer] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isCopiedNetwatch, setIsCopiedNetwatch] = useState(false);
+  const [isCopiedWatcher, setIsCopiedWatcher] = useState(false);
   const [editingTower, setEditingTower] = useState<NetworkTower | null>(null);
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
@@ -418,6 +420,15 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-200" />
               <span>Jaribu: AP Imerejea</span>
+            </button>
+
+            <button
+              onClick={() => setShowWindowsWatcherModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg active:scale-95"
+              title="Kukagua AP kiotomatiki kutoka kwenye kompyuta yako ya Windows (Omada)"
+            >
+              <Server className="w-4 h-4 text-yellow-300" />
+              <span>Watcher wa Windows (Omada PC)</span>
             </button>
 
             <button
@@ -1472,6 +1483,96 @@ add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Soko
             <div className="p-4 border-t border-stone-800 flex justify-end bg-stone-950/40">
               <button
                 onClick={() => setShowNetwatchModal(false)}
+                className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Funga
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Windows Watcher Modal */}
+      {showWindowsWatcherModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-stone-900 border border-indigo-500/40 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Server className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Windows Watcher (Omada PC Auto-Monitor)</h3>
+                  <p className="text-xs text-stone-400">Inachunguza uhalisia wa AP kila sekunde 10 kwenye mtandao wako wa ndani</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWindowsWatcherModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="p-4 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-indigo-300">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>Jinsi Inavyofanya Kazi Bila MikroTik:</span>
+                </div>
+                <p className="text-stone-300 leading-relaxed">
+                  Kwa sababu kompyuta yako ya Windows tayari ipo chumbani/ofisini ikiwa imewashwa na inaendesha <strong>Omada Controller (127.0.0.1:8043)</strong>, faili hili dogo la <code>.bat</code> au <code>PowerShell</code> linapima (ping) IP ya AP yako (<code>192.168.88.10</code>).
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-stone-300">
+                  <li><strong>Ukichomoa AP kwenye waya au umeme:</strong> Ndani ya sekunde 10, script inatuma taarifa kwenye tovuti na kuweka <strong>OFFLINE 🔴</strong> papo hapo, na kukuletea SMS/WhatsApp!</li>
+                  <li><strong>Ukichomeka AP tena:</strong> Ndani ya sekunde 10, script inatambua kuwa imerudi na kuweka <strong>ONLINE 🟢</strong> yenyewe bila wewe kubonyeza chochote!</li>
+                </ul>
+              </div>
+
+              {/* Action 1: Download .BAT File */}
+              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Njia ya 1: Pakua Faili Ubonyeze Mara Mbili (Double Click)</h4>
+                    <p className="text-[11px] text-stone-400">Pakua faili hili kisha uliendeshe (Run) kwenye hiyo kompyuta yako ya Windows:</p>
+                  </div>
+                  <a
+                    href="/download/lema-ap-watcher.bat"
+                    download="lema-ap-watcher.bat"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-lg"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Pakua Watcher (.bat)</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Action 2: Run via PowerShell */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-300">Njia ya 2: Au Bandika Amri Hii Kwenye PowerShell ya Windows:</label>
+                <div className="relative">
+                  <pre className="p-4 bg-stone-950 border border-stone-800 rounded-2xl text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">
+{`powershell -Command "while(\$true) { if (Test-Connection 192.168.88.10 -Count 1 -Quiet -TimeoutSeconds 1) { curl.exe -s 'https://lemawifi.online/api/v1/hardware/heartbeat?ip=192.168.88.10' | Out-Null; Write-Host 'AP IPO HEWANI (ONLINE)' -ForegroundColor Green } else { curl.exe -s 'https://lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.10&status=down' | Out-Null; Write-Host 'AP IMEZIMA (OFFLINE)' -ForegroundColor Red }; Start-Sleep -Seconds 10 }"`}
+                  </pre>
+                  <button
+                    onClick={() => {
+                      const cmd = `powershell -Command "while(\$true) { if (Test-Connection 192.168.88.10 -Count 1 -Quiet -TimeoutSeconds 1) { curl.exe -s 'https://lemawifi.online/api/v1/hardware/heartbeat?ip=192.168.88.10' | Out-Null; Write-Host 'AP IPO HEWANI (ONLINE)' -ForegroundColor Green } else { curl.exe -s 'https://lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.10&status=down' | Out-Null; Write-Host 'AP IMEZIMA (OFFLINE)' -ForegroundColor Red }; Start-Sleep -Seconds 10 }"`;
+                      navigator.clipboard.writeText(cmd);
+                      setIsCopiedWatcher(true);
+                      showToast('📋 Amri ya PowerShell imenakiliwa!');
+                      setTimeout(() => setIsCopiedWatcher(false), 3000);
+                    }}
+                    className="absolute top-3 right-3 px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
+                  >
+                    {isCopiedWatcher ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopiedWatcher ? 'Imenakiliwa!' : 'Nakili Amri'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-stone-800 flex justify-end bg-stone-950/40">
+              <button
+                onClick={() => setShowWindowsWatcherModal(false)}
                 className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
               >
                 Funga
