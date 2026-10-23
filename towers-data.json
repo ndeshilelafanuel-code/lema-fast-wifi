@@ -3,7 +3,7 @@
     "id": "tower-omada-mbezi",
     "name": "Omada",
     "location": "Mbezi",
-    "ipAddress": "192.168.88.10",
+    "ipAddress": "192.168.1.153",
     "macAddress": "D4-D6-DF-0D-B3-A0",
     "model": "Omada Outdoor EAP",
     "coverageRadiusMeters": 200,

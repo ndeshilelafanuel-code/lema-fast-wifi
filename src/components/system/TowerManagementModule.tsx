@@ -59,7 +59,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showNetwatchModal, setShowNetwatchModal] = useState(false);
   const [showWindowsWatcherModal, setShowWindowsWatcherModal] = useState(false);
-  const [isSendingAlertTest, setIsSendingAlertTest] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
   const [isSyncingServer, setIsSyncingServer] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -68,10 +67,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   const [editingTower, setEditingTower] = useState<NetworkTower | null>(null);
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
-
-
-
-  // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -79,33 +74,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
-  };
-
-  const handleSimulateAlert = async (status: 'down' | 'up') => {
-    setIsSendingAlertTest(true);
-    try {
-      const res = await fetch(`/api/v1/hardware/alert/outage?ip=192.168.88.115&status=${status}`);
-      const data = await res.json();
-      if (data && data.success) {
-        showToast(
-          status === 'down'
-            ? '🚨 Kengele imetuma WhatsApp & SMS: "AP IMEZIMA (OFFLINE)"!'
-            : '✅ Kengele imetuma WhatsApp & SMS: "AP IMERUDI HEWANI (ONLINE)"!'
-        );
-        // Refresh towers list
-        const towerRes = await fetch('/api/v1/towers');
-        const towerData = await towerRes.json();
-        if (towerData?.success && Array.isArray(towerData.towers)) {
-          importTowers(towerData.towers);
-        }
-      } else {
-        showToast('Kengele haijakamilika.');
-      }
-    } catch (e) {
-      showToast('Hitilafu wakati wa kutuma kengele ya dharura.');
-    } finally {
-      setIsSendingAlertTest(false);
-    }
   };
 
   // Add Tower form state
@@ -173,7 +141,7 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
       macAddress: editForm.macAddress.trim() || undefined,
       model: editForm.model,
       coverageRadiusMeters: Number(editForm.coverageRadiusMeters) || 200,
-      status: editForm.status,
+      status: editingTower.status,
       frequencyBand: editForm.frequencyBand,
       txPowerDbm: Number(editForm.txPowerDbm) || 26,
       antennaType: editForm.antennaType,
@@ -235,21 +203,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     deleteTower(id);
     setDeletingTowerId(null);
     showToast(`Mnara "${target?.name || id}" umefutwa kikamilifu.`);
-  };
-
-  const handleToggleStatus = async (tower: NetworkTower) => {
-    const nextStatus = tower.status === 'online' ? 'offline' : 'online';
-    updateTower(tower.id, { status: nextStatus });
-    try {
-      await fetch(
-        `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(tower.ipAddress)}&mac=${encodeURIComponent(tower.macAddress || '')}&name=${encodeURIComponent(tower.name)}&site=${encodeURIComponent(tower.location)}&status=${nextStatus === 'online' ? 'up' : 'down'}`
-      );
-    } catch (e) {}
-    showToast(
-      nextStatus === 'online'
-        ? `🟢 Mnara "${tower.name}" sasa uko HEWANI (Online)`
-        : `🔴 Mnara "${tower.name}" umezimwa na arifa imetumwa (Offline)`
-    );
   };
 
   // Filter towers
@@ -639,31 +592,24 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                         </div>
                       </td>
 
-                      {/* Status */}
+                      {/* Status (Automatic via Omada / Watchdog) */}
                       <td className="p-4">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(tower)}
-                          title="Bofya hapa kubadilisha hadhi (Online / Offline) na kutuma kengele"
-                          className="cursor-pointer transition-transform active:scale-95 text-left"
-                        >
-                          {isOnline ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 font-bold text-[11px] shadow-2xs">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                              <span>🟢 Hewani (Bofya Kuzima)</span>
-                            </span>
-                          ) : isMaintenance ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 font-bold text-[11px] shadow-2xs">
-                              <span className="w-2 h-2 rounded-full bg-amber-500" />
-                              <span>🛠️ Matengenezo</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-[11px] shadow-2xs">
-                              <span className="w-2 h-2 rounded-full bg-rose-500" />
-                              <span>🔴 Offline (Bofya Kuwasha)</span>
-                            </span>
-                          )}
-                        </button>
+                        {isOnline ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-700 font-bold text-[11px] shadow-2xs">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>🟢 Hewani (Auto)</span>
+                          </span>
+                        ) : isMaintenance ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-300 text-amber-700 font-bold text-[11px] shadow-2xs">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            <span>🛠️ Matengenezo</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px] shadow-2xs">
+                            <span className="w-2 h-2 rounded-full bg-rose-500" />
+                            <span>🔴 Offline (Auto)</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -863,16 +809,11 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Hali ya Kuanzia:</label>
-                  <select
-                    value={addForm.status}
-                    onChange={(e) => setAddForm({ ...addForm, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#cca43b] cursor-pointer"
-                  >
-                    <option value="online">🟢 Hewani (Online)</option>
-                    <option value="offline">🔴 Hitilafu (Offline)</option>
-                    <option value="maintenance">🛠️ Matengenezo (Maintenance)</option>
-                  </select>
+                  <label className="font-bold text-stone-700">Hali ya Kifaa (Status):</label>
+                  <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-xl text-stone-700 font-bold text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>⚡ Kiotomatiki (Automatic via Ping/Watchdog)</span>
+                  </div>
                 </div>
               </div>
 
@@ -1011,16 +952,11 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Hali (Status):</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-stone-800 font-semibold focus:outline-none focus:ring-1 focus:ring-[#cca43b] cursor-pointer"
-                  >
-                    <option value="online">🟢 Hewani (Online)</option>
-                    <option value="offline">🔴 Hitilafu (Offline)</option>
-                    <option value="maintenance">🛠️ Matengenezo (Maintenance)</option>
-                  </select>
+                  <label className="font-bold text-stone-700">Hali ya Kifaa (Status):</label>
+                  <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-xl text-stone-700 font-bold text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>⚡ Kiotomatiki (Automatic via Watchdog)</span>
+                  </div>
                 </div>
               </div>
 
@@ -1520,11 +1456,11 @@ add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Soko
                   <span>Jinsi Inavyofanya Kazi Bila MikroTik:</span>
                 </div>
                 <p className="text-stone-300 leading-relaxed">
-                  Kwa sababu kompyuta yako ya Windows tayari ipo chumbani/ofisini ikiwa imewashwa na inaendesha <strong>Omada Controller (127.0.0.1:8043)</strong>, faili hili dogo la <code>.bat</code> au <code>PowerShell</code> linapima (ping) IP ya AP yako (<code>192.168.88.10</code>).
+                  Kompyuta yako ya Windows inayoendesha <strong>Omada Controller (127.0.0.1:8043)</strong> inapima (ping) AP yako yenye IP ya <strong>192.168.1.153</strong> na MAC ya <strong>D4-D6-DF-0D-B3-A0</strong> kila sekunde 6.
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-stone-300">
-                  <li><strong>Ukichomoa AP kwenye waya au umeme:</strong> Ndani ya sekunde 10, script inatuma taarifa kwenye tovuti na kuweka <strong>OFFLINE 🔴</strong> papo hapo, na kukuletea SMS/WhatsApp!</li>
-                  <li><strong>Ukichomeka AP tena:</strong> Ndani ya sekunde 10, script inatambua kuwa imerudi na kuweka <strong>ONLINE 🟢</strong> yenyewe bila wewe kubonyeza chochote!</li>
+                  <li><strong>Ukichomoa AP kwenye waya au umeme:</strong> Ndani ya sekunde 6, script inatambua kuwa AP haipatikani na kubadilisha hali kuwa <strong>OFFLINE 🔴</strong> papo hapo, na kukuletea SMS/WhatsApp!</li>
+                  <li><strong>Ukichomeka AP tena:</strong> Ndani ya sekunde 6, script inatambua kuwa imerudi na kuweka <strong>ONLINE 🟢</strong> yenyewe bila wewe kubonyeza chochote!</li>
                 </ul>
               </div>
 
@@ -1532,8 +1468,8 @@ add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Soko
               <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Njia ya 1: Pakua Faili Ubonyeze Mara Mbili (Double Click)</h4>
-                    <p className="text-[11px] text-stone-400">Pakua faili hili kisha uliendeshe (Run) kwenye hiyo kompyuta yako ya Windows:</p>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Njia ya 1: Pakua Faili Jipya la .BAT (Imerekebishwa IP 192.168.1.153)</h4>
+                    <p className="text-[11px] text-stone-400">Bofya hapa kupakua faili jipya, kisha bofya kulia ➔ <em>Run as administrator</em> au Double Click:</p>
                   </div>
                   <a
                     href="/download/lema-ap-watcher.bat"
@@ -1541,21 +1477,21 @@ add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Soko
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-lg"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Pakua Watcher (.bat)</span>
+                    <span>Pakua Watcher Mpya (.bat)</span>
                   </a>
                 </div>
               </div>
 
               {/* Action 2: Run via PowerShell */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-stone-300">Njia ya 2: Au Bandika Amri Hii Kwenye PowerShell ya Windows:</label>
+                <label className="text-xs font-bold text-stone-300">Njia ya 2: Au Bandika Amri Hii ya Moja kwa Moja Kwenye Windows PowerShell:</label>
                 <div className="relative">
                   <pre className="p-4 bg-stone-950 border border-stone-800 rounded-2xl text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">
-{`powershell -Command "while(\$true) { if (Test-Connection 192.168.88.10 -Count 1 -Quiet -TimeoutSeconds 1) { curl.exe -s 'https://lemawifi.online/api/v1/hardware/heartbeat?ip=192.168.88.10' | Out-Null; Write-Host 'AP IPO HEWANI (ONLINE)' -ForegroundColor Green } else { curl.exe -s 'https://lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.10&status=down' | Out-Null; Write-Host 'AP IMEZIMA (OFFLINE)' -ForegroundColor Red }; Start-Sleep -Seconds 10 }"`}
+{`powershell -Command "while(\$true) { if (Test-Connection 192.168.1.153 -Count 1 -Quiet -TimeoutSeconds 1) { curl.exe -k -s 'https://lemawifi.online/api/v1/hardware/heartbeat?ip=192.168.1.153&mac=D4-D6-DF-0D-B3-A0' | Out-Null; Write-Host '🟢 [ONLINE] AP ipo Hewani (192.168.1.153)' -ForegroundColor Green } else { curl.exe -k -s 'https://lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.1.153&mac=D4-D6-DF-0D-B3-A0&status=down' | Out-Null; Write-Host '🔴 [OFFLINE] AP Imezima au Imechomoka!' -ForegroundColor Red }; Start-Sleep -Seconds 6 }"`}
                   </pre>
                   <button
                     onClick={() => {
-                      const cmd = `powershell -Command "while(\$true) { if (Test-Connection 192.168.88.10 -Count 1 -Quiet -TimeoutSeconds 1) { curl.exe -s 'https://lemawifi.online/api/v1/hardware/heartbeat?ip=192.168.88.10' | Out-Null; Write-Host 'AP IPO HEWANI (ONLINE)' -ForegroundColor Green } else { curl.exe -s 'https://lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.10&status=down' | Out-Null; Write-Host 'AP IMEZIMA (OFFLINE)' -ForegroundColor Red }; Start-Sleep -Seconds 10 }"`;
+                      const cmd = `powershell -Command "while(\$true) { if (Test-Connection 192.168.1.153 -Count 1 -Quiet -TimeoutSeconds 1) { curl.exe -k -s 'https://lemawifi.online/api/v1/hardware/heartbeat?ip=192.168.1.153&mac=D4-D6-DF-0D-B3-A0' | Out-Null; Write-Host '🟢 [ONLINE] AP ipo Hewani (192.168.1.153)' -ForegroundColor Green } else { curl.exe -k -s 'https://lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.1.153&mac=D4-D6-DF-0D-B3-A0&status=down' | Out-Null; Write-Host '🔴 [OFFLINE] AP Imezima au Imechomoka!' -ForegroundColor Red }; Start-Sleep -Seconds 6 }"`;
                       navigator.clipboard.writeText(cmd);
                       setIsCopiedWatcher(true);
                       showToast('📋 Amri ya PowerShell imenakiliwa!');

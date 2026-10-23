@@ -71,24 +71,6 @@ export const GisMapModule: React.FC = () => {
     triggerToast('Mnara umezimwa na kuondolewa kwenye mfumo.');
   };
 
-  const handleTogglePower = async (tower: NetworkTower) => {
-    const nextStatus = tower.status === 'online' ? 'offline' : 'online';
-    updateTower(tower.id, { status: nextStatus });
-    if (selectedTower?.id === tower.id) {
-      setSelectedTower({ ...selectedTower, status: nextStatus });
-    }
-    try {
-      await fetch(
-        `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(tower.ipAddress)}&mac=${encodeURIComponent(tower.macAddress || '')}&name=${encodeURIComponent(tower.name)}&site=${encodeURIComponent(tower.location)}&status=${nextStatus === 'online' ? 'up' : 'down'}`
-      );
-    } catch (e) {}
-    triggerToast(
-      nextStatus === 'online'
-        ? `🟢 ${tower.name} sasa ipo HEWANI (Online)`
-        : `🔴 ${tower.name} imezimwa na kuwekwa OFFLINE`
-    );
-  };
-
   const handleTestApiConnection = () => {
     if (!controllerIp) {
       triggerToast('Tafadhali ingiza IP ya Controller au Router yako.');
@@ -248,29 +230,19 @@ export const GisMapModule: React.FC = () => {
             <div className="space-y-5">
               <div className="flex items-start justify-between gap-3 border-b border-stone-800 pb-4">
                 <div>
-                  <button
-                    type="button"
-                    onClick={() => handleTogglePower(currentSelected)}
-                    title="Bofya hapa kubadilisha hadhi (Online / Offline)"
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-transform active:scale-95 text-left ${
+                  <span
+                    className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                       currentSelected.status === 'online'
-                        ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40'
-                        : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                     }`}
                   >
-                    {currentSelected.status === 'online' ? '🟢 AP Ipo Hewani (Bofya Kuzima)' : '🔴 AP Imezimwa (Bofya Kuwasha)'}
-                  </button>
+                    {currentSelected.status === 'online' ? '🟢 AP Ipo Hewani (Auto)' : '🔴 AP Imezimwa (Auto)'}
+                  </span>
                   <h3 className="text-lg font-black text-white mt-1.5">{currentSelected.name}</h3>
                   <p className="text-xs text-stone-400">{currentSelected.location}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleTogglePower(currentSelected)}
-                    className="p-2 rounded-xl bg-stone-800 text-stone-300 hover:text-white border border-stone-700 transition-all cursor-pointer"
-                    title="Geuza Umeme (Toggle Online/Offline)"
-                  >
-                    <Power className="w-4 h-4" />
-                  </button>
                   <button
                     onClick={() => handleDeleteTower(currentSelected.id)}
                     className="p-2 rounded-xl bg-rose-950/40 text-rose-400 border border-rose-800 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"

@@ -1,47 +1,87 @@
 @echo off
-title Lema Fast WiFi - AP Auto-Status Watchdog
+setlocal enabledelayedexpansion
+title LEMA FAST WIFI - AP REAL-TIME WATCHDOG MONITOR
 color 0A
 
-:: LEMA FAST WIFI - TP-LINK OMADA AP REAL-TIME WATCHDOG
-:: Hii script inachunguza uhalisia wa AP yako kila sekunde 10.
-:: Ukichomeka AP, mfumo unabadilika kuwa ONLINE moja kwa moja!
-:: Ukichomoa AP, mfumo unabadilika kuwa OFFLINE na kukutumia kengele!
-
-set AP_IP=192.168.88.10
-set SERVER_URL=https://lemawifi.online
-
-echo ============================================================
-echo   LEMA FAST WIFI - TP-LINK OMADA REAL-TIME STATUS WATCHDOG
-echo ============================================================
-echo Inachunguza AP yenye IP: %AP_IP%
-echo Seva ya Mfumo: %SERVER_URL%
+cls
+echo =====================================================================
+echo          LEMA FAST WIFI - TP-LINK OMADA AP WATCHDOG DAEMON
+echo =====================================================================
+echo  Hii programu inachunguza uhalisia wa AP yako kila sekunde 5-10.
+echo  - Ukichomeka AP: Mfumo unabadilika kuwa ONLINE moja kwa moja!
+echo  - Ukichomoa AP:  Mfumo unabadilika kuwa OFFLINE na kutuma kengele!
+echo =====================================================================
 echo.
-echo [INFO] Ili kurekebisha IP ya AP yako, fungua faili hili kwa Notepad na ubadilishe AP_IP.
+
+:: Chaguo la IP ya AP (Default: 192.168.1.153)
+set DEFAULT_IP=192.168.1.153
+set /p USER_IP="Andika IP ya AP yako [Bonyeza ENTER kutumia %DEFAULT_IP%]: "
+if "%USER_IP%"=="" (
+    set AP_IP=%DEFAULT_IP%
+) else (
+    set AP_IP=%USER_IP%
+)
+
+:: MAC address ya AP ya Omada
+set AP_MAC=D4-D6-DF-0D-B3-A0
+
+:: Seva za Lema Fast WiFi
+set PROD_SERVER=https://lemawifi.online
+
+echo.
+echo [MIPANGILIO ILIYOCHAGULIWA]
+echo  - AP IP Target: %AP_IP%
+echo  - AP MAC:       %AP_MAC%
+echo  - Seva:         %PROD_SERVER%
+echo.
+echo =====================================================================
+echo Inaanza kuchunguza mawasiliano ya AP sasa... (Bonyeza Ctrl+C kusimamisha)
+echo =====================================================================
 echo.
 
 set LAST_STATE=unknown
 
 :loop
-ping -n 1 -w 1200 %AP_IP% >nul 2>&1
+:: Pima kama AP inajibu Ping (timeout 1000ms)
+ping -n 1 -w 1000 %AP_IP% >nul 2>&1
 if errorlevel 1 (
-    if not "%LAST_STATE%"=="offline" (
-        echo [%TIME%] [!] AP IMEZIMA! Inatuma taarifa ya OFFLINE kwenye mfumo...
-        curl -s "%SERVER_URL%/api/v1/hardware/alert/outage?ip=%AP_IP%&status=down" >nul
+    :: Ping imeshindwa (AP Imezima au Imechomoka)
+    if not "!LAST_STATE!"=="offline" (
+        echo [!TIME!] 🔴 [OFFLINE] AP haijibu Ping kwa %AP_IP%! Waya umechomoka au umezima.
+        echo          Inatuma taarifa ya OFFLINE kwenye mfumo wa Lema Fast WiFi...
+        
+        :: Tuma kupitia curl au powershell
+        curl -k -s "%PROD_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=down" >nul 2>&1
+        if errorlevel 1 (
+            powershell -Command "try { Invoke-RestMethod -Uri '%PROD_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=down' -TimeoutSec 4 | Out-Null } catch {}" >nul 2>&1
+        )
+        
+        echo          [OK] Hali imesasishwa: Mfumo sasa unaonyesha OFFLINE!
         set LAST_STATE=offline
     ) else (
-        echo [%TIME%] AP bado Imezima (Offline)...
+        echo [!TIME!] 🔴 AP bado haipatikani (%AP_IP% OFFLINE)...
     )
 ) else (
-    if not "%LAST_STATE%"=="online" (
-        echo [%TIME%] [OK] AP IMERUDI HEWANI! Inatuma taarifa ya ONLINE kwenye mfumo...
-        curl -s "%SERVER_URL%/api/v1/hardware/alert/outage?ip=%AP_IP%&status=up" >nul
-        curl -s "%SERVER_URL%/api/v1/hardware/heartbeat?ip=%AP_IP%" >nul
+    :: Ping imefanikiwa (AP Ipo Hewani)
+    if not "!LAST_STATE!"=="online" (
+        echo [!TIME!] 🟢 [ONLINE] AP imepatikana kikamilifu kwenye %AP_IP%!
+        echo          Inatuma taarifa ya ONLINE kwenye mfumo wa Lema Fast WiFi...
+        
+        curl -k -s "%PROD_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=up" >nul 2>&1
+        curl -k -s "%PROD_SERVER%/api/v1/hardware/heartbeat?ip=%AP_IP%&mac=%AP_MAC%" >nul 2>&1
+        if errorlevel 1 (
+            powershell -Command "try { Invoke-RestMethod -Uri '%PROD_SERVER%/api/v1/hardware/alert/outage?ip=%AP_IP%&mac=%AP_MAC%&status=up' -TimeoutSec 4 | Out-Null; Invoke-RestMethod -Uri '%PROD_SERVER%/api/v1/hardware/heartbeat?ip=%AP_IP%&mac=%AP_MAC%' -TimeoutSec 4 | Out-Null } catch {}" >nul 2>&1
+        )
+        
+        echo          [OK] Hali imesasishwa: Mfumo sasa unaonyesha ONLINE!
         set LAST_STATE=online
     ) else (
-        curl -s "%SERVER_URL%/api/v1/hardware/heartbeat?ip=%AP_IP%" >nul
-        echo [%TIME%] AP ipo Hewani (Online) - Heartbeat imetumwa.
+        :: Heartbeat ya kawaida
+        curl -k -s "%PROD_SERVER%/api/v1/hardware/heartbeat?ip=%AP_IP%&mac=%AP_MAC%" >nul 2>&1
+        echo [!TIME!] 🟢 AP ipo hewani (%AP_IP% ONLINE) - Mawasiliano mazuri.
     )
 )
 
-timeout /t 10 /nobreak >nul
+:: Subiri sekunde 6 kabla ya kupima tena
+timeout /t 6 /nobreak >nul
 goto loop

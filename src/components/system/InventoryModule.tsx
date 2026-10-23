@@ -382,50 +382,23 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                       </div>
                     </td>
 
-                    {/* Status */}
+                    {/* Status (Automatic via Omada / Watchdog) */}
                     <td className="p-4">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const nextStatus = device.status === 'online' ? 'offline' : 'online';
-                          const updated = {
-                            ...device,
-                            status: nextStatus as any,
-                            lastSeen: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                          };
-                          onAddManual(updated);
-                          try {
-                            await fetch(
-                              `/api/v1/hardware/alert/outage?mac=${encodeURIComponent(device.macAddress)}&status=${nextStatus === 'online' ? 'up' : 'down'}&ip=${encodeURIComponent(device.ipAddress)}&name=${encodeURIComponent(device.name)}&site=${encodeURIComponent(device.site)}`
-                            );
-                          } catch (e) {}
-                          showToast(
-                            nextStatus === 'online' ? '🟢 AP Imewashwa (Online)' : '🔴 AP Imezimwa (Offline)',
-                            nextStatus === 'online'
-                              ? `${device.name} sasa iko hewani na inahifadhiwa kwenye PostgreSQL.`
-                              : `Kengele: ${device.name} imezimwa (Arifa ya dharura imetumwa).`,
-                            nextStatus === 'online' ? 'success' : 'warning'
-                          );
-                        }}
-                        title="Bofya hapa kubadilisha hali (Online / Offline) na kutuma kengele"
-                        className="cursor-pointer transition-transform active:scale-95 text-left"
-                      >
-                        {device.status === 'online' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            <span>🟢 Online (Bofya Kuzima)</span>
-                          </span>
-                        ) : device.status === 'standby' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                            <span>🟡 Standby</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                            <span>🔴 Offline (Bofya Kuwasha)</span>
-                          </span>
-                        )}
-                      </button>
+                      {device.status === 'online' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span>🟢 Online (Auto)</span>
+                        </span>
+                      ) : device.status === 'standby' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                          <span>🟡 Standby</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                          <span>🔴 Offline (Auto)</span>
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
@@ -770,25 +743,9 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-stone-300">Hali ya Kifaa (Status)</label>
-                <div className="flex gap-2">
-                  {[
-                    { id: 'online', label: '🟢 Online (Kiko Hewani)' },
-                    { id: 'standby', label: '🟡 Standby (Kipo Stoo)' },
-                    { id: 'offline', label: '🔴 Offline' },
-                  ].map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setManualForm({ ...manualForm, status: s.id as any })}
-                      className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-colors cursor-pointer ${
-                        manualForm.status === s.id
-                          ? 'bg-emerald-600/20 border-emerald-500 text-emerald-400'
-                          : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
+                <div className="p-3 bg-stone-950 border border-stone-800 rounded-xl text-stone-300 text-xs flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>⚡ Kiotomatiki (Automatic via Watchdog/Ping)</span>
                 </div>
               </div>
 

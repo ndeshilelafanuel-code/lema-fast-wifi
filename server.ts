@@ -517,8 +517,8 @@ async function processApOutageAlert(params: {
   const foundDevice = savedHardware.find(
     (h) =>
       (cleanParamMac && h.macAddress.replace(/[:-]/g, '').toUpperCase() === cleanParamMac) ||
-      (params.apIp && h.ipAddress && h.ipAddress.includes(params.apIp)) ||
-      (!cleanParamMac && !params.apIp && savedHardware.length === 1)
+      (params.apIp && h.ipAddress && (h.ipAddress.includes(params.apIp) || params.apIp.includes(h.ipAddress))) ||
+      savedHardware.length === 1
   );
   
   const apName = params.apName || foundDevice?.name || 'Smart WiFi AP';
@@ -528,6 +528,9 @@ async function processApOutageAlert(params: {
   // Update device status in memory and disk
   if (foundDevice) {
     foundDevice.status = status === 'down' ? 'offline' : 'online';
+    if (params.apIp && params.apIp.startsWith('192.168.')) {
+      foundDevice.ipAddress = params.apIp;
+    }
     foundDevice.lastSeen = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     (foundDevice as any).lastHeartbeat = status === 'up' ? Date.now() : 0;
     saveHardwareToDisk();
@@ -687,8 +690,8 @@ app.all('/api/v1/hardware/heartbeat', async (req, res) => {
   const device = savedHardware.find(
     (h) =>
       (cleanTargetMac && h.macAddress.replace(/[:-]/g, '').toUpperCase() === cleanTargetMac) ||
-      (targetIp && h.ipAddress && h.ipAddress.includes(targetIp)) ||
-      (!targetMac && savedHardware.length === 1)
+      (targetIp && h.ipAddress && (h.ipAddress.includes(targetIp) || targetIp.includes(h.ipAddress))) ||
+      savedHardware.length === 1
   );
 
   const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -697,18 +700,34 @@ app.all('/api/v1/hardware/heartbeat', async (req, res) => {
   if (device) {
     if (device.status === 'offline') wasOffline = true;
     device.status = 'online';
+    if (targetIp && targetIp.startsWith('192.168.')) {
+      device.ipAddress = targetIp;
+    }
     device.lastSeen = nowStr;
     (device as any).lastHeartbeat = Date.now();
     saveHardwareToDisk();
+    try {
+      db.update(hardware).set({ status: 'online', lastSeen: nowStr }).where(eq(hardware.id, device.id)).catch(() => {});
+    } catch (e) {}
   }
 
   const towers = loadSavedTowers();
-  const tower = towers.find((t: any) => t.ipAddress === targetIp || (targetMac && t.macAddress === targetMac));
+  const tower = towers.find((t: any) => 
+    (cleanTargetMac && (t.macAddress || '').replace(/[:-]/g, '').toUpperCase() === cleanTargetMac) ||
+    (t.ipAddress === targetIp) ||
+    towers.length === 1
+  );
   if (tower) {
     if (tower.status === 'offline') wasOffline = true;
     tower.status = 'online';
+    if (targetIp && targetIp.startsWith('192.168.')) {
+      tower.ipAddress = targetIp;
+    }
     (tower as any).lastHeartbeat = Date.now();
     saveTowersToFile(towers);
+    try {
+      db.update(towers).set({ status: 'online' }).where(eq(towers.id, tower.id)).catch(() => {});
+    } catch (e) {}
   }
 
   if (wasOffline) {
