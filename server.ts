@@ -8,7 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { db } from './src/db/index.ts';
-import { hardware, towers } from './src/db/schema.ts';
+import { hardware, towers as towersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
 
@@ -564,7 +564,7 @@ async function processApOutageAlert(params: {
       t.status = status === 'down' ? 'offline' : 'online';
       towersChanged = true;
       try {
-        db.update(towers).set({ status: t.status }).where(eq(towers.id, t.id)).catch(() => {});
+        db.update(towersTable).set({ status: t.status }).where(eq(towersTable.id, t.id)).catch(() => {});
       } catch (e) {}
     }
   });
@@ -726,7 +726,7 @@ app.all('/api/v1/hardware/heartbeat', async (req, res) => {
     (tower as any).lastHeartbeat = Date.now();
     saveTowersToFile(towers);
     try {
-      db.update(towers).set({ status: 'online' }).where(eq(towers.id, tower.id)).catch(() => {});
+      db.update(towersTable).set({ status: 'online' }).where(eq(towersTable.id, tower.id)).catch(() => {});
     } catch (e) {}
   }
 
@@ -2408,7 +2408,7 @@ app.get('/api/v1/towers', async (_req, res) => {
   const isApOffline = apItem && apItem.status === 'offline';
 
   try {
-    const rows = await db.select().from(towers);
+    const rows = await db.select().from(towersTable);
     if (rows && rows.length > 0) {
       const diskTowers = loadSavedTowers();
       const diskMap = new Map(diskTowers.map((t: any) => [t.id, t]));
@@ -2447,7 +2447,7 @@ app.post('/api/v1/towers', async (req, res) => {
     try {
       for (const t of incomingTowers) {
         if (!t.id || !t.name) continue;
-        await db.insert(towers).values({
+        await db.insert(towersTable).values({
           id: t.id,
           name: t.name,
           location: t.location || '',
@@ -2456,7 +2456,7 @@ app.post('/api/v1/towers', async (req, res) => {
           status: t.status || 'active',
           lastPingMs: typeof t.lastPingMs === 'number' ? t.lastPingMs : 5,
         }).onConflictDoUpdate({
-          target: towers.id,
+          target: towersTable.id,
           set: {
             name: t.name,
             location: t.location || '',

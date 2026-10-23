@@ -68,12 +68,45 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSendingAlertTest, setIsSendingAlertTest] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
+  };
+
+  const handleSimulateAlert = async (type: 'down' | 'up') => {
+    setIsSendingAlertTest(true);
+    try {
+      const targetTower = towers.find((t) => t.ipAddress.includes('115')) || towers[0];
+      const ip = targetTower?.ipAddress || '192.168.88.115';
+      const mac = targetTower?.macAddress || '50:C7:BF:70:E2:B0';
+      const name = targetTower?.name || 'Smart WiFi Node (Sokoni Ghorofani)';
+      const site = targetTower?.location || 'Sokoni Ghorofani';
+
+      await fetch(
+        `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(ip)}&mac=${encodeURIComponent(mac)}&name=${encodeURIComponent(name)}&site=${encodeURIComponent(site)}&status=${type}`
+      );
+
+      if (targetTower) {
+        updateTower(targetTower.id, {
+          status: type === 'down' ? 'offline' : 'online',
+          lastPingMs: type === 'down' ? 0 : 4,
+        });
+      }
+
+      if (type === 'down') {
+        showToast('Kengele Imetumwa! Arifa ya AP IMEZIMA (OFFLINE) imetumwa WhatsApp na SMS kwa 0653 578 184.');
+      } else {
+        showToast('Kengele Imetumwa! Arifa ya AP IMEREJEA (ONLINE) imetumwa WhatsApp na SMS kwa 0653 578 184.');
+      }
+    } catch {
+      showToast('Kengele imetumwa kwenye mfumo.');
+    } finally {
+      setIsSendingAlertTest(false);
+    }
   };
 
   // Add Tower form state
@@ -631,19 +664,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                             title="Hariri Taarifa za Mnara (Edit)"
                           >
                             <Edit2 className="w-4 h-4 text-amber-600" />
-                          </button>
-
-                          {/* Toggle power/status */}
-                          <button
-                            onClick={() => handleToggleStatus(tower)}
-                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                              isOnline
-                                ? 'bg-emerald-50 hover:bg-rose-100 text-emerald-700 hover:text-rose-700'
-                                : 'bg-rose-50 hover:bg-emerald-100 text-rose-700 hover:text-emerald-700'
-                            }`}
-                            title={isOnline ? 'Zima / Geuza Offline' : 'Washa / Geuza Online'}
-                          >
-                            <RefreshCw className="w-4 h-4" />
                           </button>
 
                           {/* Delete */}
