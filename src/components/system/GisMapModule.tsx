@@ -71,13 +71,22 @@ export const GisMapModule: React.FC = () => {
     triggerToast('Mnara umezimwa na kuondolewa kwenye mfumo.');
   };
 
-  const handleTogglePower = (tower: NetworkTower) => {
+  const handleTogglePower = async (tower: NetworkTower) => {
     const nextStatus = tower.status === 'online' ? 'offline' : 'online';
     updateTower(tower.id, { status: nextStatus });
     if (selectedTower?.id === tower.id) {
       setSelectedTower({ ...selectedTower, status: nextStatus });
     }
-    triggerToast(`Hali ya ${tower.name} imebadilishwa kuwa: ${nextStatus.toUpperCase()}`);
+    try {
+      await fetch(
+        `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(tower.ipAddress)}&mac=${encodeURIComponent(tower.macAddress || '')}&name=${encodeURIComponent(tower.name)}&site=${encodeURIComponent(tower.location)}&status=${nextStatus === 'online' ? 'up' : 'down'}`
+      );
+    } catch (e) {}
+    triggerToast(
+      nextStatus === 'online'
+        ? `🟢 ${tower.name} sasa ipo HEWANI (Online)`
+        : `🔴 ${tower.name} imezimwa na kuwekwa OFFLINE`
+    );
   };
 
   const handleTestApiConnection = () => {
@@ -239,13 +248,18 @@ export const GisMapModule: React.FC = () => {
             <div className="space-y-5">
               <div className="flex items-start justify-between gap-3 border-b border-stone-800 pb-4">
                 <div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    currentSelected.status === 'online'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                  }`}>
-                    {currentSelected.status === 'online' ? '🟢 AP Ipo Hewani (Online)' : '🔴 Hitilafu / Umeme Umekatika'}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePower(currentSelected)}
+                    title="Bofya hapa kubadilisha hadhi (Online / Offline)"
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer transition-transform active:scale-95 text-left ${
+                      currentSelected.status === 'online'
+                        ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40'
+                        : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40'
+                    }`}
+                  >
+                    {currentSelected.status === 'online' ? '🟢 AP Ipo Hewani (Bofya Kuzima)' : '🔴 AP Imezimwa (Bofya Kuwasha)'}
+                  </button>
                   <h3 className="text-lg font-black text-white mt-1.5">{currentSelected.name}</h3>
                   <p className="text-xs text-stone-400">{currentSelected.location}</p>
                 </div>

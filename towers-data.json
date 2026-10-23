@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "id": "tower-omada-mbezi",
+    "name": "Omada",
+    "location": "Mbezi",
+    "ipAddress": "192.168.88.10",
+    "macAddress": "D4-D6-DF-0D-B3-A0",
+    "model": "Omada Outdoor EAP",
+    "coverageRadiusMeters": 200,
+    "status": "offline",
+    "frequencyBand": "WiFi 7 / Dual-Band (2.4/5GHz)",
+    "txPowerDbm": 28,
+    "antennaType": "Omni-directional 360°",
+    "heightMeters": 18,
+    "lastPingMs": 0,
+    "installedAt": "2026-10-22T07:17:30.941Z"
+  }
+]

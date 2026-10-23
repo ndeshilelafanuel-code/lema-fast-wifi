@@ -548,13 +548,25 @@ async function processApOutageAlert(params: {
 
   // Update towers-data.json and PostgreSQL towers
   const diskTowers = loadSavedTowers();
-  const tower = diskTowers.find((t: any) => t.ipAddress === targetIp || t.macAddress === apMac);
-  if (tower) {
-    tower.status = status === 'down' ? 'offline' : 'online';
+  const cleanParamMac2 = (apMac || '').replace(/[:-]/g, '').toUpperCase();
+  let towersChanged = false;
+  diskTowers.forEach((t: any) => {
+    const tMac = (t.macAddress || '').replace(/[:-]/g, '').toUpperCase();
+    const isMatch =
+      (cleanParamMac2 && tMac === cleanParamMac2) ||
+      (targetIp && t.ipAddress === targetIp) ||
+      (apName && t.name && t.name.toLowerCase().includes(apName.toLowerCase())) ||
+      diskTowers.length === 1;
+    if (isMatch) {
+      t.status = status === 'down' ? 'offline' : 'online';
+      towersChanged = true;
+      try {
+        db.update(towers).set({ status: t.status }).where(eq(towers.id, t.id)).catch(() => {});
+      } catch (e) {}
+    }
+  });
+  if (towersChanged) {
     saveTowersToFile(diskTowers);
-    try {
-      await db.update(towers).set({ status: tower.status }).where(eq(towers.id, tower.id));
-    } catch (e) {}
   }
 
   const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -2371,6 +2383,11 @@ function saveTowersToFile(towers: any[]) {
 }
 
 app.get('/api/v1/towers', async (_req, res) => {
+  // Check hardware inventory status for 100% real-time consistency
+  loadSavedHardware();
+  const apItem = savedHardware.find((h) => h.category === 'ap') || savedHardware[0];
+  const isApOffline = apItem && apItem.status === 'offline';
+
   try {
     const rows = await db.select().from(towers);
     if (rows && rows.length > 0) {
@@ -2378,6 +2395,7 @@ app.get('/api/v1/towers', async (_req, res) => {
       const diskMap = new Map(diskTowers.map((t: any) => [t.id, t]));
       const mapped = rows.map((r) => {
         const extra = diskMap.get(r.id) || {};
+        const effectiveStatus = isApOffline ? 'offline' : (r.status || 'online');
         return {
           ...extra,
           id: r.id,
@@ -2385,8 +2403,8 @@ app.get('/api/v1/towers', async (_req, res) => {
           location: r.location || '',
           ipAddress: r.ipAddress || '',
           macAddress: r.macAddress || '',
-          status: r.status,
-          lastPingMs: r.lastPingMs || 5,
+          status: effectiveStatus,
+          lastPingMs: effectiveStatus === 'offline' ? 0 : (r.lastPingMs || 5),
         };
       });
       return res.json({ success: true, towers: mapped, source: 'cloud_sql_postgresql' });
@@ -2394,7 +2412,13 @@ app.get('/api/v1/towers', async (_req, res) => {
   } catch (err) {
     console.warn('[PostgreSQL Towers] Read fallback to disk:', err);
   }
-  return res.json({ success: true, towers: loadSavedTowers(), source: 'disk_backup' });
+  const diskTowers = loadSavedTowers().map((t: any) => {
+    if (isApOffline) {
+      return { ...t, status: 'offline', lastPingMs: 0 };
+    }
+    return t;
+  });
+  return res.json({ success: true, towers: diskTowers, source: 'disk_backup' });
 });
 
 app.post('/api/v1/towers', async (req, res) => {

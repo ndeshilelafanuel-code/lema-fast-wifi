@@ -369,32 +369,46 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem('wifi_hotspot_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  // Load and poll saved towers from backend server in real-time (Watchdog sync)
+  // Load and poll saved towers from backend server in real-time (Watchdog sync with hardware inventory)
   useEffect(() => {
     let isMounted = true;
-    const fetchTowers = () => {
-      fetch('/api/v1/towers')
-        .then((res) => res.json())
-        .then((data) => {
-          if (isMounted && data && data.success && Array.isArray(data.towers) && data.towers.length > 0) {
-            setTowers((current) => {
-              if (current.length === 0) return data.towers;
-              const serverMap = new Map(data.towers.map((t: NetworkTower) => [t.id, t]));
-              const updatedCurrent = current.map((t) => {
-                const serverItem: any = serverMap.get(t.id);
-                return serverItem ? { ...t, ...serverItem } : t;
-              });
-              const currentIds = new Set(current.map((t) => t.id));
-              const missingFromServer = data.towers.filter((t: NetworkTower) => !currentIds.has(t.id));
-              return [...missingFromServer, ...updatedCurrent];
-            });
+    const fetchTowersAndHardware = async () => {
+      try {
+        const [towerRes, hwRes] = await Promise.all([
+          fetch('/api/v1/towers').then((r) => r.json()).catch(() => null),
+          fetch('/api/v1/hardware/inventory').then((r) => r.json()).catch(() => null),
+        ]);
+
+        let apStatus: 'online' | 'offline' | null = null;
+        if (hwRes && Array.isArray(hwRes.inventory) && hwRes.inventory.length > 0) {
+          const ap = hwRes.inventory.find((i: any) => i.category === 'ap') || hwRes.inventory[0];
+          if (ap) {
+            apStatus = ap.status === 'online' ? 'online' : 'offline';
           }
-        })
-        .catch(() => {});
+        }
+
+        if (isMounted) {
+          if (towerRes && towerRes.success && Array.isArray(towerRes.towers) && towerRes.towers.length > 0) {
+            setTowers((current) => {
+              const base = towerRes.towers.length > 0 ? towerRes.towers : current;
+              return base.map((t: NetworkTower) => {
+                if (apStatus && (!t.status || t.status === 'online' || t.status === 'offline')) {
+                  return { ...t, status: apStatus };
+                }
+                return t;
+              });
+            });
+          } else if (apStatus) {
+            setTowers((current) =>
+              current.map((t) => ({ ...t, status: apStatus as any }))
+            );
+          }
+        }
+      } catch (e) {}
     };
 
-    fetchTowers();
-    const interval = setInterval(fetchTowers, 3000);
+    fetchTowersAndHardware();
+    const interval = setInterval(fetchTowersAndHardware, 2500);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -733,6 +747,16 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ towers: updated }),
       }).catch(() => {});
+
+      if (updates.status) {
+        const target = updated.find((t) => t.id === id);
+        if (target) {
+          fetch(
+            `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(target.ipAddress)}&mac=${encodeURIComponent(target.macAddress || '')}&name=${encodeURIComponent(target.name)}&site=${encodeURIComponent(target.location)}&status=${updates.status === 'online' ? 'up' : 'down'}`
+          ).catch(() => {});
+        }
+      }
+
       return updated;
     });
   };

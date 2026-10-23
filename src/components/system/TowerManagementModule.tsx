@@ -235,10 +235,19 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     showToast(`Mnara "${target?.name || id}" umefutwa kikamilifu.`);
   };
 
-  const handleToggleStatus = (tower: NetworkTower) => {
+  const handleToggleStatus = async (tower: NetworkTower) => {
     const nextStatus = tower.status === 'online' ? 'offline' : 'online';
     updateTower(tower.id, { status: nextStatus });
-    showToast(`Hali ya mnara "${tower.name}" imebadilishwa kuwa: ${nextStatus.toUpperCase()}`);
+    try {
+      await fetch(
+        `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(tower.ipAddress)}&mac=${encodeURIComponent(tower.macAddress || '')}&name=${encodeURIComponent(tower.name)}&site=${encodeURIComponent(tower.location)}&status=${nextStatus === 'online' ? 'up' : 'down'}`
+      );
+    } catch (e) {}
+    showToast(
+      nextStatus === 'online'
+        ? `🟢 Mnara "${tower.name}" sasa uko HEWANI (Online)`
+        : `🔴 Mnara "${tower.name}" umezimwa na arifa imetumwa (Offline)`
+    );
   };
 
   // Filter towers
@@ -621,22 +630,29 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
 
                       {/* Status */}
                       <td className="p-4">
-                        {isOnline ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px]">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>🟢 Hewani</span>
-                          </span>
-                        ) : isMaintenance ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
-                            <span className="w-2 h-2 rounded-full bg-amber-500" />
-                            <span>🛠️ Matengenezo</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[11px]">
-                            <span className="w-2 h-2 rounded-full bg-rose-500" />
-                            <span>🔴 Offline</span>
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(tower)}
+                          title="Bofya hapa kubadilisha hadhi (Online / Offline) na kutuma kengele"
+                          className="cursor-pointer transition-transform active:scale-95 text-left"
+                        >
+                          {isOnline ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 font-bold text-[11px] shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>🟢 Hewani (Bofya Kuzima)</span>
+                            </span>
+                          ) : isMaintenance ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 font-bold text-[11px] shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span>🛠️ Matengenezo</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-[11px] shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" />
+                              <span>🔴 Offline (Bofya Kuwasha)</span>
+                            </span>
+                          )}
+                        </button>
                       </td>
 
                       {/* Actions */}
