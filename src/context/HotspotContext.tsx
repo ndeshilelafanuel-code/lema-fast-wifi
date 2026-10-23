@@ -674,7 +674,9 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const processMobilePayment = async (
     phone: string,
-    packageId: string
+    packageId: string,
+    realMac?: string,
+    realIp?: string
   ): Promise<{ success: boolean; message: string; voucher?: Voucher; session?: ActiveSession }> => {
     const targetPkg = settings.packages.find((p) => p.id === packageId) || settings.packages[0];
 
@@ -701,6 +703,9 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const now = new Date();
     const expiresAt = new Date(now.getTime() + durationMs).toISOString();
 
+    const resolvedMac = (realMac || '').trim() || `00:E0:4C:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
+    const resolvedIp = realIp || `192.168.88.${Math.floor(25 + Math.random() * 180)}`;
+
     const voucher: Voucher = {
       id: `v-pay-${Date.now()}`,
       code,
@@ -714,7 +719,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       activatedAt: now.toISOString(),
       expiresAt,
       usedByPhone: phone,
-      macAddress: `00:E0:4C:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`,
+      macAddress: resolvedMac,
     };
 
     // Determine network by prefix
@@ -745,8 +750,8 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: `sess-${Date.now()}`,
       voucherCode: code,
       phoneNumber: phone,
-      ipAddress: `192.168.88.${Math.floor(25 + Math.random() * 180)}`,
-      macAddress: voucher.macAddress!,
+      ipAddress: resolvedIp,
+      macAddress: resolvedMac,
       connectedAt: now.toISOString(),
       expiresAt,
       packageId: targetPkg.id,
@@ -756,9 +761,22 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       bytesUp: 524288,
     };
 
-    setVouchers((prev) => [voucher, ...prev]);
+    // Expire any existing voucher for this device MAC so it never stays unused
+    setVouchers((prev) => [
+      voucher,
+      ...prev.map((v) =>
+        v.macAddress?.toUpperCase() === resolvedMac.toUpperCase() && v.status === 'active'
+          ? { ...v, status: 'expired' as const }
+          : v
+      ),
+    ]);
     setTransactions((prev) => [transaction, ...prev]);
-    setActiveSessions((prev) => [session, ...prev]);
+
+    // Strictly enforce 1 device MAC = 1 active session in the state
+    setActiveSessions((prev) => [
+      session,
+      ...prev.filter((s) => s.macAddress?.toUpperCase() !== resolvedMac.toUpperCase())
+    ]);
     setCurrentClientSession(session);
 
     return {
@@ -781,10 +799,11 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       (s) => s.id === sessionId || s.macAddress?.toUpperCase() === sessionId.toUpperCase()
     );
     const mac = targetSession?.macAddress || (sessionId.includes(':') || sessionId.includes('-') ? sessionId : '');
+    const apMac = (targetSession as any)?.apMac || '';
     const vCode = targetSession?.voucherCode;
 
     // Send DELETE to server API so Omada Controller is instructed to terminate internet access
-    fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}`, {
+    fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}&apMac=${encodeURIComponent(apMac)}`, {
       method: 'DELETE',
       headers: {
         'x-admin-key': adminKey,

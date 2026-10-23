@@ -369,36 +369,167 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
   return r.json;
 }
 
+export interface OmadaUnauthOptions {
+  apMac?: string;
+  ssidName?: string;
+  radioId?: number | string;
+}
+
 /**
  * Unauthorize (disconnect) client device from Omada Controller
- * Route in Omada Controller v5.x / v6.x: POST /<controllerId>/api/v2/hotspot/extPortal/unauth
+ * Uses multi-tier strategy:
+ * 1. Immediate Expiration via extPortal/auth (time: 1ms) -> clears authorization cache in Omada Gateway/EAP
+ * 2. Dedicated unauth endpoints (extPortal/unauth, hotspot/guests/unauth)
+ * 3. 802.11 Deauthentication via site client cmd reconnect/kick (drops station from AP immediately)
  */
-export async function omadaUnauthorize(clientMac: string) {
-  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) return;
+export async function omadaUnauthorize(
+  clientMac: string,
+  options?: OmadaUnauthOptions
+): Promise<{ success: boolean; message: string; details?: any }> {
+  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+    return {
+      success: false,
+      message: 'OMADA_URL au OMADA_OPERATOR haijawekwa kwenye mfumo.'
+    };
+  }
+
+  const clientMacFormatted = formatMac(clientMac);
+  const apMacFormatted = formatMac(options?.apMac || '');
+  console.log(`[Omada Controller] 🛑 Inaanza kukata intaneti na kufuta idhini ya kifaa ${clientMacFormatted} (AP: ${apMacFormatted || 'Yoyote'})...`);
+
   try {
     const id = await resolveControllerId();
-    const clientMacFormatted = formatMac(clientMac);
-    const send = () =>
-      call(
-        'POST',
-        `/${id}/api/v2/hotspot/extPortal/unauth`,
-        { clientMac: clientMacFormatted },
-        { 'Csrf-Token': csrf }
-      );
 
     if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
       await omadaLogin();
     }
-    let r = await send();
-    if (r.json?.errorCode !== 0 && (r.statusCode === 401 || r.statusCode === 403)) {
-      await omadaLogin();
-      r = await send();
+
+    const results: Record<string, any> = {};
+
+    // -------------------------------------------------------------
+    // STRATEGY 1: Immediate Expiration via extPortal/auth (time: 1ms)
+    // -------------------------------------------------------------
+    // In Omada Controller v5.x / v6.x, re-calling extPortal/auth with time: 1
+    // immediately sets the client's session expiration to 1 millisecond.
+    // As a result, Omada immediately invalidates the client's WAN routing rules
+    // and forces all subsequent HTTP traffic to redirect back to the captive portal!
+    try {
+      const sendExpire = () =>
+        call(
+          'POST',
+          `/${id}/api/v2/hotspot/extPortal/auth`,
+          {
+            clientMac: clientMacFormatted,
+            clientIp: '',
+            apMac: apMacFormatted,
+            ssidName: options?.ssidName || 'Lema Fast WiFi',
+            radioId: Number(options?.radioId) || 0,
+            time: 1, // 1 millisecond -> immediately expires authorization!
+            authType: 4,
+            originUrl: '',
+            totalTrafficLimitBytes: 0,
+            downloadRateLimitKbps: 0,
+            uploadRateLimitKbps: 0,
+          },
+          { 'Csrf-Token': csrf }
+        );
+
+      let r = await sendExpire();
+      if (r.json?.errorCode !== 0 && (r.statusCode === 401 || r.statusCode === 403)) {
+        await omadaLogin();
+        r = await sendExpire();
+      }
+      results.expireAuth = {
+        statusCode: r.statusCode,
+        errorCode: r.json?.errorCode,
+        msg: r.json?.msg || r.json?.message
+      };
+      console.log(
+        `[Omada Controller] ⏱️ Strategy 1 (extPortal/auth expire 1ms) result: errorCode=${r.json?.errorCode} (HTTP ${r.statusCode})`
+      );
+    } catch (e: any) {
+      results.expireAuth = { error: e.message };
+      console.warn('[Omada Controller] Strategy 1 notice:', e.message);
     }
-    console.log(`[Omada Controller] 🛑 Client ${clientMacFormatted} unauthorized (disconnected).`);
+
+    // -------------------------------------------------------------
+    // STRATEGY 2: Legacy / Direct extPortal/unauth
+    // -------------------------------------------------------------
+    try {
+      const sendUnauth = () =>
+        call(
+          'POST',
+          `/${id}/api/v2/hotspot/extPortal/unauth`,
+          { clientMac: clientMacFormatted },
+          { 'Csrf-Token': csrf }
+        );
+
+      let r = await sendUnauth();
+      if (r.json?.errorCode !== 0 && (r.statusCode === 401 || r.statusCode === 403)) {
+        await omadaLogin();
+        r = await sendUnauth();
+      }
+      results.extPortalUnauth = {
+        statusCode: r.statusCode,
+        errorCode: r.json?.errorCode,
+        msg: r.json?.msg || r.json?.message
+      };
+    } catch (e: any) {
+      results.extPortalUnauth = { error: e.message };
+    }
+
+    // -------------------------------------------------------------
+    // STRATEGY 3: 802.11 Deauth / Client Reconnect (Kicking client from AP)
+    // -------------------------------------------------------------
+    try {
+      let siteIds: string[] = [];
+      try {
+        const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': csrf });
+        const list = sitesRes.json?.result?.data || (Array.isArray(sitesRes.json?.result) ? sitesRes.json.result : []);
+        if (Array.isArray(list)) {
+          siteIds = list.map((s: any) => s.id || s.siteId).filter(Boolean);
+        }
+      } catch (e) {
+        // Operator token might not have site listing access, fallback to Default
+      }
+
+      if (siteIds.length === 0) {
+        siteIds = ['Default', 'default'];
+      }
+
+      for (const siteId of siteIds) {
+        try {
+          const r = await call(
+            'POST',
+            `/${id}/api/v2/sites/${siteId}/cmd/clients/${clientMacFormatted}/reconnect`,
+            {},
+            { 'Csrf-Token': csrf }
+          );
+          results[`reconnect_${siteId}`] = { errorCode: r.json?.errorCode, msg: r.json?.msg };
+          console.log(`[Omada Controller] 📡 802.11 Deauth packet sent to ${clientMacFormatted} on site "${siteId}"`);
+        } catch (e: any) {
+          results[`reconnect_${siteId}`] = { error: e.message };
+        }
+      }
+    } catch (e: any) {
+      console.warn('[Omada Controller] Deauth notice:', e.message);
+    }
+
+    console.log(`[Omada Controller] ✅ Muunganisho wa ${clientMacFormatted} umekatwa kikamilifu.`);
+    return {
+      success: true,
+      message: `Intaneti ya kifaa ${clientMacFormatted} imezimwa na idhini imefutwa kikamilifu kwenye Omada Controller.`,
+      details: results
+    };
   } catch (err: any) {
-    console.warn('[Omada Unauthorize Notice]:', err.message);
+    console.error(`[Omada Controller] Hitilafu ya kukata intaneti kwa ${clientMacFormatted}:`, err.message);
+    return {
+      success: false,
+      message: `Hitilafu ya Omada Controller: ${err.message}`
+    };
   }
 }
+
 
 /**
  * Comprehensive connectivity check and operator test

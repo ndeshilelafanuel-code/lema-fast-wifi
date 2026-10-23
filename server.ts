@@ -963,10 +963,14 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
     queryMac ||
     (targetId.includes(':') || targetId.includes('-') ? targetId : '');
 
+  const apMac = sessionToDelete?.apMac || (req.query.apMac as string) || '';
+  const ssidName = sessionToDelete?.ssidName || (req.query.ssid as string) || 'Lema Fast WiFi';
+  const radioId = sessionToDelete?.radioId || (req.query.radioId as string) || 0;
+
   if (clientMac) {
     try {
-      await omadaUnauthorize(clientMac);
-      console.log(`[Omada Disconnect] Unauthorizing MAC ${clientMac}`);
+      console.log(`[Omada Disconnect] Unauthorizing MAC ${clientMac} on AP ${apMac || 'any'}`);
+      await omadaUnauthorize(clientMac, { apMac, ssidName, radioId });
     } catch (err: any) {
       console.warn('[Omada Disconnect Notice]:', err?.message);
     }
@@ -975,22 +979,27 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
   // Update associated voucher to expired (it has been used)
   const vCode = sessionToDelete?.voucherCode;
   loadSavedVouchers();
+  const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  const cleanMacNorm = normalizeMac(clientMac);
+
   if (vCode) {
     const v = savedVouchers.find((v) => v.code === vCode);
     if (v) {
       v.status = 'expired';
       v.macAddress = clientMac || v.macAddress;
-      saveVouchersToDisk();
-    }
-  } else if (clientMac) {
-    const v = savedVouchers.find(
-      (v) => (v.boundMac?.toUpperCase() === clientMac || v.macAddress?.toUpperCase() === clientMac) && v.status === 'active'
-    );
-    if (v) {
-      v.status = 'expired';
-      saveVouchersToDisk();
     }
   }
+
+  // Also expire any other voucher associated with this device MAC so it never stays 'unused'
+  if (cleanMacNorm) {
+    savedVouchers.forEach((v: any) => {
+      const vMacNorm = normalizeMac(v.boundMac || v.macAddress);
+      if (vMacNorm === cleanMacNorm && (v.status === 'active' || v.code === vCode)) {
+        v.status = 'expired';
+      }
+    });
+  }
+  saveVouchersToDisk();
 
   // Update Wi-Fi clients status to pending_login
   if (clientMac) {
@@ -1059,11 +1068,25 @@ app.get('/api/v1/vouchers', (_req, res) => {
 app.post('/api/v1/vouchers', (req, res) => {
   const { vouchers } = req.body;
   if (Array.isArray(vouchers)) {
-    // Merge vouchers by code
+    // Merge vouchers by code without downgrading active/expired statuses
     for (const v of vouchers) {
       const idx = savedVouchers.findIndex((sv) => sv.code === v.code);
       if (idx >= 0) {
-        savedVouchers[idx] = { ...savedVouchers[idx], ...v };
+        const current = savedVouchers[idx];
+        const effectiveStatus =
+          (current.status === 'active' || current.status === 'expired') && v.status === 'unused'
+            ? current.status
+            : (v.status || current.status);
+
+        savedVouchers[idx] = {
+          ...current,
+          ...v,
+          status: effectiveStatus,
+          boundMac: current.boundMac || v.boundMac || current.macAddress || v.macAddress || '',
+          macAddress: current.macAddress || v.macAddress || current.boundMac || v.boundMac || '',
+          activatedAt: current.activatedAt || v.activatedAt,
+          expiresAt: current.expiresAt || v.expiresAt,
+        };
       } else {
         savedVouchers.unshift(v);
       }
@@ -1199,6 +1222,9 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
     phoneNumber: phone || '',
     ipAddress: effectiveClientIp,
     macAddress: effectiveClientMac,
+    apMac: effectiveApMac,
+    ssidName: String(ssidName || 'Lema Fast WiFi'),
+    radioId: radioId || 0,
     connectedAt: new Date(now).toISOString(),
     expiresAt,
     packageId: found.packageId || 'pkg-custom',
@@ -1476,12 +1502,18 @@ app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
 
   // Also push to activeSessions
   loadSavedSessions();
+  const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  const cleanMacNorm = normalizeMac(cleanMac);
+
   const newSession = {
     id: `sess-${Date.now()}`,
     voucherCode: target.voucherCode,
     phoneNumber: '0653578184',
     ipAddress: target.ip,
     macAddress: target.mac,
+    apMac: String(apMac || '').toUpperCase(),
+    ssidName: ssidName || 'Lema Fast WiFi',
+    radioId: radioId || 0,
     connectedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + durationMs).toISOString(),
     packageId: 'pkg-grant',
@@ -1491,7 +1523,7 @@ app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
     bytesUp: 524288
   };
 
-  savedActiveSessions = [newSession, ...savedActiveSessions.filter((s: any) => s.macAddress !== cleanMac)];
+  savedActiveSessions = [newSession, ...savedActiveSessions.filter((s: any) => normalizeMac(s.macAddress || s.mac) !== cleanMacNorm)];
   saveSessionsToDisk();
 
   return res.json({
@@ -1499,6 +1531,46 @@ app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
     message: `Mteja (${cleanMac}) ameruhusiwa intaneti kikamilifu kwenye Omada!`,
     session: newSession
   });
+});
+
+// POST Disconnect / Deauthorize client directly on Omada Controller (Admin Protected)
+app.post('/api/v1/omada/client/disconnect', requireAdmin, async (req, res) => {
+  const { mac, apMac, ssidName, radioId } = req.body || {};
+  const cleanMac = String(mac || '').trim().toUpperCase();
+  if (!cleanMac) {
+    return res.status(400).json({ error: 'MAC address is required' });
+  }
+
+  const result = await omadaUnauthorize(cleanMac, {
+    apMac: apMac ? String(apMac).toUpperCase() : '',
+    ssidName: ssidName || 'Lema Fast WiFi',
+    radioId: radioId || 0
+  });
+
+  loadSavedSessions();
+  const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  const cleanMacNorm = normalizeMac(cleanMac);
+
+  savedActiveSessions = savedActiveSessions.filter((s: any) => normalizeMac(s.macAddress || s.mac) !== cleanMacNorm);
+  saveSessionsToDisk();
+
+  loadSavedVouchers();
+  savedVouchers.forEach((v: any) => {
+    if (normalizeMac(v.boundMac || v.macAddress) === cleanMacNorm && v.status === 'active') {
+      v.status = 'expired';
+    }
+  });
+  saveVouchersToDisk();
+
+  loadSavedWifiClients();
+  const wIdx = wifiClients.findIndex((c) => normalizeMac(c.mac) === cleanMacNorm);
+  if (wIdx >= 0) {
+    wifiClients[wIdx].status = 'pending_login';
+    wifiClients[wIdx].voucherCode = undefined;
+    saveWifiClients();
+  }
+
+  return res.json({ success: true, message: result.message, details: result.details });
 });
 
 // ==========================================
@@ -2865,7 +2937,23 @@ app.post('/api/v1/payments/webhook', async (req, res) => {
       order.completedAt = new Date().toISOString();
     }
 
-    console.log(`[Payment Webhook] SUCCESS for order ${orderId}! Generated voucher: ${voucherCode}`);
+    // Persist to savedVouchers so it is ready to be redeemed
+    loadSavedVouchers();
+    savedVouchers.unshift({
+      id: `v-pay-${Date.now()}`,
+      code: voucherCode,
+      packageId: order?.packageId || 'pkg-custom',
+      packageName: order?.packageName || 'Intaneti ya Kasi',
+      price: order?.amount || body.amount || 1000,
+      durationHours: order?.durationHours || 24,
+      speedLimit: '3.0M/1.5M',
+      status: 'unused',
+      createdAt: new Date().toISOString(),
+      usedByPhone: phoneToNotify,
+    });
+    saveVouchersToDisk();
+
+    console.log(`[Payment Webhook] SUCCESS for order ${orderId}! Generated and saved voucher: ${voucherCode}`);
 
     // Send WhatsApp notification immediately via Meta WhatsApp Cloud API
     const { international } = normalizeTzPhone(phoneToNotify);
@@ -2914,6 +3002,22 @@ app.post('/api/v1/payments/simulate-confirm', async (req, res) => {
   order.voucherCode = voucherCode;
   order.reference = `STK-${Math.floor(100000 + Math.random() * 900000)}TZ`;
   order.completedAt = new Date().toISOString();
+
+  // Persist to savedVouchers
+  loadSavedVouchers();
+  savedVouchers.unshift({
+    id: `v-pay-${Date.now()}`,
+    code: voucherCode,
+    packageId: order.packageId || 'pkg-custom',
+    packageName: order.packageName || 'Intaneti ya Kasi',
+    price: order.amount || 1000,
+    durationHours: order.durationHours || 24,
+    speedLimit: '3.0M/1.5M',
+    status: 'unused',
+    createdAt: new Date().toISOString(),
+    usedByPhone: order.phone || '',
+  });
+  saveVouchersToDisk();
 
   // Send WhatsApp and SMS message if phone provided
   if (order.phone) {
