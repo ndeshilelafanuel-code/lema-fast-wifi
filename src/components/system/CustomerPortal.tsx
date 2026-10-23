@@ -617,14 +617,22 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         }
       }
 
-      const candidateHosts = [
+      const dynamicSubnetGateway1 = clientIp && clientIp.includes('.') ? `${clientIp.replace(/\.\d+$/, '.1')}:8088` : '';
+      const dynamicSubnetGateway254 = clientIp && clientIp.includes('.') ? `${clientIp.replace(/\.\d+$/, '.254')}:8088` : '';
+      const dynamicSubnetGatewayHttps = clientIp && clientIp.includes('.') ? `${clientIp.replace(/\.\d+$/, '.1')}:8043` : '';
+
+      const candidateHosts = Array.from(new Set([
         customTargetHost,
-        '192.168.88.1:8088',
-        '192.168.88.1:8043',
-        '192.168.0.254:8088',
+        dynamicSubnetGateway1,
+        dynamicSubnetGateway254,
+        dynamicSubnetGatewayHttps,
         '192.168.1.1:8088',
+        '192.168.1.1:8043',
+        '192.168.1.254:8088',
+        '192.168.0.254:8088',
         '192.168.0.1:8088',
-      ].filter(Boolean);
+        '192.168.88.1:8088',
+      ])).filter(Boolean);
 
       // Ensure hidden iframe exists so form POST is NOT blocked by Android CaptivePortalLogin
       let hiddenIframe = document.getElementById('omada_auth_iframe') as HTMLIFrameElement | null;
@@ -780,16 +788,25 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
   }, [isWatchingAdModal, adWatchCountdown]);
 
   // Handle direct window navigation for Android CaptivePortalLogin release
+  const [showOmadaHelpGuide, setShowOmadaHelpGuide] = useState<boolean>(false);
+
   const handleOpenInternet = () => {
     authorizeOmadaHardware(clientMac);
     setStatusMessage({
       type: 'success',
       text: '🚀 Inafungua intaneti... Subiri sekunde 1 simu ithibitishe muunganisho.'
     });
+
+    const gatewayIp = clientIp && clientIp.includes('.') ? clientIp.replace(/\.\d+$/, '.1') : '192.168.1.1';
+    try {
+      const beacon = new Image();
+      beacon.src = `http://${gatewayIp}:8088/portal/auth?clientMac=${encodeURIComponent(clientMac)}&authType=0`;
+    } catch (e) {}
+
     const targetUrl = omadaParams.target || 'http://connectivitycheck.gstatic.com/generate_204';
     setTimeout(() => {
       window.location.href = targetUrl;
-    }, 350);
+    }, 400);
   };
 
   return (
@@ -1036,7 +1053,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               <p className="text-xs text-emerald-300">
                 Kifurushi Chako: <strong>{currentClientSession.packageName}</strong>
               </p>
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <button
                   type="button"
                   onClick={handleOpenInternet}
@@ -1045,6 +1062,26 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                   <Zap className="w-4 h-4 fill-stone-950" />
                   <span>Fungua Intaneti / Anza Kuvinjari ➔</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowOmadaHelpGuide((prev) => !prev)}
+                  className="w-full text-center text-[10px] text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
+                >
+                  {showOmadaHelpGuide ? '▲ Ficha Maelekezo ya Omada' : '❓ Simu bado inaandika "Sign in to network"? Bofya hapa'}
+                </button>
+
+                {showOmadaHelpGuide && (
+                  <div className="p-3 bg-stone-900 border border-stone-800 rounded-xl text-left text-[11px] text-stone-300 space-y-2 animate-in fade-in duration-150">
+                    <p className="font-bold text-amber-400">Hatua za Kufungua Moja kwa Moja kwenye Kompyuta:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-stone-300">
+                      <li>Kwenye Kompyuta yako yenye <strong>Omada Controller</strong>, nenda kushoto kwenye <strong>Clients</strong>.</li>
+                      <li>Tafuta kifaa chenye MAC: <code className="text-emerald-300 bg-stone-950 px-1 rounded">{clientMac}</code> (IP: {clientIp}).</li>
+                      <li>Bonyeza kitufe cha <strong>"Authorize"</strong> (alama ya kufuli) kuruhusu simu ipate intaneti mara moja!</li>
+                      <li>Kwenye <strong>Hotspot ➔ Portal ➔ Edit</strong>, hakikisha umechagua <strong>"No Authentication"</strong> badala ya RADIUS.</li>
+                    </ol>
+                  </div>
+                )}
               </div>
             </div>
 
