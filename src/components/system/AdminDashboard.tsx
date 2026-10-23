@@ -394,6 +394,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }, 4000);
   };
 
+  const [adminApiKeyInput, setAdminApiKeyInput] = useState<string>(() => {
+    return localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+  });
+  const [savedKeyToast, setSavedKeyToast] = useState<boolean>(false);
+
+  const handleSaveAdminApiKey = () => {
+    const trimmed = adminApiKeyInput.trim() || 'lema_admin_secret_key_2026';
+    localStorage.setItem('admin_api_key', trimmed);
+    setAdminApiKeyInput(trimmed);
+    setSavedKeyToast(true);
+    showToast('Admin API Key Imehifadhiwa', `Funguo (${trimmed.slice(0, 10)}...) imehifadhiwa kwa mafanikio.`);
+    setTimeout(() => setSavedKeyToast(false), 3000);
+  };
+
   // Wotefy Interactive Chat & Auto-Reply state variables
   const [isChatAutoReplyOn, setIsChatAutoReplyOn] = useState<boolean>(true);
   const [autoReplyMessageText, setAutoReplyMessageText] = useState<string>('Tafadhali subiri kidogo, Msimamizi atajibu hivi punde au bando lako litafunguka pindi muamala utakapokamilika.');
@@ -2421,6 +2435,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onChange={(e) => updateSettings({ payoutAccount: e.target.value })}
                       className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs font-mono text-amber-400"
                     />
+                  </div>
+                  <div>
+                    <label className="text-stone-400 block mb-1 flex items-center justify-between">
+                      <span>Admin API Key (Ulinzi wa Vocha & Seva):</span>
+                      <span className="text-[10px] text-emerald-400 font-mono">x-admin-key</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={adminApiKeyInput}
+                        onChange={(e) => setAdminApiKeyInput(e.target.value)}
+                        placeholder="lema_admin_secret_key_2026"
+                        className="flex-1 px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-emerald-400 text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveAdminApiKey}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-xs shrink-0"
+                      >
+                        {savedKeyToast ? '✓ Imehifadhiwa' : 'Hifadhi Key'}
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1 block">
+                      Funguo ya siri inayotumiwa kuthibitisha uundaji wa vocha na idhini ya wateja (default: <code>lema_admin_secret_key_2026</code>).
+                    </span>
                   </div>
                 </div>
               </div>

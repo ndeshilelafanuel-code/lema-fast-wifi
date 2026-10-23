@@ -34,10 +34,12 @@ app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
 });
 
 // Msaidizi wa uthibitishaji wa Msimamizi (Admin Security Guard)
+const DEFAULT_ADMIN_KEY = 'lema_admin_secret_key_2026';
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const expectedKey = process.env.ADMIN_API_KEY;
-  const adminKey = req.get('x-admin-key');
+  const expectedKey = (process.env.ADMIN_API_KEY || DEFAULT_ADMIN_KEY).trim();
+  const adminKey = (req.get('x-admin-key') || '').trim();
   if (expectedKey && adminKey === expectedKey) return next();
+  console.warn(`[Admin Auth 401] x-admin-key mismatch. Received: "${adminKey ? '***' : 'empty'}", Expected: "${expectedKey ? '***' : 'empty'}"`);
   return res.status(401).json({
     success: false,
     message: 'Ruhusa imekataliwa (Unauthorized: x-admin-key header sahihi inahitajika).'

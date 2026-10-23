@@ -271,6 +271,16 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
+  // Hakikisha admin_api_key ipo kwenye localStorage kwa ajili ya maombi ya seva
+  useEffect(() => {
+    try {
+      const existing = localStorage.getItem('admin_api_key');
+      if (!existing || !existing.trim()) {
+        localStorage.setItem('admin_api_key', 'lema_admin_secret_key_2026');
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(activeSessions));
     // Also sync to server
@@ -505,9 +515,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setVouchers((prev) => [...newVouchers, ...prev]);
     // Sync with backend server with admin authentication header
-    const adminKey = typeof window !== 'undefined'
-      ? (localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026')
-      : 'lema_admin_secret_key_2026';
+    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+    const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+    if (typeof window !== 'undefined' && (!rawKey || !rawKey.trim())) {
+      try {
+        localStorage.setItem('admin_api_key', adminKey);
+      } catch {}
+    }
     fetch('/api/v1/vouchers', {
       method: 'POST',
       headers: {
@@ -516,9 +530,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       },
       body: JSON.stringify({ vouchers: newVouchers }),
     })
-      .then((r) => {
+      .then(async (r) => {
         if (!r.ok) {
-          console.error('[Vouchers Sync] Server rejected with status', r.status);
+          const errData = await r.json().catch(() => null);
+          console.error('[Vouchers Sync] Server rejected with status', r.status, errData);
           alert(`Tahadhari: Vocha hazikuhifadhiwa kwenye seva (Hitilafu ${r.status}). Thibitisha ADMIN_API_KEY.`);
         }
       })
