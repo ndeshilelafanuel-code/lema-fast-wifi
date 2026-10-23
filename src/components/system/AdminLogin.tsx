@@ -54,6 +54,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       (inputUser === 'superadmin' && inputPass === 'lema2026');
 
     if (isSuperAdmin) {
+      localStorage.setItem('admin_api_key', 'lema_admin_secret_key_2026');
       if (rememberMe) {
         localStorage.setItem('hotspot_admin_auth', 'true');
       } else {

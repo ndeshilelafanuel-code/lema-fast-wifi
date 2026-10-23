@@ -46,6 +46,7 @@ SURA YA 3: HATUA YA PILI - WEKA EXTERNAL PORTAL SERVER
    - Washa (Enable) "Pre-Authentication Access"
    - Ongeza:
      - lemawifi.online
+     - www.lemawifi.online
      - fonts.googleapis.com
      - fonts.gstatic.com
      - cdn.jsdelivr.net

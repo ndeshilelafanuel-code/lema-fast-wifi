@@ -505,28 +505,32 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setVouchers((prev) => [...newVouchers, ...prev]);
     // Sync with backend server with admin authentication header
-    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+    const adminKey = typeof window !== 'undefined'
+      ? (localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026')
+      : 'lema_admin_secret_key_2026';
     fetch('/api/v1/vouchers', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(adminKey ? { 'x-admin-key': adminKey } : {})
+        'x-admin-key': adminKey
       },
       body: JSON.stringify({ vouchers: newVouchers }),
-    }).catch(() => {});
+    })
+      .then((r) => {
+        if (!r.ok) {
+          console.error('[Vouchers Sync] Server rejected with status', r.status);
+          alert(`Tahadhari: Vocha hazikuhifadhiwa kwenye seva (Hitilafu ${r.status}). Thibitisha ADMIN_API_KEY.`);
+        }
+      })
+      .catch((err) => {
+        console.error('[Vouchers Sync Error]:', err);
+      });
     return newVouchers;
   };
 
   const redeemVoucher = (code: string, phone?: string, realMac?: string, realIp?: string) => {
     const trimmed = code.trim();
     let existing = vouchers.find((v) => v.code === trimmed);
-
-    // Call server to redeem and sync across all devices with standardized clientMac parameter
-    fetch('/api/v1/vouchers/redeem', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: trimmed, phone, clientMac: realMac, clientIp: realIp }),
-    }).catch(() => {});
 
     // If voucher does not exist in loaded vouchers, reject immediately
     if (!existing) {

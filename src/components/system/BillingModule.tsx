@@ -52,13 +52,17 @@ export const BillingModule: React.FC = () => {
   const handleAuthorizeClient = async (mac: string) => {
     setIsAuthorizing(mac);
     try {
+      const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
       const res = await fetch('/api/v1/omada/client/authorize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey
+        },
         body: JSON.stringify({ mac, hours: 2, planName: 'Idhini ya Msimamizi (Saa 2)' })
       });
       const data = await res.json();
-      if (data && data.success) {
+      if (res.ok && data && data.success) {
         setBillingLogs((prev) => [
           `[${new Date().toLocaleTimeString()}] [ADMIN-GRANT] ✅ Mteja (${mac}) ameruhusiwa intaneti (ACTIVE)! Vocha iliyotengenezwa: ${data.session?.voucherCode || '9412'}`,
           ...prev
@@ -68,8 +72,11 @@ export const BillingModule: React.FC = () => {
         if (cData && Array.isArray(cData.clients)) {
           setOmadaClients(cData.clients);
         }
+      } else {
+        alert(`Hitilafu ya kuruhusu mteja: ${data?.message || 'Unauthorized / Error ' + res.status}`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      alert(`Hitilafu ya mtandao: ${e?.message}`);
     } finally {
       setIsAuthorizing(null);
     }

@@ -1301,8 +1301,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
               </div>
             )}
 
-            {/* Mode Switcher Tabs (Vocha Kwanza, Lipa Simu, Rudisha Mtandao) */}
-            <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 border border-stone-200 rounded-2xl text-[11px] font-bold">
+            {/* Mode Switcher Tabs (Vocha Kwanza, Lipa Simu) */}
+            <div className="grid grid-cols-2 gap-1 p-1 bg-stone-100 border border-stone-200 rounded-2xl text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setActiveTab('voucher')}
@@ -1324,17 +1324,6 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
                 }`}
               >
                 Lipa Simu (STK)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('reconnect')}
-                className={`py-2 px-1 rounded-xl transition-all cursor-pointer text-center truncate ${
-                  activeTab === 'reconnect'
-                    ? 'bg-[#cca43b] text-white shadow-xs font-black'
-                    : 'text-stone-600 hover:text-stone-900'
-                }`}
-              >
-                Rudisha Mtandao
               </button>
             </div>
 

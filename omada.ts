@@ -180,11 +180,15 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
 
   let r = await send();
 
-  // If token expired, re-login once and retry
-  if (r.json?.errorCode === -1001 || r.json?.errorCode === -1003 || r.json?.errorCode === 1001) {
-    console.log('[Omada Controller] Session expired, re-authenticating...');
-    await omadaLogin();
-    r = await send();
+  // If authorization returned any error or expired session, attempt re-login once and retry
+  if (r.json?.errorCode !== 0 || r.statusCode === 401 || r.statusCode === 403) {
+    console.log(`[Omada Controller] First auth attempt returned errorCode: ${r.json?.errorCode} (HTTP ${r.statusCode}), re-authenticating operator session...`);
+    try {
+      await omadaLogin();
+      r = await send();
+    } catch (reLoginErr: any) {
+      console.warn('[Omada Controller] Re-login attempt failed:', reLoginErr.message);
+    }
   }
 
   if (r.json?.errorCode !== 0) {

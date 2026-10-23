@@ -33,16 +33,21 @@ app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
   });
 });
 
+// Msaidizi wa uthibitishaji wa Msimamizi (Admin Security Guard)
+const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const expectedKey = process.env.ADMIN_API_KEY;
+  const adminKey = req.get('x-admin-key');
+  if (expectedKey && adminKey === expectedKey) return next();
+  return res.status(401).json({
+    success: false,
+    message: 'Ruhusa imekataliwa (Unauthorized: x-admin-key header sahihi inahitajika).'
+  });
+};
+
 // Kulinda vocha: kuunda au kusoma orodha yote ya vocha ni kwa Admin tu (isipokuwa /redeem)
 app.use('/api/v1/vouchers', (req, res, next) => {
   if (req.path === '/redeem') return next();
-  const adminKey = req.get('x-admin-key') || (req.query && (req.query.adminKey as string));
-  const expectedKey = process.env.ADMIN_API_KEY;
-  if (expectedKey) {
-    if (adminKey && adminKey === expectedKey) return next();
-    return res.status(401).json({ success: false, message: 'Ruhusa imekataliwa (Unauthorized - x-admin-key inahitajika).' });
-  }
-  return next();
+  return requireAdmin(req, res, next);
 });
 
 // In-memory store for WhatsApp messages & sessions
@@ -1004,6 +1009,14 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
     });
   }
 
+  // AP MAC inahitajika iwapo mfumo umeunganishwa na Omada
+  if (process.env.OMADA_URL && !effectiveApMac) {
+    return res.status(400).json({
+      success: false,
+      message: 'Fungua ukurasa kupitia WiFi ya Lema (AP haijatambuliwa).'
+    });
+  }
+
   loadSavedVouchers();
   const found: any = savedVouchers.find((v) => v.code === trimmed);
   if (!found) {
@@ -1021,7 +1034,11 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   }
 
   // Bind to single device MAC: If already active and bound to another MAC, refuse!
-  if (found.status === 'active' && found.boundMac && found.boundMac !== effectiveClientMac) {
+  const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  const cleanClientMacNorm = normalizeMac(effectiveClientMac);
+  const cleanBoundMacNorm = normalizeMac(found.boundMac);
+
+  if (found.status === 'active' && cleanBoundMacNorm && cleanBoundMacNorm !== cleanClientMacNorm) {
     return res.status(403).json({
       success: false,
       message: `Vocha hii tayari inatumika kwenye kifaa kingine (${found.boundMac.slice(0, 8)}...). Vocha moja ni kwa kifaa kimoja tu.`
@@ -1057,6 +1074,11 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
         message: `Mfumo umeshindwa kuruhusu intaneti kwenye Omada Controller: ${omadaErr.message}. Vocha haijatumika, jaribu tena baada ya sekunde chache.`
       });
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({
+      success: false,
+      message: 'Mfumo bado haujaunganishwa na Omada Controller (OMADA_URL au OMADA_OPERATOR haijawekwa).'
+    });
   } else {
     console.warn('[Omada] OMADA_URL/OMADA_OPERATOR haijawekwa kwenye env. Inaruhusu kimajaribio (dev/mock mode).');
   }
@@ -1236,8 +1258,8 @@ app.all('/api/v1/omada/client/connect', (req, res) => {
   return res.json({ success: true, client: wifiClients[0], total: wifiClients.length });
 });
 
-// POST Authorize client (Grant access directly on Omada Controller v6.3 from Admin Dashboard)
-app.post('/api/v1/omada/client/authorize', async (req, res) => {
+// POST Authorize client (Grant access directly on Omada Controller v6.3 from Admin Dashboard - Protected by Admin Key)
+app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
   const { mac, hours, planName, apMac, clientIp, ssidName, radioId } = req.body || {};
   const cleanMac = String(mac || '').trim().toUpperCase();
   if (!cleanMac) {
