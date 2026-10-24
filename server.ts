@@ -1537,8 +1537,8 @@ app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/api/v1/omada/test-connection', requireAdmin, async (_req, res) => {
-  const result = await testOmadaConnection();
+app.post('/api/v1/omada/test-connection', requireAdmin, async (req, res) => {
+  const result = await testOmadaConnection(req.body);
   return res.json(result);
 });
 

@@ -280,51 +280,85 @@ export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
 
   cookie = '';
   csrf = '';
-  console.log(`[Omada Controller] Attempting Controller Admin login as "${currentConfig.operatorUser}" to controller ${id}...`);
+  console.log(`[Omada Controller] Attempting login as "${currentConfig.operatorUser}" to controller ${id}...`);
+
+  let lastErrorCode: number | undefined;
+  let lastErrorMsg = '';
 
   // 1. Try Controller Admin Login across global and controller-scoped endpoints
+  // Omada admin login API v5.x/v6.x requires username/password or name/password
   const adminEndpoints = [
-    '/api/v2/login',
-    `/${id}/api/v2/login`
+    `/${id}/api/v2/login`,
+    '/api/v2/login'
   ];
 
   for (const ep of adminEndpoints) {
     try {
       const adminRes = await call('POST', ep, {
+        username: currentConfig.operatorUser,
         name: currentConfig.operatorUser,
         password: currentConfig.operatorPass,
       });
       if (adminRes.json?.errorCode === 0) {
-        csrf = adminRes.json?.result?.token || '';
+        csrf = adminRes.json?.result?.token || adminRes.json?.token || (adminRes.headers['csrf-token'] as string) || '';
         const cookiesList = adminRes.setCookie || [];
         cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
         loggedAt = Date.now();
         console.log(`[Omada Controller] ✅ Admin Login successful via ${ep}! Full administrator session active.`);
         return { csrf, cookie };
+      } else if (adminRes.json?.errorCode !== undefined) {
+        lastErrorCode = adminRes.json.errorCode;
+        lastErrorMsg = adminRes.json.msg || adminRes.json.message || '';
       }
-    } catch (e) {}
+    } catch (e: any) {
+      console.warn(`[Omada Controller] Admin login on ${ep} failed:`, e.message);
+    }
   }
 
-  console.log('[Omada Controller] Falling back to Hotspot Operator login (/api/v2/hotspot/login)...');
+  console.log('[Omada Controller] Trying Hotspot Operator login endpoints (/api/v2/hotspot/login)...');
 
-  // 2. Fall back to Hotspot Operator Login
-  const r = await call('POST', `/${id}/api/v2/hotspot/login`, {
-    name: currentConfig.operatorUser,
-    password: currentConfig.operatorPass,
-  });
+  // 2. Try Hotspot Operator Login across controller and global endpoints
+  const operatorEndpoints = [
+    `/${id}/api/v2/hotspot/login`,
+    '/api/v2/hotspot/login'
+  ];
 
-  if (r.json?.errorCode !== 0) {
-    const msg = r.json?.msg || r.json?.message || (r.raw ? r.raw.slice(0, 120) : 'Unknown error');
-    throw new Error(`Omada login imeshindikana (Kosa ${r.json?.errorCode || r.statusCode}): ${msg}`);
+  for (const ep of operatorEndpoints) {
+    try {
+      const r = await call('POST', ep, {
+        name: currentConfig.operatorUser,
+        username: currentConfig.operatorUser,
+        password: currentConfig.operatorPass,
+      });
+
+      if (r.json?.errorCode === 0) {
+        csrf = r.json?.result?.token || r.json?.token || (r.headers['csrf-token'] as string) || '';
+        const cookiesList = r.setCookie || [];
+        cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
+        loggedAt = Date.now();
+        console.log(`[Omada Controller] ✅ Hotspot Operator login successful via ${ep}!`);
+        return { csrf, cookie };
+      } else if (r.json?.errorCode !== undefined) {
+        lastErrorCode = r.json.errorCode;
+        lastErrorMsg = r.json.msg || r.json.message || (r.raw ? r.raw.slice(0, 120) : '');
+      }
+    } catch (e: any) {
+      console.warn(`[Omada Controller] Operator login on ${ep} failed:`, e.message);
+    }
   }
 
-  csrf = r.json?.result?.token || '';
-  const cookiesList = r.setCookie || [];
-  cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
-  loggedAt = Date.now();
+  // Handle specific Omada Error -30109: Invalid username or password
+  if (lastErrorCode === -30109) {
+    throw new Error(
+      `Omada login imeshindikana (Kosa -30109): Invalid username or password.\n\n` +
+      `💡 Hatua za kutatua:\n` +
+      `1. Akaunti ya Operator (Inayopendekezwa na TP-Link): Fungua Omada Controller > nenda 'Hotspot Manager' (au Settings > Hotspot) > 'Operators' > bonyeza '+ Add' kutengeneza Operator username na password, kisha ziweke hapa.\n` +
+      `2. Akaunti ya Admin: Kama unatumia Msimamizi Mkuu, tumia jina la 'Local Admin' (k.m. admin), USITUMIE barua pepe ya TP-Link Cloud ID (kama gmail).\n` +
+      `3. Hakikisha hakuna nafasi (spaces) mwanzoni au mwishoni na herufi kubwa/ndogo zinalingana kikamilifu.`
+    );
+  }
 
-  console.log('[Omada Controller] ✅ Hotspot Operator login successful!');
-  return { csrf, cookie };
+  throw new Error(`Omada login imeshindikana (Kosa ${lastErrorCode ?? 'N/A'}): ${lastErrorMsg || 'Invalid username or password'}`);
 }
 
 /**
@@ -719,7 +753,46 @@ export async function omadaUnblockClient(
 /**
  * Comprehensive connectivity check and operator test
  */
-export async function testOmadaConnection(): Promise<{ success: boolean; message: string; details?: any }> {
+export async function testOmadaConnection(
+  overrides?: Partial<OmadaConfig>
+): Promise<{ success: boolean; message: string; details?: any }> {
+  if (overrides) {
+    if (overrides.omadaUrl !== undefined && overrides.omadaUrl.trim() !== '') {
+      currentConfig.omadaUrl = overrides.omadaUrl.trim().replace(/\/$/, '');
+    }
+    if (overrides.controllerId !== undefined && overrides.controllerId.trim() !== '') {
+      currentConfig.controllerId = overrides.controllerId.trim();
+    }
+    if (overrides.operatorUser !== undefined && overrides.operatorUser.trim() !== '') {
+      currentConfig.operatorUser = overrides.operatorUser.trim();
+    }
+    if (overrides.operatorPass !== undefined && overrides.operatorPass.trim() !== '') {
+      currentConfig.operatorPass = overrides.operatorPass.trim();
+    }
+    if (overrides.strictTls !== undefined) {
+      currentConfig.strictTls = Boolean(overrides.strictTls);
+    }
+  }
+
+  if (!currentConfig.omadaUrl) {
+    return {
+      success: false,
+      message: 'Tafadhali weka Anwani ya Omada (URL au Ngrok) kabla ya kupima muunganisho.'
+    };
+  }
+  if (!currentConfig.operatorUser) {
+    return {
+      success: false,
+      message: 'Tafadhali weka Jina la Omada Admin / Operator User kabla ya kupima muunganisho.'
+    };
+  }
+  if (!currentConfig.operatorPass) {
+    return {
+      success: false,
+      message: 'Tafadhali weka Nenosiri (Password) la Omada kabla ya kupima muunganisho.'
+    };
+  }
+
   try {
     const id = await resolveControllerId();
     const loginRes = await omadaLogin();

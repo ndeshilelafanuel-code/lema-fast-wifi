@@ -553,7 +553,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         headers: {
           'Content-Type': 'application/json',
           'x-admin-key': adminKey
-        }
+        },
+        body: JSON.stringify({
+          omadaUrl: omadaUrlInput.trim(),
+          controllerId: omadaIdInput.trim(),
+          operatorUser: omadaUserInput.trim(),
+          operatorPass: omadaPassInput.trim(),
+          strictTls: omadaStrictTlsInput
+        })
       });
       const data = await res.json();
       setOmadaConnStatus(data);
@@ -563,7 +570,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
         showToast('Muunganisho Umefanikiwa! 🟢', data.message);
       } else {
-        showToast('Muunganisho Umeshindikana 🔴', data.message, 'error');
+        showToast('Muunganisho Umeshindikana 🔴', (data.message || '').split('\n')[0] || 'Kosa la Omada', 'error');
       }
     } catch (err: any) {
       setOmadaConnStatus({ success: false, message: err.message });
@@ -2766,18 +2773,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   </div>
 
+                  <div className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-xl text-[11px] text-stone-300 leading-relaxed space-y-1.5">
+                    <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                      <span>💡 Aina ya Akaunti ya Omada Inayotumika:</span>
+                    </p>
+                    <p>
+                      <strong>1. Hotspot Operator (Inayopendekezwa):</strong> Kwenye Omada Controller, nenda <em>Hotspot Manager</em> (au <em>Settings &gt; Authentication &gt; Hotspot</em>) &gt; <em>Operators</em> &gt; Bofya <strong>+ Add</strong> kutengeneza jina la Operator na nenosiri lake.
+                    </p>
+                    <p>
+                      <strong>2. Controller Admin:</strong> Unaweza pia kutumia jina na nenosiri la Msimamizi wa Ndani (Local Admin). <em>Tahadhari:</em> Usiweke barua pepe ya TP-Link Cloud ID (kama mfano@gmail.com).
+                    </p>
+                  </div>
+
                   {omadaConnStatus && (
                     <div
-                      className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                      className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
                         omadaConnStatus.success
                           ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
                           : 'bg-rose-950/40 border-rose-800/60 text-rose-300'
                       }`}
                     >
-                      <div className="font-bold flex items-center gap-1.5 mb-1">
+                      <div className="font-bold flex items-center gap-1.5 mb-1.5 text-sm">
                         {omadaConnStatus.success ? '✅ Muunganisho Umethibitishwa' : '⚠️ Taarifa ya Muunganisho'}
                       </div>
-                      <p>{omadaConnStatus.message}</p>
+                      <p className="whitespace-pre-line font-mono text-[11px] leading-relaxed">{omadaConnStatus.message}</p>
                     </div>
                   )}
 
