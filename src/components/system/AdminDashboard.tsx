@@ -2417,31 +2417,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </thead>
                   <tbody className="divide-y divide-stone-850">
                     {transactions.length > 0 || activeSessions.length > 0 ? (
-                      Array.from(new Set([
-                        ...transactions.map(t => t.phoneNumber).filter(Boolean),
-                        ...activeSessions.map(s => s.phoneNumber).filter(Boolean)
-                      ])).map((phone) => {
-                        const txCount = transactions.filter(t => t.phoneNumber === phone).length;
-                        const session = activeSessions.find(s => s.phoneNumber === phone);
-                        return (
-                          <tr key={phone as string} className="hover:bg-stone-850/30">
-                            <td className="p-4 font-bold text-white font-sans">{phone}</td>
-                            <td className="p-4 text-sky-400 font-bold font-mono">{session?.macAddress || 'N/A'}</td>
-                            <td className="p-4 font-sans text-stone-300">{session?.ipAddress || 'Hotspot Core'}</td>
-                            <td className="p-4">{session ? 'Sasa hivi' : 'Hivi karibuni'}</td>
-                            <td className="p-4 text-amber-400 font-bold">{txCount} mara</td>
+                      (() => {
+                        const customerList: Array<{
+                          id: string;
+                          phone: string;
+                          mac: string;
+                          site: string;
+                          connectedAt: string;
+                          txCount: number;
+                          isActive: boolean;
+                        }> = [];
+                        const seen = new Set<string>();
+
+                        // Include all currently active sessions (whether phone or voucher code)
+                        for (const s of activeSessions) {
+                          const key = s.phoneNumber || s.macAddress || s.voucherCode || s.id;
+                          if (!seen.has(key)) {
+                            seen.add(key);
+                            const txCount = s.phoneNumber ? transactions.filter(t => t.phoneNumber === s.phoneNumber).length : 1;
+                            customerList.push({
+                              id: s.id,
+                              phone: s.phoneNumber || `Vocha: ${s.voucherCode}`,
+                              mac: s.macAddress || 'N/A',
+                              site: s.ipAddress || 'Hotspot Core',
+                              connectedAt: s.connectedAt ? new Date(s.connectedAt).toLocaleTimeString() : 'Sasa hivi',
+                              txCount,
+                              isActive: true,
+                            });
+                          }
+                        }
+
+                        // Include transaction customers who are currently offline
+                        for (const t of transactions) {
+                          const key = t.phoneNumber || t.referenceNumber || t.id;
+                          if (key && !seen.has(key)) {
+                            seen.add(key);
+                            const txCount = t.phoneNumber ? transactions.filter(tx => tx.phoneNumber === t.phoneNumber).length : 1;
+                            customerList.push({
+                              id: t.id,
+                              phone: t.phoneNumber || 'Mteja wa Mtandaoni',
+                              mac: 'N/A',
+                              site: 'Hotspot Gateway',
+                              connectedAt: t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'Hivi karibuni',
+                              txCount,
+                              isActive: false,
+                            });
+                          }
+                        }
+
+                        return customerList.map((cust) => (
+                          <tr key={cust.id} className="hover:bg-stone-850/30">
+                            <td className="p-4 font-bold text-white font-sans">{cust.phone}</td>
+                            <td className="p-4 text-sky-400 font-bold font-mono">{cust.mac}</td>
+                            <td className="p-4 font-sans text-stone-300">{cust.site}</td>
+                            <td className="p-4">{cust.connectedAt}</td>
+                            <td className="p-4 text-amber-400 font-bold">{cust.txCount} mara</td>
                             <td className="p-4">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-sans font-semibold ${
-                                session 
+                                cust.isActive 
                                   ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
                                   : 'bg-stone-800 text-stone-400'
                               }`}>
-                                {session ? 'Active' : 'Offline'}
+                                {cust.isActive ? 'Active (Hewani)' : 'Offline'}
                               </span>
                             </td>
                           </tr>
-                        );
-                      })
+                        ));
+                      })()
                     ) : (
                       <tr>
                         <td colSpan={6} className="p-8 text-center text-stone-500 font-sans">

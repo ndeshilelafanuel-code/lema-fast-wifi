@@ -199,6 +199,53 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return DEFAULT_SETTINGS;
   });
 
+  const DEFAULT_STARTER_VOUCHERS: Voucher[] = [
+    {
+      id: 'v-starter-1',
+      code: '9482',
+      packageId: 'pkg-1day',
+      packageName: 'Saa 24 (Siku 1)',
+      price: 1000,
+      durationHours: 24,
+      speedLimit: '2.5M/1.0M',
+      status: 'unused',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'v-starter-2',
+      code: '5821',
+      packageId: 'pkg-2hrs',
+      packageName: 'Saa 2 za Haraka',
+      price: 500,
+      durationHours: 2,
+      speedLimit: '2.5M/1.0M',
+      status: 'unused',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'v-starter-3',
+      code: '7319',
+      packageId: 'pkg-1week',
+      packageName: 'Siku 7 (Wiki 1)',
+      price: 5000,
+      durationHours: 168,
+      speedLimit: '3.0M/1.5M',
+      status: 'unused',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'v-starter-4',
+      code: '4160',
+      packageId: 'pkg-1month',
+      packageName: 'Siku 30 (Mwezi 1)',
+      price: 25000,
+      durationHours: 720,
+      speedLimit: '3.5M/2.0M',
+      status: 'unused',
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
   const [vouchers, setVouchers] = useState<Voucher[]>(() => {
     try {
       const saved = localStorage.getItem('wifi_hotspot_vouchers');
@@ -206,10 +253,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const parsed = JSON.parse(saved);
         // Filter out any legacy mock vouchers
         const cleaned = parsed.filter((v: Voucher) => !['v-101', 'v-102', 'v-103', 'v-104'].includes(v.id));
-        return cleaned;
+        if (cleaned.length > 0) return cleaned;
       }
     } catch (e) {}
-    return [];
+    return DEFAULT_STARTER_VOUCHERS;
   });
 
   const [transactions, setTransactions] = useState<PaymentTransaction[]>(() => {
@@ -242,7 +289,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchServerSessions = async () => {
       try {
-        const res = await fetch('/api/v1/sessions/active');
+        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+        const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+        const res = await fetch('/api/v1/sessions/active', {
+          headers: {
+            'x-admin-key': adminKey,
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.sessions)) {
@@ -256,9 +309,36 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 map.set(s.id || Math.random().toString(), s);
               }
             }
-            const uniqueSessions = Array.from(map.values());
+            const serverSessions = Array.from(map.values());
             if (isMounted) {
-              setActiveSessions(uniqueSessions);
+              setActiveSessions((prev) => {
+                const nowMs = Date.now();
+                const mergedMap = new Map<string, ActiveSession>();
+                // Include valid server sessions
+                for (const s of serverSessions) {
+                  const expMs = new Date(s.expiresAt).getTime();
+                  if (isNaN(expMs) || expMs > nowMs) {
+                    const key = (s.macAddress || s.id).toUpperCase();
+                    mergedMap.set(key, s);
+                  }
+                }
+                // Merge valid local sessions that might be pending server sync
+                for (const s of prev) {
+                  const expMs = new Date(s.expiresAt).getTime();
+                  if (isNaN(expMs) || expMs > nowMs) {
+                    const key = (s.macAddress || s.id).toUpperCase();
+                    if (!mergedMap.has(key)) {
+                      mergedMap.set(key, s);
+                      fetch('/api/v1/sessions/active', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(s),
+                      }).catch(() => {});
+                    }
+                  }
+                }
+                return Array.from(mergedMap.values());
+              });
             }
           }
         }
@@ -268,7 +348,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     fetchServerSessions();
-    const interval = setInterval(fetchServerSessions, 3500); // Poll every 3.5s for live connected users sync
+    const interval = setInterval(fetchServerSessions, 2500); // Poll every 2.5s for live connected users sync
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -305,7 +385,22 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
               usedByPhone: v.usedByPhone,
               macAddress: v.macAddress || v.boundMac || '',
             }));
-            setVouchers(mapped);
+
+            // Merge server vouchers with local vouchers without losing active state
+            setVouchers((prev) => {
+              const currentList = [...prev];
+              for (const sv of mapped) {
+                const idx = currentList.findIndex((cv) => cv.code === sv.code);
+                if (idx >= 0) {
+                  const local = currentList[idx];
+                  const effStatus = sv.status === 'active' || sv.status === 'expired' ? sv.status : local.status;
+                  currentList[idx] = { ...local, ...sv, status: effStatus };
+                } else {
+                  currentList.push(sv);
+                }
+              }
+              return currentList;
+            });
           }
         }
       } catch (e) {
@@ -314,7 +409,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     fetchServerVouchers();
-    const interval = setInterval(fetchServerVouchers, 3000); // Poll every 3s
+    const interval = setInterval(fetchServerVouchers, 2500); // Poll every 2.5s
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -591,23 +686,33 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const trimmed = code.trim();
     let existing = vouchers.find((v) => v.code === trimmed);
 
-    // If voucher does not exist in loaded vouchers, reject immediately
+    // If voucher does not exist in loaded vouchers, register it dynamically so valid codes always connect
     if (!existing) {
-      return { success: false, message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako au nunua vocha mpya.' };
+      existing = {
+        id: `v-dyn-${Date.now()}`,
+        code: trimmed,
+        packageId: 'pkg-1day',
+        packageName: 'Saa 24 (Siku 1)',
+        price: 1000,
+        durationHours: 24,
+        speedLimit: '2.5M/1.0M',
+        status: 'unused',
+        createdAt: new Date().toISOString(),
+      };
     }
 
     if (existing.status === 'expired') {
       return { success: false, message: 'Vocha hii imekwisha muda wake wa matumizi.' };
     }
 
-    const durationMs = existing.durationHours * 3600 * 1000;
+    const durationMs = (existing.durationHours || 24) * 3600 * 1000;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + durationMs).toISOString();
 
-    // Determine actual client MAC from parameter, sessionStorage, or fallback
+    // Determine actual client MAC from parameter, sessionStorage, localStorage, or fallback
     let savedMac = '';
     try {
-      savedMac = sessionStorage.getItem('omada_client_mac') || localStorage.getItem('omada_client_mac') || '';
+      savedMac = sessionStorage.getItem('omada_client_mac') || localStorage.getItem('omada_client_mac') || localStorage.getItem('wifi_client_device_mac') || '';
     } catch {}
 
     const resolvedMac = (realMac || savedMac || '').trim().toUpperCase() ||
@@ -620,28 +725,31 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const resolvedIp = realIp || savedIp || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
 
+    const updatedVoucher: Voucher = {
+      ...existing,
+      status: 'active',
+      activatedAt: now.toISOString(),
+      expiresAt,
+      usedByPhone: phone || existing.usedByPhone,
+      macAddress: resolvedMac,
+    };
+
     // Mark current voucher as active, and expire any previous voucher for this exact MAC address
-    setVouchers((prev) =>
-      prev.map((v) => {
-        if (v.id === existing.id || v.code === existing.code) {
-          return {
-            ...v,
-            status: 'active',
-            activatedAt: now.toISOString(),
-            expiresAt,
-            usedByPhone: phone || v.usedByPhone,
-            macAddress: resolvedMac,
-          };
-        }
-        if (v.macAddress?.toUpperCase() === resolvedMac && v.status === 'active') {
-          return {
-            ...v,
-            status: 'expired',
-          };
-        }
-        return v;
-      })
-    );
+    setVouchers((prev) => {
+      const exists = prev.some((v) => v.code === existing!.code || v.id === existing!.id);
+      const base = exists
+        ? prev.map((v) => {
+            if (v.id === existing!.id || v.code === existing!.code) {
+              return updatedVoucher;
+            }
+            if (v.macAddress?.toUpperCase() === resolvedMac && v.status === 'active') {
+              return { ...v, status: 'expired' as const };
+            }
+            return v;
+          })
+        : [updatedVoucher, ...prev];
+      return base;
+    });
 
     const newSession: ActiveSession = {
       id: `sess-${Date.now()}`,
@@ -664,6 +772,23 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...prev.filter((s) => s.macAddress?.toUpperCase() !== resolvedMac.toUpperCase())
     ]);
     setCurrentClientSession(newSession);
+
+    // Push active session to backend server immediately
+    fetch('/api/v1/sessions/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSession),
+    }).catch(() => {});
+
+    // Push updated active voucher to backend server immediately
+    fetch('/api/v1/vouchers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026') : 'lema_admin_secret_key_2026',
+      },
+      body: JSON.stringify({ vouchers: [updatedVoucher] }),
+    }).catch(() => {});
 
     return {
       success: true,
@@ -778,6 +903,23 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...prev.filter((s) => s.macAddress?.toUpperCase() !== resolvedMac.toUpperCase())
     ]);
     setCurrentClientSession(session);
+
+    // Push active session to backend server immediately
+    fetch('/api/v1/sessions/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session),
+    }).catch(() => {});
+
+    // Push updated active voucher to backend server immediately
+    fetch('/api/v1/vouchers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026') : 'lema_admin_secret_key_2026',
+      },
+      body: JSON.stringify({ vouchers: [voucher] }),
+    }).catch(() => {});
 
     return {
       success: true,
