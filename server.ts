@@ -1090,21 +1090,12 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
 
   if (clientMac && omadaConf.omadaUrl && omadaConf.operatorUser) {
     try {
-      console.log(`[Omada Disconnect] Unauthorizing MAC ${clientMac} on AP ${apMac || 'any'}`);
-      omadaResult = await omadaUnauthorize(clientMac, { apMac, ssidName, radioId });
+      console.log(`[Omada Disconnect] Blocking and unauthorizing MAC ${clientMac} on AP ${apMac || 'any'}`);
+      omadaResult = await omadaBlockClient(clientMac);
+      addBlockedMac(clientMac, 'Disconnected by Admin (KATA INTANETI)');
     } catch (err: any) {
-      console.warn('[Omada Disconnect Notice]:', err?.message);
-      omadaResult = { success: false, message: err?.message };
-    }
-  }
-
-  if (omadaResult && !omadaResult.success && !force) {
-    console.warn(`[Omada Disconnect Warning] Omada unauth warning for ${clientMac}:`, omadaResult.message);
-    // Attempt block as fail-safe fallback to ensure internet stays off
-    try {
-      await omadaBlockClient(clientMac);
-    } catch (be: any) {
-      console.warn('[Omada Block Fallback Notice]:', be?.message);
+      console.warn('[Omada Block Notice]:', err?.message);
+      omadaResult = { success: false, omadaConfirmed: false, message: err?.message };
     }
   }
 
@@ -1415,6 +1406,9 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   }
 
   try {
+    await omadaUnblockClient(effectiveClientMac).catch(() => {});
+    removeBlockedMac(effectiveClientMac);
+
     await omadaAuthorize({
       clientMac: effectiveClientMac,
       apMac: effectiveApMac,
