@@ -9,3 +9,5 @@ coverage/
 *.mp4
 *.mov
 *.avi
+.tempmediaStorage/
+**/.tempmediaStorage/
