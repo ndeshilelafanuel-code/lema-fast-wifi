@@ -280,8 +280,30 @@ export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
 
   cookie = '';
   csrf = '';
-  console.log(`[Omada Controller] Logging in as Operator "${currentConfig.operatorUser}" to controller ${id}...`);
+  console.log(`[Omada Controller] Attempting Controller Admin login as "${currentConfig.operatorUser}" to controller ${id}...`);
 
+  // 1. Try Controller Admin Login first (POST /<controllerId>/api/v2/login)
+  try {
+    const adminRes = await call('POST', `/${id}/api/v2/login`, {
+      username: currentConfig.operatorUser,
+      password: currentConfig.operatorPass,
+    });
+
+    if (adminRes.json?.errorCode === 0) {
+      csrf = adminRes.json?.result?.token || '';
+      const cookiesList = adminRes.setCookie || [];
+      cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
+      loggedAt = Date.now();
+      console.log('[Omada Controller] ✅ Admin Login successful! Full administrator session active.');
+      return { csrf, cookie };
+    }
+  } catch (e: any) {
+    console.warn('[Omada Controller] Admin login attempt notice:', e.message);
+  }
+
+  console.log('[Omada Controller] Falling back to Hotspot Operator login (/api/v2/hotspot/login)...');
+
+  // 2. Fall back to Hotspot Operator Login
   const r = await call('POST', `/${id}/api/v2/hotspot/login`, {
     name: currentConfig.operatorUser,
     password: currentConfig.operatorPass,
@@ -297,7 +319,7 @@ export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
   cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
   loggedAt = Date.now();
 
-  console.log('[Omada Controller] ✅ Login successful! Operator session active.');
+  console.log('[Omada Controller] ✅ Hotspot Operator login successful!');
   return { csrf, cookie };
 }
 
@@ -526,6 +548,18 @@ export async function omadaUnauthorize(
       }
 
       for (const siteId of siteIds) {
+        try {
+          const adminUnauthRes = await call(
+            'POST',
+            `/${id}/api/v2/sites/${siteId}/cmd/clients/${clientMacFormatted}/unauth`,
+            { mac: clientMacFormatted },
+            { 'Csrf-Token': csrf }
+          );
+          if (adminUnauthRes.json?.errorCode !== undefined) {
+            results[`admin_site_unauth_${siteId}`] = { errorCode: adminUnauthRes.json?.errorCode, msg: adminUnauthRes.json?.msg };
+          }
+        } catch (e: any) {}
+
         try {
           const uRes = await call(
             'POST',
