@@ -29,6 +29,7 @@ interface HotspotContextType {
   recordAdClick: (id: string) => void;
   generateVouchers: (packageId: string, count: number) => Voucher[];
   deleteVoucher: (id: string) => void;
+  clearExpiredVouchers?: () => void;
   redeemVoucher: (code: string, phone?: string, realMac?: string, realIp?: string) => { success: boolean; message: string; session?: ActiveSession };
   processMobilePayment: (
     phone: string,
@@ -199,64 +200,18 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return DEFAULT_SETTINGS;
   });
 
-  const DEFAULT_STARTER_VOUCHERS: Voucher[] = [
-    {
-      id: 'v-starter-1',
-      code: '9482',
-      packageId: 'pkg-1day',
-      packageName: 'Saa 24 (Siku 1)',
-      price: 1000,
-      durationHours: 24,
-      speedLimit: '2.5M/1.0M',
-      status: 'unused',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'v-starter-2',
-      code: '5821',
-      packageId: 'pkg-2hrs',
-      packageName: 'Saa 2 za Haraka',
-      price: 500,
-      durationHours: 2,
-      speedLimit: '2.5M/1.0M',
-      status: 'unused',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'v-starter-3',
-      code: '7319',
-      packageId: 'pkg-1week',
-      packageName: 'Siku 7 (Wiki 1)',
-      price: 5000,
-      durationHours: 168,
-      speedLimit: '3.0M/1.5M',
-      status: 'unused',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'v-starter-4',
-      code: '4160',
-      packageId: 'pkg-1month',
-      packageName: 'Siku 30 (Mwezi 1)',
-      price: 25000,
-      durationHours: 720,
-      speedLimit: '3.5M/2.0M',
-      status: 'unused',
-      createdAt: new Date().toISOString(),
-    },
-  ];
-
   const [vouchers, setVouchers] = useState<Voucher[]>(() => {
     try {
       const saved = localStorage.getItem('wifi_hotspot_vouchers');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Filter out any legacy mock vouchers
-        const cleaned = parsed.filter((v: Voucher) => !['v-101', 'v-102', 'v-103', 'v-104'].includes(v.id));
-        if (cleaned.length > 0) return cleaned;
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter((v: Voucher) => !['v-101', 'v-102', 'v-103', 'v-104'].includes(v.id));
+          return cleaned;
+        }
       }
     } catch (e) {}
-    return DEFAULT_STARTER_VOUCHERS;
+    return [];
   });
 
   const [transactions, setTransactions] = useState<PaymentTransaction[]>(() => {
@@ -359,15 +314,17 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchServerVouchers = async () => {
       try {
-        const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+        // CRITICAL SECURITY: Customer devices do not have admin_api_key and must NEVER query /api/v1/vouchers
+        if (!rawKey) return;
         const res = await fetch('/api/v1/vouchers', {
           headers: {
-            'x-admin-key': adminKey,
+            'x-admin-key': rawKey,
           },
         });
         if (res.ok) {
           const data = await res.json();
-          if (data?.success && Array.isArray(data.vouchers) && data.vouchers.length > 0 && isMounted) {
+          if (data?.success && Array.isArray(data.vouchers) && isMounted) {
             const mapped: Voucher[] = data.vouchers.map((v: any) => ({
               id: v.id || `v-${v.code}`,
               code: v.code,
@@ -384,20 +341,17 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
               macAddress: v.macAddress || v.boundMac || '',
             }));
 
-            // Merge server vouchers with local vouchers without losing active state
+            // Authoritative sync: Server determines what vouchers exist
+            // Preserve newly created in-flight vouchers created in the last 4 seconds
             setVouchers((prev) => {
-              const currentList = [...prev];
-              for (const sv of mapped) {
-                const idx = currentList.findIndex((cv) => cv.code === sv.code);
-                if (idx >= 0) {
-                  const local = currentList[idx];
-                  const effStatus = sv.status === 'active' || sv.status === 'expired' ? sv.status : local.status;
-                  currentList[idx] = { ...local, ...sv, status: effStatus };
-                } else {
-                  currentList.push(sv);
-                }
-              }
-              return currentList;
+              const now = Date.now();
+              const recentInFlight = prev.filter(
+                (pv) =>
+                  !mapped.some((sv) => sv.code === pv.code || sv.id === pv.id) &&
+                  pv.createdAt &&
+                  now - new Date(pv.createdAt).getTime() < 4000
+              );
+              return [...recentInFlight, ...mapped];
             });
           }
         }
@@ -644,18 +598,16 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setVouchers((prev) => [...newVouchers, ...prev]);
     // Sync with backend server with admin authentication header
-    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
-    const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
-    if (typeof window !== 'undefined' && (!rawKey || !rawKey.trim())) {
-      try {
-        localStorage.setItem('admin_api_key', adminKey);
-      } catch {}
+    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+    if (!rawKey) {
+      console.warn('[Vouchers Sync] No admin key stored in session.');
+      return newVouchers;
     }
     fetch('/api/v1/vouchers', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': adminKey
+        'x-admin-key': rawKey
       },
       body: JSON.stringify({ vouchers: newVouchers }),
     })
@@ -919,8 +871,68 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   };
 
-  const deleteVoucher = (id: string) => {
-    setVouchers((prev) => prev.filter((v) => v.id !== id));
+  const deleteVoucher = async (id: string) => {
+    // 1. Immediately remove from React state
+    setVouchers((prev) => prev.filter((v) => v.id !== id && v.code !== id));
+
+    // 2. Immediately remove from localStorage
+    try {
+      const saved = localStorage.getItem('wifi_hotspot_vouchers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((v: any) => v.id !== id && v.code !== id);
+          localStorage.setItem('wifi_hotspot_vouchers', JSON.stringify(filtered));
+        }
+      }
+    } catch (e) {}
+
+    // 3. Send permanent DELETE request to server API
+    try {
+      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+      if (rawKey) {
+        await fetch(`/api/v1/vouchers/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: {
+            'x-admin-key': rawKey,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('[Voucher Delete Error]:', err);
+    }
+  };
+
+  const clearExpiredVouchers = async () => {
+    // 1. Remove expired from local state
+    setVouchers((prev) => prev.filter((v) => v.status !== 'expired'));
+
+    // 2. Persist to localStorage
+    try {
+      const saved = localStorage.getItem('wifi_hotspot_vouchers');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((v: any) => v.status !== 'expired');
+          localStorage.setItem('wifi_hotspot_vouchers', JSON.stringify(filtered));
+        }
+      }
+    } catch (e) {}
+
+    // 3. Send DELETE clear_expired to server
+    try {
+      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+      if (rawKey) {
+        await fetch('/api/v1/vouchers?action=clear_expired', {
+          method: 'DELETE',
+          headers: {
+            'x-admin-key': rawKey,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('[Clear Expired Error]:', err);
+    }
   };
 
   const disconnectSession = async (sessionId: string) => {
@@ -1226,6 +1238,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         redeemVoucher,
         processMobilePayment,
         deleteVoucher,
+        clearExpiredVouchers,
         disconnectSession,
         reconnectByReference,
         resetDemoData,

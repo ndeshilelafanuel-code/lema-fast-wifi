@@ -329,6 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     deleteAd,
     generateVouchers,
     deleteVoucher,
+    clearExpiredVouchers,
     disconnectSession,
     resetDemoData,
     currentClientSession,
@@ -438,15 +439,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         body: JSON.stringify({ mac }),
       });
       const data = await res.json().catch(() => null);
-      if (data?.success) {
-        showToast('Kifaa Kimezuiwa (Blocked)', `MAC ${mac} imezuiwa kikamilifu kwenye Omada Controller!`, 'success');
+      if (data?.success && data?.omadaConfirmed) {
+        showToast('Kifaa Kimezuiwa (Blocked)', `MAC ${mac} imezuiwa kikamilifu kwenye Omada Controller na kwenye mfumo!`, 'success');
+      } else if (data?.localBlocked) {
+        showToast('Kifaa Kimezuiwa Kwenye Mfumo', data?.message || `Kifaa ${mac} kimezuiwa kwenye mfumo (Omada haikuthibitisha).`, 'warning');
       } else {
-        showToast('Tahadhari ya Omada', data?.message || 'Amri imetekelezwa kwenye mfumo.', 'warning');
+        showToast('Hitilafu ya Omada', data?.message || 'Amri ya kuzuia imeshindikana.', 'error');
+        return;
       }
       disconnectSession(mac);
     } catch (err: any) {
-      showToast('Kifaa Kimezuiwa', `Kifaa ${mac} kimezuiwa kwenye mfumo.`, 'info');
-      disconnectSession(mac);
+      showToast('Hitilafu ya Mtandao', `Kushindwa kuwasiliana na seva: ${err.message}`, 'error');
     }
   };
 
@@ -2953,6 +2956,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   >
                     Zilizotumika ({vouchers.filter((v) => v.status === 'expired').length})
                   </button>
+
+                  {vouchers.some((v) => v.status === 'expired') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Una uhakika unataka kufuta kabisa vocha zote zilizotumika (expired)?')) {
+                          clearExpiredVouchers?.();
+                          showToast('Vocha Zimefutwa', 'Vocha zote zilizotumika zimefutwa kabisa kwenye mfumo na seva.', 'success');
+                        }
+                      }}
+                      className="ml-auto px-3 py-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-950/60 border border-rose-900/50 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Futa Zilizotumika</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2994,8 +3013,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </td>
                         <td className="p-4">
                           <button
-                            onClick={() => deleteVoucher(v.id)}
-                            className="p-1 text-stone-500 hover:text-rose-400 cursor-pointer"
+                            onClick={() => {
+                              deleteVoucher(v.id);
+                              showToast('Vocha Imefutwa', `Vocha "${v.code}" imefutwa kabisa kutoka kwenye seva.`, 'info');
+                            }}
+                            title="Futa vocha hii kabisa"
+                            className="p-1 text-stone-500 hover:text-rose-400 cursor-pointer transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

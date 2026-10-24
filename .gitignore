@@ -20,3 +20,5 @@ whatsapp-config.json
 wifi-clients.json
 hardware-inventory.json
 towers-data.json
+blocked-macs.json
+admin-key.txt

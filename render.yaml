@@ -30,3 +30,24 @@ services:
         sync: false
       - key: WHATSAPP_VERIFY_TOKEN
         sync: false
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: OMADA_URL
+        sync: false
+      - key: OMADA_ID
+        sync: false
+      - key: OMADA_OPERATOR
+        sync: false
+      - key: OMADA_OPERATOR_PASSWORD
+        sync: false
+      - key: OMADA_ADMIN_USER
+        sync: false
+      - key: OMADA_ADMIN_PASSWORD
+        sync: false
+      - key: PAYMENTS_ENABLED
+        sync: false
+

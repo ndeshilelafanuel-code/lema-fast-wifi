@@ -40,9 +40,9 @@ app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
   });
 });
 
-// Msaidizi wa uthibitishaji wa Msimamizi (Real Server-Side Admin Security Guard)
+// Msaidizi wa uthibitishaji wa Msimamizi (Strict Server-Side Admin Security Guard)
 const getAdminKey = () => (process.env.ADMIN_API_KEY || '').trim();
-const getAdminUser = () => (process.env.ADMIN_USER || 'admin').trim();
+const getAdminUser = () => (process.env.ADMIN_USER || 'admin').trim().toLowerCase();
 const getAdminPass = () => (process.env.ADMIN_PASSWORD || 'lema2026!').trim();
 
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -50,7 +50,7 @@ const requireAdmin = (req: express.Request, res: express.Response, next: express
   if (!key) {
     return res.status(503).json({ success: false, message: 'ADMIN_API_KEY haijawekwa kwenye mfumo.' });
   }
-  const provided = (req.get('x-admin-key') || (req.query.admin_key as string) || '').trim();
+  const provided = (req.get('x-admin-key') || '').trim();
 
   if (provided && provided === key) {
     return next();
@@ -65,18 +65,96 @@ const requireAdmin = (req: express.Request, res: express.Response, next: express
 
 // 1. Uthibitisho halisi wa Msimamizi Seva (Admin Login via POST)
 app.post('/api/v1/admin/login', (req, res) => {
-  const { user } = req.body || {};
-  const inputUser = String(user || 'admin').trim().toLowerCase() || 'admin';
+  const adminKey = getAdminKey();
+  if (!adminKey) {
+    return res.status(503).json({
+      success: false,
+      message: 'ADMIN_API_KEY haijawekwa kwenye mazingira ya seva (.env).'
+    });
+  }
 
-  console.log(`[Admin Login] Success for user "${inputUser}"`);
-  return res.json({
-    success: true,
-    message: 'Umeingia kikamilifu kama Msimamizi.',
-    key: getAdminKey() || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b',
-    user: inputUser,
-    role: 'admin'
+  const expectedUser = getAdminUser();
+  const expectedPass = getAdminPass();
+
+  const { user, pass } = req.body || {};
+  const inputUser = String(user || '').trim().toLowerCase();
+  const inputPass = String(pass || '').trim();
+
+  if (inputUser === expectedUser && inputPass === expectedPass) {
+    console.log(`[Admin Login] Success for user "${inputUser}"`);
+    return res.json({
+      success: true,
+      message: 'Umeingia kikamilifu kama Msimamizi.',
+      key: adminKey,
+      user: inputUser,
+      role: 'admin'
+    });
+  }
+
+  console.warn(`[Admin Login 401] Failed login attempt for user "${inputUser}"`);
+  return res.status(401).json({
+    success: false,
+    message: 'Jina la mtumiaji (Username) au nenosiri (Password) si sahihi.'
   });
 });
+
+// =========================================================================
+// BLACKLIST / BLOCKED MACS PERSISTENCE (Local Firewall Protection)
+// =========================================================================
+const BLOCKED_MACS_FILE = path.resolve(__dirname, 'blocked-macs.json');
+interface BlockedMacRecord {
+  mac: string;
+  blockedAt: string;
+  reason?: string;
+}
+let blockedMacs: BlockedMacRecord[] = [];
+
+function loadBlockedMacs() {
+  try {
+    if (fs.existsSync(BLOCKED_MACS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(BLOCKED_MACS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        blockedMacs = data;
+      }
+    }
+  } catch (e) {
+    console.warn('[Blocked MACs] Could not load blocked-macs.json:', e);
+  }
+}
+
+function saveBlockedMacs() {
+  try {
+    fs.writeFileSync(BLOCKED_MACS_FILE, JSON.stringify(blockedMacs, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Blocked MACs] Could not save blocked-macs.json:', e);
+  }
+}
+
+function isMacBlocked(mac: string): boolean {
+  if (!mac) return false;
+  const clean = mac.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  return blockedMacs.some((b) => b.mac.replace(/[^0-9A-Fa-f]/g, '').toUpperCase() === clean);
+}
+
+function addBlockedMac(mac: string, reason?: string) {
+  const clean = mac.trim().toUpperCase();
+  if (!isMacBlocked(clean)) {
+    blockedMacs.unshift({
+      mac: clean,
+      blockedAt: new Date().toISOString(),
+      reason: reason || 'Blocked by Admin',
+    });
+    saveBlockedMacs();
+  }
+}
+
+function removeBlockedMac(mac: string) {
+  const clean = mac.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  blockedMacs = blockedMacs.filter((b) => b.mac.replace(/[^0-9A-Fa-f]/g, '').toUpperCase() !== clean);
+  saveBlockedMacs();
+}
+
+loadBlockedMacs();
 
 // 2. Kila kitu chini ya /api/v1 ni cha admin, isipokuwa routes hizi maalum za wateja pekee
 const isPublicV1Route = (method: string, path: string): boolean => {
@@ -1088,73 +1166,20 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
 const VOUCHERS_FILE = path.resolve(__dirname, 'vouchers-data.json');
 let savedVouchers: any[] = [];
 
-const DEFAULT_STARTER_VOUCHERS = [
-  {
-    id: 'v-starter-1',
-    code: '9482',
-    packageId: 'pkg-1day',
-    packageName: 'Saa 24 (Siku 1)',
-    price: 1000,
-    durationHours: 24,
-    speedLimit: '2.5M/1.0M',
-    status: 'unused',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'v-starter-2',
-    code: '5821',
-    packageId: 'pkg-2hrs',
-    packageName: 'Saa 2 za Haraka',
-    price: 500,
-    durationHours: 2,
-    speedLimit: '2.5M/1.0M',
-    status: 'unused',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'v-starter-3',
-    code: '7319',
-    packageId: 'pkg-1week',
-    packageName: 'Siku 7 (Wiki 1)',
-    price: 5000,
-    durationHours: 168,
-    speedLimit: '3.0M/1.5M',
-    status: 'unused',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'v-starter-4',
-    code: '4160',
-    packageId: 'pkg-1month',
-    packageName: 'Siku 30 (Mwezi 1)',
-    price: 25000,
-    durationHours: 720,
-    speedLimit: '3.5M/2.0M',
-    status: 'unused',
-    createdAt: new Date().toISOString(),
-  },
-];
-
 function loadSavedVouchers() {
   try {
     if (fs.existsSync(VOUCHERS_FILE)) {
       const data = JSON.parse(fs.readFileSync(VOUCHERS_FILE, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         savedVouchers = data;
         return;
       }
     }
-    // Seed initial vouchers if empty
-    if (savedVouchers.length === 0) {
-      savedVouchers = [...DEFAULT_STARTER_VOUCHERS];
-      saveVouchersToDisk();
-      console.log(`[Vouchers] Vouchers za awali (${savedVouchers.length}) zimehifadhiwa kwenye diski.`);
-    }
   } catch (e) {
     console.warn('[Vouchers] Hitilafu wakati wa kusoma vocha:', e);
-    if (savedVouchers.length === 0) {
-      savedVouchers = [...DEFAULT_STARTER_VOUCHERS];
-    }
+  }
+  if (!savedVouchers) {
+    savedVouchers = [];
   }
 }
 
@@ -1212,6 +1237,101 @@ app.post('/api/v1/vouchers', (req, res) => {
   return res.status(400).json({ success: false, error: 'Invalid vouchers array' });
 });
 
+// DELETE single voucher by ID or Code (Permanent deletion)
+app.delete('/api/v1/vouchers/:id', requireAdmin, async (req, res) => {
+  const targetId = decodeURIComponent(req.params.id || '').trim();
+  if (!targetId) {
+    return res.status(400).json({ success: false, message: 'ID au Code ya vocha inahitajika.' });
+  }
+
+  loadSavedVouchers();
+  const beforeCount = savedVouchers.length;
+  savedVouchers = savedVouchers.filter((v) => v.id !== targetId && v.code !== targetId);
+  saveVouchersToDisk();
+
+  // If Postgres database is configured, delete from vouchers table as well
+  try {
+    if (process.env.DATABASE_URL) {
+      const { createPool } = await import('./src/db/index.ts');
+      const pool = createPool();
+      await pool.query('DELETE FROM vouchers WHERE id = $1 OR code = $1', [targetId]);
+    }
+  } catch (err: any) {
+    console.warn('[Vouchers DB Delete Warning]:', err?.message || err);
+  }
+
+  const removed = beforeCount - savedVouchers.length;
+  console.log(`[Vouchers DELETE] Vocha "${targetId}" imefutwa kabisa (${removed} removed). Baki: ${savedVouchers.length}`);
+  return res.json({
+    success: true,
+    message: `Vocha imefutwa kikamilifu.`,
+    deletedId: targetId,
+    remainingCount: savedVouchers.length,
+    vouchers: savedVouchers,
+  });
+});
+
+// DELETE bulk vouchers or clear expired / clear all
+app.delete('/api/v1/vouchers', requireAdmin, async (req, res) => {
+  const { action, status, ids } = req.body || {};
+  const queryAction = (req.query.action as string) || '';
+  const queryStatus = (req.query.status as string) || '';
+
+  const effAction = action || queryAction;
+  const effStatus = status || queryStatus;
+
+  loadSavedVouchers();
+  const beforeCount = savedVouchers.length;
+
+  if (effAction === 'clear_all' || effAction === 'all') {
+    savedVouchers = [];
+    saveVouchersToDisk();
+    try {
+      if (process.env.DATABASE_URL) {
+        const { createPool } = await import('./src/db/index.ts');
+        const pool = createPool();
+        await pool.query('DELETE FROM vouchers');
+      }
+    } catch (e) {}
+    console.log('[Vouchers DELETE] Vocha zote zimefutwa kikamilifu.');
+    return res.json({ success: true, message: 'Vocha zote zimefutwa.', remainingCount: 0, vouchers: [] });
+  }
+
+  if (effAction === 'clear_expired' || effStatus === 'expired') {
+    savedVouchers = savedVouchers.filter((v) => v.status !== 'expired');
+    saveVouchersToDisk();
+    try {
+      if (process.env.DATABASE_URL) {
+        const { createPool } = await import('./src/db/index.ts');
+        const pool = createPool();
+        await pool.query("DELETE FROM vouchers WHERE status = 'expired'");
+      }
+    } catch (e) {}
+    const removed = beforeCount - savedVouchers.length;
+    console.log(`[Vouchers DELETE] Vocha zilizotumika (${removed}) zimefutwa.`);
+    return res.json({
+      success: true,
+      message: `Vocha ${removed} zilizotumika zimefutwa kikamilifu.`,
+      remainingCount: savedVouchers.length,
+      vouchers: savedVouchers,
+    });
+  }
+
+  if (Array.isArray(ids) && ids.length > 0) {
+    const idsSet = new Set(ids);
+    savedVouchers = savedVouchers.filter((v) => !idsSet.has(v.id) && !idsSet.has(v.code));
+    saveVouchersToDisk();
+    return res.json({
+      success: true,
+      message: 'Vocha zilizoteuliwa zimefutwa.',
+      remainingCount: savedVouchers.length,
+      vouchers: savedVouchers,
+    });
+  }
+
+  return res.status(400).json({ success: false, message: 'Kitendo cha ufutaji kinahitajika.' });
+});
+
 function parseKbps(s?: string) {
   const m = String(s || '').match(/([\d.]+)\s*([MK])\s*\/\s*([\d.]+)\s*([MK])/i);
   if (!m) return { down: 0, up: 0 };
@@ -1234,6 +1354,14 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
     return res.status(400).json({
       success: false,
       message: 'Anwani ya kifaa (Client MAC) na Anwani ya AP (AP MAC) zinahitajika ili kuwasha vocha.'
+    });
+  }
+
+  // Reject blocked/blacklisted MAC address
+  if (isMacBlocked(effectiveClientMac)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Kifaa hiki kimezuiwa kwenye mtandao (Blocked MAC). Wasiliana na msimamizi wa mtandao.'
     });
   }
 
@@ -1276,33 +1404,32 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
 
   const { down, up } = parseKbps(found.speedLimit);
 
-  // If OMADA_URL is configured, trigger real Omada Controller v6.3 authorization
+  // Authorize strictly against Omada Controller v5.x / v6.x
   const omadaCfg = getOmadaConfig();
-  if (omadaCfg.omadaUrl && omadaCfg.operatorUser) {
-    try {
-      await omadaAuthorize({
-        clientMac: effectiveClientMac,
-        apMac: effectiveApMac,
-        ssidName: String(ssidName || 'Lema Fast WiFi'),
-        radioId: radioId || 0,
-        clientIp: effectiveClientIp,
-        durationMs: remainingDurationMs,
-        downKbps: down,
-        upKbps: up,
-      });
-      console.log(`[Omada Controller v6.3] Successfully authorized ${effectiveClientMac} on AP ${effectiveApMac}`);
-    } catch (omadaErr: any) {
-      console.error('[Omada Controller Error - Authorization Failed]:', omadaErr?.message || omadaErr);
-      return res.status(502).json({
-        success: false,
-        message: `Omada Controller imeshindwa kuruhusu kifaa (${effectiveClientMac}): ${omadaErr?.message || 'Unknown error'}`
-      });
-    }
-  } else {
-    console.log('[Lema Fast WiFi] Authorized voucher in standalone/AP mode:', {
-      mac: effectiveClientMac,
-      code: trimmed,
-      package: found.packageName
+  if (!omadaCfg.omadaUrl || !omadaCfg.operatorUser) {
+    return res.status(503).json({
+      success: false,
+      message: 'Mfumo bado haujaunganishwa na Omada Controller. Tafadhali wasiliana na msimamizi.'
+    });
+  }
+
+  try {
+    await omadaAuthorize({
+      clientMac: effectiveClientMac,
+      apMac: effectiveApMac,
+      ssidName: String(ssidName || 'Lema Fast WiFi'),
+      radioId: radioId || 0,
+      clientIp: effectiveClientIp,
+      durationMs: remainingDurationMs,
+      downKbps: down,
+      upKbps: up,
+    });
+    console.log(`[Omada Controller v6.3] Successfully authorized ${effectiveClientMac} on AP ${effectiveApMac}`);
+  } catch (omadaErr: any) {
+    console.error('[Omada Controller Error - Authorization Failed]:', omadaErr?.message || omadaErr);
+    return res.status(502).json({
+      success: false,
+      message: `Omada Controller imeshindwa kuruhusu kifaa (${effectiveClientMac}): ${omadaErr?.message || 'Unknown error'}`
     });
   }
 
@@ -1507,13 +1634,17 @@ app.get('/api/v1/omada/config', requireAdmin, (_req, res) => {
       controllerId: cfg.controllerId,
       operatorUser: cfg.operatorUser,
       hasPassword: Boolean(cfg.operatorPass),
+      adminUser: cfg.adminUser || '',
+      hasAdminPassword: Boolean(cfg.adminPass),
       strictTls: cfg.strictTls,
+      slidingLeaseEnabled: cfg.slidingLeaseEnabled,
+      slidingLeaseMinutes: cfg.slidingLeaseMinutes,
     }
   });
 });
 
 app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
-  const { omadaUrl, controllerId, operatorUser, operatorPass, strictTls } = req.body || {};
+  const { omadaUrl, controllerId, operatorUser, operatorPass, adminUser, adminPass, strictTls, slidingLeaseEnabled, slidingLeaseMinutes } = req.body || {};
   const patch: any = {};
   if (omadaUrl !== undefined) patch.omadaUrl = String(omadaUrl).trim();
   if (controllerId !== undefined) patch.controllerId = String(controllerId).trim();
@@ -1521,7 +1652,13 @@ app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
   if (operatorPass !== undefined && String(operatorPass).trim() !== '') {
     patch.operatorPass = String(operatorPass).trim();
   }
+  if (adminUser !== undefined) patch.adminUser = String(adminUser).trim();
+  if (adminPass !== undefined && String(adminPass).trim() !== '') {
+    patch.adminPass = String(adminPass).trim();
+  }
   if (strictTls !== undefined) patch.strictTls = Boolean(strictTls);
+  if (slidingLeaseEnabled !== undefined) patch.slidingLeaseEnabled = Boolean(slidingLeaseEnabled);
+  if (slidingLeaseMinutes !== undefined) patch.slidingLeaseMinutes = Number(slidingLeaseMinutes);
 
   const updated = updateOmadaConfig(patch);
   return res.json({
@@ -1532,7 +1669,11 @@ app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
       controllerId: updated.controllerId,
       operatorUser: updated.operatorUser,
       hasPassword: Boolean(updated.operatorPass),
+      adminUser: updated.adminUser || '',
+      hasAdminPassword: Boolean(updated.adminPass),
       strictTls: updated.strictTls,
+      slidingLeaseEnabled: updated.slidingLeaseEnabled,
+      slidingLeaseMinutes: updated.slidingLeaseMinutes,
     }
   });
 });
@@ -1698,23 +1839,38 @@ app.post('/api/v1/omada/client/disconnect', requireAdmin, async (req, res) => {
 
 // POST Block (Blacklist) client on Omada Controller & revoke access
 app.post('/api/v1/omada/client/block', requireAdmin, async (req, res) => {
-  const { mac, siteId } = req.body || {};
+  const { mac, siteId, force } = req.body || {};
   const cleanMac = String(mac || '').trim().toUpperCase();
   if (!cleanMac) {
     return res.status(400).json({ error: 'MAC address is required' });
   }
 
-  // 1. Send Omada Block API command (hardware blacklist on EAP)
+  // 1. Add to local blacklist firewall immediately
+  addBlockedMac(cleanMac, 'Blocked via Admin Dashboard');
+
+  // 2. Send Omada Block API command (hardware blacklist on Controller)
   const result = await omadaBlockClient(cleanMac, siteId);
 
-  // 2. Remove from active sessions
+  // If Omada command failed and admin did not specify force, report 502
+  if (!result.success && !force) {
+    console.warn(`[Omada Block Warning] Controller block failed for ${cleanMac}, but device is blocked locally.`);
+    return res.status(502).json({
+      success: false,
+      omadaConfirmed: false,
+      localBlocked: true,
+      message: result.message || 'Omada Controller imeshindwa kuzuia kifaa hiki moja kwa moja.',
+      details: result.details
+    });
+  }
+
+  // 3. Remove from active sessions
   loadSavedSessions();
   const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
   const cleanMacNorm = normalizeMac(cleanMac);
   savedActiveSessions = savedActiveSessions.filter((s: any) => normalizeMac(s.macAddress || s.mac) !== cleanMacNorm);
   saveSessionsToDisk();
 
-  // 3. Expire all vouchers bound to this MAC
+  // 4. Expire all vouchers bound to this MAC
   loadSavedVouchers();
   savedVouchers.forEach((v: any) => {
     if (normalizeMac(v.boundMac || v.macAddress) === cleanMacNorm && v.status === 'active') {
@@ -1723,7 +1879,7 @@ app.post('/api/v1/omada/client/block', requireAdmin, async (req, res) => {
   });
   saveVouchersToDisk();
 
-  // 4. Update wifi client record
+  // 5. Update wifi client record
   loadSavedWifiClients();
   const wIdx = wifiClients.findIndex((c) => normalizeMac(c.mac) === cleanMacNorm);
   if (wIdx >= 0) {
@@ -1734,8 +1890,9 @@ app.post('/api/v1/omada/client/block', requireAdmin, async (req, res) => {
 
   return res.json({
     success: true,
-    omadaConfirmed: result.success,
-    message: result.message || `Kifaa (${cleanMac}) kimezuiwa (Blocked) kikamilifu!`,
+    omadaConfirmed: result.omadaConfirmed,
+    localBlocked: true,
+    message: result.message || `Kifaa (${cleanMac}) kimezuiwa kikamilifu!`,
     details: result.details
   });
 });
@@ -1747,10 +1904,16 @@ app.post('/api/v1/omada/client/unblock', requireAdmin, async (req, res) => {
   if (!cleanMac) {
     return res.status(400).json({ error: 'MAC address is required' });
   }
+
+  // 1. Remove from local blacklist firewall
+  removeBlockedMac(cleanMac);
+
+  // 2. Call Omada unblock
   const result = await omadaUnblockClient(cleanMac, siteId);
   return res.json({
     success: true,
-    message: result.message,
+    localUnblocked: true,
+    message: result.message || `Kifaa ${cleanMac} kimefunguliwa.`,
     details: result.details
   });
 });

@@ -19,6 +19,8 @@ export interface OmadaConfig {
   controllerId: string;
   operatorUser: string;
   operatorPass: string;
+  adminUser?: string;
+  adminPass?: string;
   strictTls: boolean;
   siteId?: string;
   customUnauthEndpoint?: string;
@@ -41,11 +43,16 @@ function loadInitialConfig(): OmadaConfig {
     console.warn('[Omada] Could not load omada-config.json:', err.message);
   }
 
+  const opUser = (disk.operatorUser || process.env.OMADA_OPERATOR || '').trim();
+  const opPass = (disk.operatorPass || process.env.OMADA_OPERATOR_PASSWORD || '').trim();
+
   return {
     omadaUrl: (disk.omadaUrl || process.env.OMADA_URL || '').trim().replace(/\/$/, ''),
     controllerId: (disk.controllerId || process.env.OMADA_ID || '').trim(),
-    operatorUser: (disk.operatorUser || process.env.OMADA_OPERATOR || '').trim(),
-    operatorPass: (disk.operatorPass || process.env.OMADA_OPERATOR_PASSWORD || '').trim(),
+    operatorUser: opUser,
+    operatorPass: opPass,
+    adminUser: (disk.adminUser || process.env.OMADA_ADMIN_USER || opUser).trim(),
+    adminPass: (disk.adminPass || process.env.OMADA_ADMIN_PASSWORD || opPass).trim(),
     strictTls: disk.strictTls !== undefined ? Boolean(disk.strictTls) : process.env.OMADA_STRICT_TLS === '1',
     siteId: (disk.siteId || process.env.OMADA_SITE_ID || 'Default').trim(),
     customUnauthEndpoint: (disk.customUnauthEndpoint || process.env.OMADA_CUSTOM_UNAUTH_ENDPOINT || '').trim(),
@@ -75,6 +82,8 @@ export function updateOmadaConfig(patch: Partial<OmadaConfig>): OmadaConfig {
   if (currentConfig.controllerId) process.env.OMADA_ID = currentConfig.controllerId;
   if (currentConfig.operatorUser) process.env.OMADA_OPERATOR = currentConfig.operatorUser;
   if (currentConfig.operatorPass) process.env.OMADA_OPERATOR_PASSWORD = currentConfig.operatorPass;
+  if (currentConfig.adminUser) process.env.OMADA_ADMIN_USER = currentConfig.adminUser;
+  if (currentConfig.adminPass) process.env.OMADA_ADMIN_PASSWORD = currentConfig.adminPass;
 
   try {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(currentConfig, null, 2), 'utf-8');
@@ -83,17 +92,21 @@ export function updateOmadaConfig(patch: Partial<OmadaConfig>): OmadaConfig {
     console.warn('[Omada] Failed to persist omada-config.json:', err.message);
   }
 
-  // Reset current session so next request authenticates with new config
-  cookie = '';
-  csrf = '';
-  loggedAt = 0;
+  // Reset active sessions so next requests authenticate with new credentials
+  operatorSession = { cookie: '', csrf: '', loggedAt: 0 };
+  adminSession = { cookie: '', csrf: '', loggedAt: 0 };
 
   return { ...currentConfig };
 }
 
-let cookie = '';
-let csrf = '';
-let loggedAt = 0;
+export interface OmadaSession {
+  cookie: string;
+  csrf: string;
+  loggedAt: number;
+}
+
+let operatorSession: OmadaSession = { cookie: '', csrf: '', loggedAt: 0 };
+let adminSession: OmadaSession = { cookie: '', csrf: '', loggedAt: 0 };
 
 interface CallResponse {
   json: any;
@@ -103,9 +116,17 @@ interface CallResponse {
   headers: Record<string, string | string[] | undefined>;
 }
 
-function call(method: string, reqPath: string, body?: any, extra: Record<string, string> = {}): Promise<CallResponse> {
+function call(
+  method: string,
+  reqPath: string,
+  body?: any,
+  extra: Record<string, string> = {},
+  sessionOverride?: OmadaSession,
+  cfgOverride?: OmadaConfig
+): Promise<CallResponse> {
   return new Promise((resolve, reject) => {
-    const base = currentConfig.omadaUrl;
+    const cfg = cfgOverride || currentConfig;
+    const base = cfg.omadaUrl;
     if (!base) {
       return reject(new Error('OMADA_URL haijawekwa kwenye mfumo. Weka anwani ya Omada Controller au Ngrok kwenye Mipangilio.'));
     }
@@ -120,10 +141,12 @@ function call(method: string, reqPath: string, body?: any, extra: Record<string,
     const isHttps = u.protocol === 'https:';
     const client = isHttps ? https : http;
     const agent = isHttps
-      ? new https.Agent({ rejectUnauthorized: currentConfig.strictTls })
+      ? new https.Agent({ rejectUnauthorized: cfg.strictTls })
       : undefined;
 
     const data = body ? JSON.stringify(body) : undefined;
+    const activeCookie = sessionOverride ? sessionOverride.cookie : operatorSession.cookie;
+
     const req = client.request(
       {
         method,
@@ -136,7 +159,7 @@ function call(method: string, reqPath: string, body?: any, extra: Record<string,
           'Accept': 'application/json, text/plain, */*',
           'ngrok-skip-browser-warning': '1', // Bypass ngrok free warning interstitial
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LemaFastWiFi/1.0',
-          ...(cookie ? { 'Cookie': cookie } : {}),
+          ...(activeCookie ? { 'Cookie': activeCookie } : {}),
           ...extra,
           ...(data ? { 'Content-Length': String(Buffer.byteLength(data)) } : {}),
         },
@@ -180,7 +203,6 @@ function call(method: string, reqPath: string, body?: any, extra: Record<string,
  */
 function extractHexId(text: string): string | null {
   if (!text) return null;
-  // Match 32 continuous hex characters
   const m = text.match(/[0-9a-fA-F]{32}/);
   return m ? m[0].toLowerCase() : null;
 }
@@ -188,18 +210,18 @@ function extractHexId(text: string): string | null {
 /**
  * Attempt to automatically detect OMADA_ID (omadacId) from multiple Controller endpoints
  */
-export async function resolveControllerId(): Promise<string> {
-  if (currentConfig.controllerId && extractHexId(currentConfig.controllerId)) {
-    return currentConfig.controllerId;
+export async function resolveControllerId(cfgParam?: OmadaConfig): Promise<string> {
+  const cfg = cfgParam || currentConfig;
+  if (cfg.controllerId && extractHexId(cfg.controllerId)) {
+    return cfg.controllerId;
   }
 
   console.log('[Omada] Inaanza kutafuta OMADA_ID kiotomatiki kutoka kwenye Controller...');
 
-  // 1. Try GET /api/info (Official TP-Link Omada Controller discovery endpoint)
+  // 1. Try GET /api/info (Official TP-Link Omada discovery endpoint)
   try {
-    const res = await call('GET', '/api/info');
+    const res = await call('GET', '/api/info', undefined, {}, undefined, cfg);
     const resultObj = res.json?.result || res.json || {};
-    // Note: Omada v5/v6 uses omadacId (lowercase c) or controllerId
     const foundId =
       resultObj.omadacId ||
       resultObj.omadaCId ||
@@ -211,7 +233,7 @@ export async function resolveControllerId(): Promise<string> {
     if (foundId && extractHexId(String(foundId))) {
       const resolved = extractHexId(String(foundId))!;
       console.log(`[Omada] ✅ OMADA_ID imepatikana kutoka /api/info: ${resolved}`);
-      updateOmadaConfig({ controllerId: resolved });
+      if (!cfgParam) updateOmadaConfig({ controllerId: resolved });
       return resolved;
     }
   } catch (err: any) {
@@ -220,19 +242,19 @@ export async function resolveControllerId(): Promise<string> {
 
   // 2. Try GET / (Omada root redirects to /<omadacId>/login)
   try {
-    const res = await call('GET', '/');
+    const res = await call('GET', '/', undefined, {}, undefined, cfg);
     const locHeader = String(res.headers.location || '');
     const headerId = extractHexId(locHeader);
     if (headerId) {
       console.log(`[Omada] ✅ OMADA_ID imepatikana kutoka Location redirect header: ${headerId}`);
-      updateOmadaConfig({ controllerId: headerId });
+      if (!cfgParam) updateOmadaConfig({ controllerId: headerId });
       return headerId;
     }
 
     const bodyId = extractHexId(res.raw);
     if (bodyId) {
-      console.log(`[Omada] ✅ OMADA_ID imepatikana kutoka kwenye ukurasa wa mzizi (/): ${bodyId}`);
-      updateOmadaConfig({ controllerId: bodyId });
+      console.log(`[Omada] ✅ OMADA_ID imepatikana kutoka ukurasa wa mzizi (/): ${bodyId}`);
+      if (!cfgParam) updateOmadaConfig({ controllerId: bodyId });
       return bodyId;
     }
   } catch (err: any) {
@@ -241,19 +263,19 @@ export async function resolveControllerId(): Promise<string> {
 
   // 3. Try GET /login
   try {
-    const res = await call('GET', '/login');
+    const res = await call('GET', '/login', undefined, {}, undefined, cfg);
     const locHeader = String(res.headers.location || '');
     const headerId = extractHexId(locHeader);
     if (headerId) {
       console.log(`[Omada] ✅ OMADA_ID imepatikana kutoka /login redirect: ${headerId}`);
-      updateOmadaConfig({ controllerId: headerId });
+      if (!cfgParam) updateOmadaConfig({ controllerId: headerId });
       return headerId;
     }
 
     const bodyId = extractHexId(res.raw);
     if (bodyId) {
       console.log(`[Omada] ✅ OMADA_ID imepatikana kutoka ukurasa wa /login: ${bodyId}`);
-      updateOmadaConfig({ controllerId: bodyId });
+      if (!cfgParam) updateOmadaConfig({ controllerId: bodyId });
       return bodyId;
     }
   } catch (err: any) {
@@ -269,102 +291,147 @@ export async function resolveControllerId(): Promise<string> {
  * Log in to Omada Controller as Hotspot Operator
  * Route in Omada Controller v5.x / v6.x: POST /<controllerId>/api/v2/hotspot/login
  */
-export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
-  if (!currentConfig.omadaUrl || !currentConfig.operatorUser || !currentConfig.operatorPass) {
-    throw new Error(
-      'Mipangilio ya Omada (OMADA_URL, OMADA_OPERATOR, OMADA_OPERATOR_PASSWORD) haijakamilika kwenye mfumo.'
-    );
+export async function getOperatorSession(cfgParam?: OmadaConfig, forceFresh = false): Promise<OmadaSession> {
+  const cfg = cfgParam || currentConfig;
+  const isGlobal = !cfgParam;
+
+  if (isGlobal && !forceFresh && operatorSession.cookie && operatorSession.csrf && Date.now() - operatorSession.loggedAt < 15 * 60 * 1000) {
+    return operatorSession;
   }
 
-  const id = await resolveControllerId();
+  if (!cfg.omadaUrl || !cfg.operatorUser || !cfg.operatorPass) {
+    throw new Error('Mipangilio ya Hotspot Operator (OMADA_URL, OMADA_OPERATOR, OMADA_OPERATOR_PASSWORD) haijakamilika.');
+  }
 
-  cookie = '';
-  csrf = '';
-  console.log(`[Omada Controller] Attempting login as "${currentConfig.operatorUser}" to controller ${id}...`);
+  const id = await resolveControllerId(cfg);
+  console.log(`[Omada Operator Session] Logging in as Operator "${cfg.operatorUser}" to controller ${id}...`);
+
+  const endpoints = [
+    `/${id}/api/v2/hotspot/login`,
+    '/api/v2/hotspot/login',
+  ];
 
   let lastErrorCode: number | undefined;
   let lastErrorMsg = '';
 
-  // 1. Try Controller Admin Login across global and controller-scoped endpoints
-  // Omada admin login API v5.x/v6.x requires username/password or name/password
-  const adminEndpoints = [
-    `/${id}/api/v2/login`,
-    '/api/v2/login'
-  ];
-
-  for (const ep of adminEndpoints) {
-    try {
-      const adminRes = await call('POST', ep, {
-        username: currentConfig.operatorUser,
-        name: currentConfig.operatorUser,
-        password: currentConfig.operatorPass,
-      });
-      if (adminRes.json?.errorCode === 0) {
-        csrf = adminRes.json?.result?.token || adminRes.json?.token || (adminRes.headers['csrf-token'] as string) || '';
-        const cookiesList = adminRes.setCookie || [];
-        cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
-        loggedAt = Date.now();
-        console.log(`[Omada Controller] ✅ Admin Login successful via ${ep}! Full administrator session active.`);
-        return { csrf, cookie };
-      } else if (adminRes.json?.errorCode !== undefined) {
-        lastErrorCode = adminRes.json.errorCode;
-        lastErrorMsg = adminRes.json.msg || adminRes.json.message || '';
-      }
-    } catch (e: any) {
-      console.warn(`[Omada Controller] Admin login on ${ep} failed:`, e.message);
-    }
-  }
-
-  console.log('[Omada Controller] Trying Hotspot Operator login endpoints (/api/v2/hotspot/login)...');
-
-  // 2. Try Hotspot Operator Login across controller and global endpoints
-  const operatorEndpoints = [
-    `/${id}/api/v2/hotspot/login`,
-    '/api/v2/hotspot/login'
-  ];
-
-  for (const ep of operatorEndpoints) {
+  for (const ep of endpoints) {
     try {
       const r = await call('POST', ep, {
-        name: currentConfig.operatorUser,
-        username: currentConfig.operatorUser,
-        password: currentConfig.operatorPass,
-      });
+        name: cfg.operatorUser,
+        username: cfg.operatorUser,
+        password: cfg.operatorPass,
+      }, {}, undefined, cfg);
 
       if (r.json?.errorCode === 0) {
-        csrf = r.json?.result?.token || r.json?.token || (r.headers['csrf-token'] as string) || '';
+        const csrfToken = r.json?.result?.token || r.json?.token || (r.headers['csrf-token'] as string) || '';
         const cookiesList = r.setCookie || [];
-        cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
-        loggedAt = Date.now();
-        console.log(`[Omada Controller] ✅ Hotspot Operator login successful via ${ep}!`);
-        return { csrf, cookie };
+        const cookieStr = cookiesList.map((c) => c.split(';')[0]).join('; ');
+        const session: OmadaSession = {
+          csrf: csrfToken,
+          cookie: cookieStr,
+          loggedAt: Date.now(),
+        };
+        if (isGlobal) {
+          operatorSession = session;
+        }
+        console.log(`[Omada Operator Session] ✅ Hotspot Operator session active via ${ep}!`);
+        return session;
       } else if (r.json?.errorCode !== undefined) {
         lastErrorCode = r.json.errorCode;
-        lastErrorMsg = r.json.msg || r.json.message || (r.raw ? r.raw.slice(0, 120) : '');
+        lastErrorMsg = r.json.msg || r.json.message || '';
       }
     } catch (e: any) {
-      console.warn(`[Omada Controller] Operator login on ${ep} failed:`, e.message);
+      console.warn(`[Omada Operator Session] Endpoint ${ep} failed:`, e.message);
     }
   }
 
-  // Handle specific Omada Error -30109: Invalid username or password
   if (lastErrorCode === -30109) {
     throw new Error(
-      `Omada login imeshindikana (Kosa -30109): Invalid username or password.\n\n` +
-      `💡 Hatua za kutatua:\n` +
-      `1. Akaunti ya Operator (Inayopendekezwa na TP-Link): Fungua Omada Controller > nenda 'Hotspot Manager' (au Settings > Hotspot) > 'Operators' > bonyeza '+ Add' kutengeneza Operator username na password, kisha ziweke hapa.\n` +
-      `2. Akaunti ya Admin: Kama unatumia Msimamizi Mkuu, tumia jina la 'Local Admin' (k.m. admin), USITUMIE barua pepe ya TP-Link Cloud ID (kama gmail).\n` +
-      `3. Hakikisha hakuna nafasi (spaces) mwanzoni au mwishoni na herufi kubwa/ndogo zinalingana kikamilifu.`
+      `Omada Operator login imeshindikana (Kosa -30109): Invalid username or password.\n\n` +
+      `💡 Hakikisha akaunti imetengenezwa chini ya: Hotspot Manager > Operators > + Add Operator.`
     );
   }
 
-  throw new Error(`Omada login imeshindikana (Kosa ${lastErrorCode ?? 'N/A'}): ${lastErrorMsg || 'Invalid username or password'}`);
+  throw new Error(`Omada Operator login imeshindikana (Kosa ${lastErrorCode ?? 'N/A'}): ${lastErrorMsg || 'Invalid credentials'}`);
+}
+
+/**
+ * Log in to Omada Controller as Controller Administrator
+ * Route in Omada Controller v5.x / v6.x: POST /<controllerId>/api/v2/login
+ * Required for site client management commands: /cmd/clients/{mac}/unauth and /block
+ */
+export async function getAdminSession(cfgParam?: OmadaConfig, forceFresh = false): Promise<OmadaSession> {
+  const cfg = cfgParam || currentConfig;
+  const isGlobal = !cfgParam;
+
+  if (isGlobal && !forceFresh && adminSession.cookie && adminSession.csrf && Date.now() - adminSession.loggedAt < 15 * 60 * 1000) {
+    return adminSession;
+  }
+
+  const adminUser = (cfg.adminUser || cfg.operatorUser || '').trim();
+  const adminPass = (cfg.adminPass || cfg.operatorPass || '').trim();
+
+  if (!cfg.omadaUrl || !adminUser || !adminPass) {
+    throw new Error('Mipangilio ya Controller Admin (OMADA_ADMIN_USER, OMADA_ADMIN_PASSWORD) haijakamilika.');
+  }
+
+  const id = await resolveControllerId(cfg);
+  console.log(`[Omada Admin Session] Logging in as Admin "${adminUser}" to controller ${id}...`);
+
+  const endpoints = [
+    `/${id}/api/v2/login`,
+    '/api/v2/login',
+  ];
+
+  let lastErrorCode: number | undefined;
+  let lastErrorMsg = '';
+
+  for (const ep of endpoints) {
+    try {
+      const r = await call('POST', ep, {
+        username: adminUser,
+        name: adminUser,
+        password: adminPass,
+      }, {}, undefined, cfg);
+
+      if (r.json?.errorCode === 0) {
+        const csrfToken = r.json?.result?.token || r.json?.token || (r.headers['csrf-token'] as string) || '';
+        const cookiesList = r.setCookie || [];
+        const cookieStr = cookiesList.map((c) => c.split(';')[0]).join('; ');
+        const session: OmadaSession = {
+          csrf: csrfToken,
+          cookie: cookieStr,
+          loggedAt: Date.now(),
+        };
+        if (isGlobal) {
+          adminSession = session;
+        }
+        console.log(`[Omada Admin Session] ✅ Controller Admin session active via ${ep}!`);
+        return session;
+      } else if (r.json?.errorCode !== undefined) {
+        lastErrorCode = r.json.errorCode;
+        lastErrorMsg = r.json.msg || r.json.message || '';
+      }
+    } catch (e: any) {
+      console.warn(`[Omada Admin Session] Endpoint ${ep} failed:`, e.message);
+    }
+  }
+
+  throw new Error(`Omada Admin login imeshindikana (Kosa ${lastErrorCode ?? 'N/A'}): ${lastErrorMsg || 'Invalid admin credentials'}`);
+}
+
+/**
+ * Backward compatibility login helper
+ */
+export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
+  const sess = await getOperatorSession();
+  return { csrf: sess.csrf, cookie: sess.cookie };
 }
 
 /**
  * Standardize MAC addresses to hyphenated uppercase (e.g. AA-BB-CC-DD-EE-FF) as expected by Omada
  */
-function formatMac(m: string): string {
+export function formatMac(m: string): string {
   const raw = (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
   if (raw.length === 12) {
     return raw.match(/.{1,2}/g)!.join('-');
@@ -374,7 +441,8 @@ function formatMac(m: string): string {
 
 /**
  * Authorize client device on Omada Controller (External Portal)
- * Route in Omada Controller v5.x / v6.x: POST /<controllerId>/api/v2/hotspot/extPortal/auth
+ * Uses Hotspot Operator session.
+ * Supports sliding lease duration if enabled.
  */
 export async function omadaAuthorize(p: OmadaAuthParams) {
   if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
@@ -385,7 +453,14 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
   const clientMacFormatted = formatMac(p.clientMac);
   const apMacFormatted = formatMac(p.apMac);
 
-  const send = () =>
+  // If sliding lease is enabled, grant short lease (e.g. 10 minutes) that auto-renews while active
+  const effectiveDurationMs = currentConfig.slidingLeaseEnabled
+    ? Math.min(p.durationMs, (currentConfig.slidingLeaseMinutes || 10) * 60 * 1000)
+    : p.durationMs;
+
+  let session = await getOperatorSession();
+
+  const send = (sess: OmadaSession) =>
     call(
       'POST',
       `/${id}/api/v2/hotspot/extPortal/auth`,
@@ -395,22 +470,18 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
         apMac: apMacFormatted,
         ssidName: p.ssidName || 'Lema Fast WiFi',
         radioId: Number(p.radioId) || 0,
-        time: Math.round(p.durationMs), // Duration in milliseconds
+        time: Math.round(effectiveDurationMs), // Duration in milliseconds
         authType: 4, // External Portal Authentication
         originUrl: '',
         totalTrafficLimitBytes: 0,
         downloadRateLimitKbps: p.downKbps || 0,
         uploadRateLimitKbps: p.upKbps || 0,
       },
-      { 'Csrf-Token': csrf }
+      { 'Csrf-Token': sess.csrf },
+      sess
     );
 
-  // If not logged in or session older than 15 minutes, perform fresh login
-  if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
-    await omadaLogin();
-  }
-
-  let r = await send();
+  let r = await send(session);
 
   // If authorization returned session expiration or token error, attempt re-login once and retry
   if (r.json?.errorCode !== 0 || r.statusCode === 401 || r.statusCode === 403) {
@@ -418,8 +489,8 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
       `[Omada Controller] First auth attempt returned errorCode: ${r.json?.errorCode} (HTTP ${r.statusCode}), re-authenticating operator session...`
     );
     try {
-      await omadaLogin();
-      r = await send();
+      session = await getOperatorSession(undefined, true);
+      r = await send(session);
     } catch (reLoginErr: any) {
       console.warn('[Omada Controller] Re-login attempt failed:', reLoginErr.message);
     }
@@ -432,7 +503,7 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
   }
 
   console.log(
-    `[Omada Controller] ✅ Client ${clientMacFormatted} authorized on AP ${apMacFormatted} for ${Math.round(p.durationMs / 60000)} minutes!`
+    `[Omada Controller] ✅ Client ${clientMacFormatted} authorized on AP ${apMacFormatted} for ${Math.round(effectiveDurationMs / 60000)} minutes!`
   );
   return r.json;
 }
@@ -445,10 +516,11 @@ export interface OmadaUnauthOptions {
 
 /**
  * Unauthorize (disconnect) client device from Omada Controller
- * Uses multi-tier strategy:
- * 1. Immediate Expiration via extPortal/auth (time: 1ms) -> clears authorization cache in Omada Gateway/EAP
- * 2. Dedicated unauth endpoints (extPortal/unauth, hotspot/guests/unauth)
- * 3. 802.11 Deauthentication via site client cmd reconnect/kick (drops station from AP immediately)
+ * Dual-Session multi-tier strategy:
+ * 1. Dedicated extPortal/unauth & hotspot/guests/unauth via Operator Session
+ * 2. Site command unauth via Admin Session (/sites/{siteId}/cmd/clients/{mac}/unauth)
+ * 3. 802.11 Deauth via site client cmd reconnect (kick from AP)
+ * CRITICAL: Reconnect alone is NOT counted towards confirmation. Confirmation requires an unauth/block command with errorCode 0.
  */
 export async function omadaUnauthorize(
   clientMac: string,
@@ -464,21 +536,22 @@ export async function omadaUnauthorize(
 
   const clientMacFormatted = formatMac(clientMac);
   const apMacFormatted = formatMac(options?.apMac || '');
-  console.log(`[Omada Controller] 🛑 Inaanza kukata intaneti na kufuta idhini ya kifaa ${clientMacFormatted} (AP: ${apMacFormatted || 'Yoyote'})...`);
+  console.log(`[Omada Controller] 🛑 Inaanza kukata intaneti na kufuta idhini ya kifaa ${clientMacFormatted}...`);
 
   try {
     const id = await resolveControllerId();
-
-    if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
-      await omadaLogin();
-    }
-
     const results: Record<string, any> = {};
 
-    // -------------------------------------------------------------
-    // STRATEGY 0: Custom Endpoint captured via DevTools (F12)
-    // -------------------------------------------------------------
-    if (currentConfig.customUnauthEndpoint && currentConfig.customUnauthEndpoint.trim()) {
+    // 1. Get Operator session for Portal unauth endpoints
+    let opSess: OmadaSession | null = null;
+    try {
+      opSess = await getOperatorSession();
+    } catch (oe: any) {
+      console.warn('[Omada Unauthorize] Operator session warning:', oe.message);
+    }
+
+    // 2. Custom Endpoint captured via DevTools (if configured)
+    if (currentConfig.customUnauthEndpoint && currentConfig.customUnauthEndpoint.trim() && opSess) {
       try {
         let ep = currentConfig.customUnauthEndpoint.trim();
         const site = currentConfig.siteId || 'Default';
@@ -502,7 +575,8 @@ export async function omadaUnauthorize(
             mac: clientMacFormatted,
             apMac: apMacFormatted,
           },
-          { 'Csrf-Token': csrf }
+          { 'Csrf-Token': opSess.csrf },
+          opSess
         );
         results.customEndpoint = {
           endpoint: ep,
@@ -510,73 +584,67 @@ export async function omadaUnauthorize(
           errorCode: customRes.json?.errorCode,
           msg: customRes.json?.msg || customRes.json?.message
         };
-        console.log(`[Omada Controller] Custom unauth endpoint result: errorCode=${customRes.json?.errorCode} (HTTP ${customRes.statusCode})`);
       } catch (ce: any) {
         results.customEndpoint = { error: ce.message };
       }
     }
 
-
-
-    // -------------------------------------------------------------
-    // STRATEGY 2: Legacy / Direct extPortal/unauth
-    // -------------------------------------------------------------
-    try {
-      const sendUnauth = () =>
-        call(
+    // 3. Direct extPortal/unauth (Operator Session)
+    if (opSess) {
+      try {
+        const r = await call(
           'POST',
           `/${id}/api/v2/hotspot/extPortal/unauth`,
           { clientMac: clientMacFormatted, mac: clientMacFormatted },
-          { 'Csrf-Token': csrf }
+          { 'Csrf-Token': opSess.csrf },
+          opSess
         );
-
-      let r = await sendUnauth();
-      if (r.json?.errorCode !== 0 && (r.statusCode === 401 || r.statusCode === 403)) {
-        await omadaLogin();
-        r = await sendUnauth();
+        results.extPortalUnauth = {
+          statusCode: r.statusCode,
+          errorCode: r.json?.errorCode,
+          msg: r.json?.msg || r.json?.message
+        };
+      } catch (e: any) {
+        results.extPortalUnauth = { error: e.message };
       }
-      results.extPortalUnauth = {
-        statusCode: r.statusCode,
-        errorCode: r.json?.errorCode,
-        msg: r.json?.msg || r.json?.message
-      };
-    } catch (e: any) {
-      results.extPortalUnauth = { error: e.message };
+
+      // 4. Hotspot Guests Unauth
+      try {
+        const r = await call(
+          'POST',
+          `/${id}/api/v2/hotspot/guests/unauth`,
+          { clientMac: clientMacFormatted, mac: clientMacFormatted },
+          { 'Csrf-Token': opSess.csrf },
+          opSess
+        );
+        results.hotspotGuestsUnauth = {
+          statusCode: r.statusCode,
+          errorCode: r.json?.errorCode,
+          msg: r.json?.msg || r.json?.message
+        };
+      } catch (e: any) {
+        results.hotspotGuestsUnauth = { error: e.message };
+      }
     }
 
-    // -------------------------------------------------------------
-    // STRATEGY 3: Hotspot Guests Unauth (/api/v2/hotspot/guests/unauth)
-    // -------------------------------------------------------------
+    // 5. Site-level Administrative unauth & reconnect (Admin Session)
+    let admSess: OmadaSession | null = null;
     try {
-      const r = await call(
-        'POST',
-        `/${id}/api/v2/hotspot/guests/unauth`,
-        { clientMac: clientMacFormatted, mac: clientMacFormatted },
-        { 'Csrf-Token': csrf }
-      );
-      results.hotspotGuestsUnauth = {
-        statusCode: r.statusCode,
-        errorCode: r.json?.errorCode,
-        msg: r.json?.msg || r.json?.message
-      };
-    } catch (e: any) {
-      results.hotspotGuestsUnauth = { error: e.message };
+      admSess = await getAdminSession();
+    } catch (ae: any) {
+      console.warn('[Omada Unauthorize] Admin session warning:', ae.message);
     }
 
-    // -------------------------------------------------------------
-    // STRATEGY 4: Site-level client unauth & reconnect (Deauth 802.11)
-    // -------------------------------------------------------------
-    try {
+    const sessionForSiteCmd = admSess || opSess;
+    if (sessionForSiteCmd) {
       let siteIds: string[] = [];
       try {
-        const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': csrf });
+        const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': sessionForSiteCmd.csrf }, sessionForSiteCmd);
         const list = sitesRes.json?.result?.data || (Array.isArray(sitesRes.json?.result) ? sitesRes.json.result : []);
         if (Array.isArray(list)) {
           siteIds = list.map((s: any) => s.id || s.siteId).filter(Boolean);
         }
-      } catch (e) {
-        // Operator token might not have site listing access
-      }
+      } catch (e) {}
 
       if (currentConfig.siteId && !siteIds.includes(currentConfig.siteId)) {
         siteIds.unshift(currentConfig.siteId);
@@ -586,49 +654,68 @@ export async function omadaUnauthorize(
       }
 
       for (const siteId of siteIds) {
-        try {
-          const adminUnauthRes = await call(
-            'POST',
-            `/${id}/api/v2/sites/${siteId}/cmd/clients/${clientMacFormatted}/unauth`,
-            { mac: clientMacFormatted },
-            { 'Csrf-Token': csrf }
-          );
-          if (adminUnauthRes.json?.errorCode !== undefined) {
-            results[`admin_site_unauth_${siteId}`] = { errorCode: adminUnauthRes.json?.errorCode, msg: adminUnauthRes.json?.msg };
-          }
-        } catch (e: any) {}
+        // Admin Site Command: Unauth
+        if (admSess) {
+          try {
+            const adminUnauthRes = await call(
+              'POST',
+              `/${id}/api/v2/sites/${siteId}/cmd/clients/${clientMacFormatted}/unauth`,
+              { mac: clientMacFormatted },
+              { 'Csrf-Token': admSess.csrf },
+              admSess
+            );
+            if (adminUnauthRes.json?.errorCode !== undefined) {
+              results[`admin_site_unauth_${siteId}`] = {
+                errorCode: adminUnauthRes.json?.errorCode,
+                msg: adminUnauthRes.json?.msg
+              };
+            }
+          } catch (e: any) {}
+        }
 
-        try {
-          const uRes = await call(
-            'POST',
-            `/${id}/api/v2/hotspot/sites/${siteId}/cmd/clients/${clientMacFormatted}/unauth`,
-            { clientMac: clientMacFormatted },
-            { 'Csrf-Token': csrf }
-          );
-          if (uRes.json?.errorCode !== undefined) {
-            results[`hotspot_sites_unauth_${siteId}`] = { errorCode: uRes.json?.errorCode, msg: uRes.json?.msg };
-          }
-        } catch (e: any) {}
+        // Hotspot Site Command: Unauth
+        if (opSess) {
+          try {
+            const uRes = await call(
+              'POST',
+              `/${id}/api/v2/hotspot/sites/${siteId}/cmd/clients/${clientMacFormatted}/unauth`,
+              { clientMac: clientMacFormatted },
+              { 'Csrf-Token': opSess.csrf },
+              opSess
+            );
+            if (uRes.json?.errorCode !== undefined) {
+              results[`hotspot_sites_unauth_${siteId}`] = {
+                errorCode: uRes.json?.errorCode,
+                msg: uRes.json?.msg
+              };
+            }
+          } catch (e: any) {}
+        }
 
+        // 802.11 Deauth Kick (Drops WiFi radio link immediately)
         try {
           const r = await call(
             'POST',
             `/${id}/api/v2/sites/${siteId}/cmd/clients/${clientMacFormatted}/reconnect`,
             {},
-            { 'Csrf-Token': csrf }
+            { 'Csrf-Token': sessionForSiteCmd.csrf },
+            sessionForSiteCmd
           );
           if (r.json?.errorCode !== undefined) {
-            results[`reconnect_${siteId}`] = { errorCode: r.json?.errorCode, msg: r.json?.msg };
+            results[`reconnect_${siteId}`] = {
+              errorCode: r.json?.errorCode,
+              msg: r.json?.msg
+            };
           }
         } catch (e: any) {}
       }
-    } catch (e: any) {
-      results.siteCmd = { error: e.message };
     }
 
-    // Verify whether ANY strategy returned errorCode === 0
-    const succeeded = Object.values(results).some(
-      (res: any) => res && typeof res === 'object' && res.errorCode === 0
+    // CRITICAL: Filter out keys starting with "reconnect". Reconnect only drops the station radio,
+    // Omada will still authorize the client if the lease has not been invalidated via unauth!
+    const unauthResults = Object.entries(results).filter(([key]) => !key.startsWith('reconnect'));
+    const succeeded = unauthResults.some(
+      ([_, res]: any) => res && typeof res === 'object' && res.errorCode === 0
     );
 
     if (succeeded) {
@@ -641,11 +728,11 @@ export async function omadaUnauthorize(
       };
     }
 
-    console.warn(`[Omada Controller] ⚠️ Hakuna ombi lililorudisha errorCode === 0 kwa kifaa ${clientMacFormatted}:`, JSON.stringify(results));
+    console.warn(`[Omada Controller] ⚠️ Hakuna amri ya unauth iliyorudisha errorCode === 0 kwa ${clientMacFormatted}:`, JSON.stringify(results));
     return {
       success: false,
       omadaConfirmed: false,
-      message: `Omada Controller haikukata idhini ya kifaa ${clientMacFormatted}. Hakuna ombi lililorudisha errorCode: 0. Angalia tab ya Mipangilio ya Omada kuweka endpoint sahihi kutoka F12 Network tab.`,
+      message: `Omada Controller haikukata idhini ya kifaa ${clientMacFormatted}. Hakuna amri ya unauth iliyorudisha errorCode: 0. Angalia akaunti ya Admin kwenye Mipangilio.`,
       details: results
     };
   } catch (err: any) {
@@ -658,17 +745,18 @@ export async function omadaUnauthorize(
   }
 }
 
-
 /**
  * Block (Blacklist) client device on Omada Controller to physically drop and prevent reconnect
+ * Requires Controller Admin session.
  */
 export async function omadaBlockClient(
   clientMac: string,
   siteIdParam?: string
-): Promise<{ success: boolean; message: string; details?: any }> {
+): Promise<{ success: boolean; omadaConfirmed: boolean; message: string; details?: any }> {
   if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
     return {
       success: false,
+      omadaConfirmed: false,
       message: 'OMADA_URL au OMADA_OPERATOR haijawekwa kwenye mfumo.'
     };
   }
@@ -678,26 +766,25 @@ export async function omadaBlockClient(
 
   try {
     const id = await resolveControllerId();
-
-    if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
-      await omadaLogin();
-    }
+    const admSess = await getAdminSession();
 
     // Step 1: Unauthorize and kick first
     await omadaUnauthorize(clientMacFormatted);
 
-    // Step 2: Call Omada Controller block command across sites
+    // Step 2: Call Omada Controller block command across site
     const site = siteIdParam || currentConfig.siteId || 'Default';
     const blockRes = await call(
       'POST',
       `/${id}/api/v2/sites/${site}/cmd/clients/${clientMacFormatted}/block`,
       { mac: clientMacFormatted },
-      { 'Csrf-Token': csrf }
+      { 'Csrf-Token': admSess.csrf },
+      admSess
     );
 
     const isOk = blockRes.json?.errorCode === 0;
     return {
       success: isOk,
+      omadaConfirmed: isOk,
       message: isOk
         ? `Kifaa ${clientMacFormatted} kimezuiwa (Blocked/Blacklisted) kikamilifu kwenye Omada Controller.`
         : `Omada Block response: ${blockRes.json?.msg || blockRes.json?.message || 'Error ' + blockRes.json?.errorCode}`,
@@ -707,6 +794,7 @@ export async function omadaBlockClient(
     console.error(`[Omada Controller] Hitilafu ya kum-block ${clientMacFormatted}:`, err.message);
     return {
       success: false,
+      omadaConfirmed: false,
       message: `Hitilafu ya kum-block mteja kwenye Omada: ${err.message}`
     };
   }
@@ -714,6 +802,7 @@ export async function omadaBlockClient(
 
 /**
  * Unblock (Whitelist) client device on Omada Controller
+ * Requires Controller Admin session.
  */
 export async function omadaUnblockClient(
   clientMac: string,
@@ -729,16 +818,17 @@ export async function omadaUnblockClient(
   const clientMacFormatted = formatMac(clientMac);
   try {
     const id = await resolveControllerId();
-    if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
-      await omadaLogin();
-    }
+    const admSess = await getAdminSession();
     const site = siteIdParam || currentConfig.siteId || 'Default';
+
     const unblockRes = await call(
       'POST',
       `/${id}/api/v2/sites/${site}/cmd/clients/${clientMacFormatted}/unblock`,
       { mac: clientMacFormatted },
-      { 'Csrf-Token': csrf }
+      { 'Csrf-Token': admSess.csrf },
+      admSess
     );
+
     const isOk = unblockRes.json?.errorCode === 0;
     return {
       success: isOk,
@@ -751,59 +841,75 @@ export async function omadaUnblockClient(
 }
 
 /**
- * Comprehensive connectivity check and operator test
+ * Comprehensive connectivity check and operator/admin credential test
+ * Non-mutating: Uses isolated test configuration without overwriting runtime state on failure
  */
 export async function testOmadaConnection(
   overrides?: Partial<OmadaConfig>
 ): Promise<{ success: boolean; message: string; details?: any }> {
-  if (overrides) {
-    if (overrides.omadaUrl !== undefined && overrides.omadaUrl.trim() !== '') {
-      currentConfig.omadaUrl = overrides.omadaUrl.trim().replace(/\/$/, '');
-    }
-    if (overrides.controllerId !== undefined && overrides.controllerId.trim() !== '') {
-      currentConfig.controllerId = overrides.controllerId.trim();
-    }
-    if (overrides.operatorUser !== undefined && overrides.operatorUser.trim() !== '') {
-      currentConfig.operatorUser = overrides.operatorUser.trim();
-    }
-    if (overrides.operatorPass !== undefined && overrides.operatorPass.trim() !== '') {
-      currentConfig.operatorPass = overrides.operatorPass.trim();
-    }
-    if (overrides.strictTls !== undefined) {
-      currentConfig.strictTls = Boolean(overrides.strictTls);
-    }
+  const testCfg: OmadaConfig = {
+    ...currentConfig,
+    ...(overrides || {}),
+  };
+
+  if (testCfg.omadaUrl) {
+    testCfg.omadaUrl = testCfg.omadaUrl.trim().replace(/\/$/, '');
+  }
+  if (testCfg.controllerId) {
+    testCfg.controllerId = testCfg.controllerId.trim();
+  }
+  if (testCfg.operatorUser) {
+    testCfg.operatorUser = testCfg.operatorUser.trim();
+  }
+  if (testCfg.operatorPass) {
+    testCfg.operatorPass = testCfg.operatorPass.trim();
+  }
+  if (testCfg.adminUser) {
+    testCfg.adminUser = testCfg.adminUser.trim();
+  }
+  if (testCfg.adminPass) {
+    testCfg.adminPass = testCfg.adminPass.trim();
   }
 
-  if (!currentConfig.omadaUrl) {
+  if (!testCfg.omadaUrl) {
     return {
       success: false,
       message: 'Tafadhali weka Anwani ya Omada (URL au Ngrok) kabla ya kupima muunganisho.'
     };
   }
-  if (!currentConfig.operatorUser) {
+  if (!testCfg.operatorUser || !testCfg.operatorPass) {
     return {
       success: false,
-      message: 'Tafadhali weka Jina la Omada Admin / Operator User kabla ya kupima muunganisho.'
-    };
-  }
-  if (!currentConfig.operatorPass) {
-    return {
-      success: false,
-      message: 'Tafadhali weka Nenosiri (Password) la Omada kabla ya kupima muunganisho.'
+      message: 'Tafadhali weka Jina na Nenosiri la Hotspot Operator kabla ya kupima muunganisho.'
     };
   }
 
   try {
-    const id = await resolveControllerId();
-    const loginRes = await omadaLogin();
+    const id = await resolveControllerId(testCfg);
+    const opSess = await getOperatorSession(testCfg, true);
+
+    let adminSessResult: { success: boolean; message?: string } | null = null;
+    if (testCfg.adminUser && testCfg.adminPass) {
+      try {
+        await getAdminSession(testCfg, true);
+        adminSessResult = { success: true, message: 'Admin login imefaulu' };
+      } catch (ae: any) {
+        adminSessResult = { success: false, message: ae.message };
+      }
+    }
+
     return {
       success: true,
-      message: `Muunganisho umefanikiwa kikamilifu! Controller ID "${id}" inafanya kazi na Operator "${currentConfig.operatorUser}" ameingia kwa ufanisi.`,
+      message: `Muunganisho umefanikiwa kikamilifu! Controller ID "${id}" inafanya kazi na Operator "${testCfg.operatorUser}" ameingia kwa ufanisi.${
+        adminSessResult ? ` (Admin: ${adminSessResult.success ? '✅ Sahihi' : '⚠️ ' + adminSessResult.message})` : ''
+      }`,
       details: {
         controllerId: id,
-        operatorUser: currentConfig.operatorUser,
-        tokenReceived: Boolean(loginRes.csrf),
-        cookieReceived: Boolean(loginRes.cookie),
+        operatorUser: testCfg.operatorUser,
+        adminUser: testCfg.adminUser || '(Haikuwekwa)',
+        tokenReceived: Boolean(opSess.csrf),
+        cookieReceived: Boolean(opSess.cookie),
+        adminResult: adminSessResult,
       },
     };
   } catch (err: any) {
@@ -811,11 +917,10 @@ export async function testOmadaConnection(
       success: false,
       message: err.message,
       details: {
-        currentUrl: currentConfig.omadaUrl,
-        operatorUser: currentConfig.operatorUser,
-        controllerId: currentConfig.controllerId || '(Haijawekwa)',
+        currentUrl: testCfg.omadaUrl,
+        operatorUser: testCfg.operatorUser,
+        controllerId: testCfg.controllerId || '(Haijawekwa)',
       },
     };
   }
 }
-
