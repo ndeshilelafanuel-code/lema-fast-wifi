@@ -40,24 +40,83 @@ app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
   });
 });
 
-// Msaidizi wa uthibitishaji wa Msimamizi (Admin Security Guard)
-const DEFAULT_ADMIN_KEY = 'lema_admin_secret_key_2026';
+// Msaidizi wa uthibitishaji wa Msimamizi (Real Server-Side Admin Security Guard)
+const getAdminKey = () => (process.env.ADMIN_API_KEY || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b').trim();
+const getAdminUser = () => (process.env.ADMIN_USER || 'admin').trim();
+const getAdminPass = () => (process.env.ADMIN_PASSWORD || 'lema2026!').trim();
+
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const expectedKey = (process.env.ADMIN_API_KEY || DEFAULT_ADMIN_KEY).trim();
-  const adminKey = (req.get('x-admin-key') || '').trim();
-  if (expectedKey && adminKey === expectedKey) return next();
-  console.warn(`[Admin Auth 401] x-admin-key mismatch. Received: "${adminKey ? '***' : 'empty'}", Expected: "${expectedKey ? '***' : 'empty'}"`);
+  const key = getAdminKey();
+  if (!key) {
+    return res.status(503).json({
+      success: false,
+      message: 'ADMIN_API_KEY haijawekwa kwenye seva (Tafadhali weka kwenye .env au mazingira ya seva).'
+    });
+  }
+  const provided = (req.get('x-admin-key') || '').trim();
+  if (provided && provided === key) return next();
+
+  console.warn(`[Admin Auth 401] Access denied for ${req.method} ${req.path}. Received x-admin-key: "${provided ? '***' : 'empty'}"`);
   return res.status(401).json({
     success: false,
-    message: 'Ruhusa imekataliwa (Unauthorized: x-admin-key header sahihi inahitajika).'
+    message: 'Ruhusa imekataliwa (Unauthorized: x-admin-key sahihi inahitajika kuendelea).'
   });
 };
 
-// Kulinda vocha: kuunda au kusoma orodha yote ya vocha ni kwa Admin tu (isipokuwa /redeem)
-app.use('/api/v1/vouchers', (req, res, next) => {
-  if (req.path === '/redeem') return next();
+// 1. Uthibitisho halisi wa Msimamizi Seva (Admin Login via POST)
+app.post('/api/v1/admin/login', (req, res) => {
+  const { user, pass } = req.body || {};
+  const expectedUser = getAdminUser().toLowerCase();
+  const expectedPass = getAdminPass();
+  const inputUser = String(user || '').trim().toLowerCase();
+  const inputPass = String(pass || '').trim();
+
+  const isSuperAdmin =
+    (inputUser === expectedUser && inputPass === expectedPass) ||
+    (inputUser === 'superadmin' && inputPass === expectedPass);
+
+  if (isSuperAdmin) {
+    console.log(`[Admin Login] Success for user "${inputUser}"`);
+    return res.json({
+      success: true,
+      message: 'Umeingia kikamilifu kama Msimamizi.',
+      key: getAdminKey(),
+      user: inputUser,
+      role: 'admin'
+    });
+  }
+
+  console.warn(`[Admin Login Failed] Invalid credentials for user "${inputUser}"`);
+  return res.status(401).json({
+    success: false,
+    message: 'Jina la mtumiaji au neno la siri siyo sahihi.'
+  });
+});
+
+// 2. Kila kitu chini ya /api/v1 ni cha admin, isipokuwa routes hizi maalum za wateja na vifaa
+const isPublicV1Route = (method: string, path: string): boolean => {
+  if (method === 'POST' && path === '/admin/login') return true;
+  if (method === 'POST' && path === '/vouchers/redeem') return true;
+  if (method === 'POST' && path === '/vouchers/trial') return true;
+  if (method === 'POST' && path === '/payments/stk-push') return true;
+  if (method === 'GET' && path.startsWith('/payments/order-status/')) return true;
+  if (method === 'POST' && path === '/payments/webhook') return true;
+  if ((method === 'GET' || method === 'POST') && path === '/whatsapp/webhook') return true;
+  if ((method === 'GET' || method === 'POST') && path === '/hardware/heartbeat') return true;
+  if ((method === 'GET' || method === 'POST') && path === '/hardware/alert/outage') return true;
+  if (method === 'POST' && path === '/omada/webhook') return true;
+  if (method === 'GET' && path === '/omada/webhook-info') return true;
+  if (method === 'GET' && path === '/towers') return true;
+  return false;
+};
+
+app.use('/api/v1', (req, res, next) => {
+  if (isPublicV1Route(req.method, req.path)) {
+    return next();
+  }
   return requireAdmin(req, res, next);
 });
+
 
 // In-memory store for WhatsApp messages & sessions
 interface StoredMessage {
@@ -947,6 +1006,7 @@ app.post('/api/v1/sessions/sync', (req, res) => {
 app.delete('/api/v1/sessions/active/:id', async (req, res) => {
   const { id } = req.params;
   const queryMac = (req.query.mac ? String(req.query.mac) : '').trim().toUpperCase();
+  const force = req.query.force === 'true' || req.body?.force === true;
   loadSavedSessions();
   const targetId = id.trim().toUpperCase();
   const sessionToDelete = savedActiveSessions.find(
@@ -967,13 +1027,29 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
   const ssidName = sessionToDelete?.ssidName || (req.query.ssid as string) || 'Lema Fast WiFi';
   const radioId = sessionToDelete?.radioId || (req.query.radioId as string) || 0;
 
-  if (clientMac) {
+  const omadaConf = getOmadaConfig();
+  let omadaResult: { success: boolean; message: string; details?: any; omadaConfirmed?: boolean } | null = null;
+
+  if (clientMac && omadaConf.omadaUrl && omadaConf.operatorUser) {
     try {
       console.log(`[Omada Disconnect] Unauthorizing MAC ${clientMac} on AP ${apMac || 'any'}`);
-      await omadaUnauthorize(clientMac, { apMac, ssidName, radioId });
+      omadaResult = await omadaUnauthorize(clientMac, { apMac, ssidName, radioId });
     } catch (err: any) {
       console.warn('[Omada Disconnect Notice]:', err?.message);
+      omadaResult = { success: false, message: err?.message };
     }
+  }
+
+  // Ikiwa Omada ipo na imeshindwa kukata, USIFUTE session wala vocha isipokuwa msimamizi aweke force=true
+  if (omadaResult && !omadaResult.success && !force) {
+    console.warn(`[Omada Disconnect Blocked] Omada haikukata ${clientMac}. Session haijafutwa ili msimamizi aone bado yupo.`);
+    return res.status(400).json({
+      success: false,
+      omadaConfirmed: false,
+      message: `Omada Controller haikukata idhini ya mteja (${clientMac}). Session na vocha hazijafutwa ili usipoteze udhibiti wa mteja.`,
+      details: omadaResult.details,
+      sessions: savedActiveSessions
+    });
   }
 
   // Update associated voucher to expired (it has been used)
@@ -1020,7 +1096,13 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
       (!clientMac || (s.macAddress || '').trim().toUpperCase() !== clientMac)
   );
   saveSessionsToDisk();
-  res.json({ success: true, sessions: savedActiveSessions });
+  res.json({
+    success: true,
+    omadaConfirmed: omadaResult?.success || false,
+    message: omadaResult?.message || 'Session imefutwa kikamilifu.',
+    details: omadaResult?.details,
+    sessions: savedActiveSessions
+  });
 });
 
 // =========================================================================
@@ -1535,7 +1617,7 @@ app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
 
 // POST Disconnect / Deauthorize client directly on Omada Controller (Admin Protected)
 app.post('/api/v1/omada/client/disconnect', requireAdmin, async (req, res) => {
-  const { mac, apMac, ssidName, radioId } = req.body || {};
+  const { mac, apMac, ssidName, radioId, force } = req.body || {};
   const cleanMac = String(mac || '').trim().toUpperCase();
   if (!cleanMac) {
     return res.status(400).json({ error: 'MAC address is required' });
@@ -1546,6 +1628,16 @@ app.post('/api/v1/omada/client/disconnect', requireAdmin, async (req, res) => {
     ssidName: ssidName || 'Lema Fast WiFi',
     radioId: radioId || 0
   });
+
+  // Ikiwa Omada haijakata mteja na admin hakuweka force=true, zuia kufuta session
+  if (!result.success && !force) {
+    return res.status(400).json({
+      success: false,
+      omadaConfirmed: false,
+      message: result.message,
+      details: result.details
+    });
+  }
 
   loadSavedSessions();
   const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
@@ -1570,8 +1662,46 @@ app.post('/api/v1/omada/client/disconnect', requireAdmin, async (req, res) => {
     saveWifiClients();
   }
 
-  return res.json({ success: true, message: result.message, details: result.details });
+  return res.json({
+    success: true,
+    omadaConfirmed: result.success,
+    message: result.message,
+    details: result.details
+  });
 });
+
+// Background Worker: Sliding-Window Short Lease Auto-Renewal
+// Ikiwa slidingLeaseEnabled imewashwa kwenye Mipangilio ya Omada, seva huongeza muda wa dakika 10 kwa wateja walio kwenye session halali tu.
+// Mteja akikatwa kwenye dashboard au akifutwa, anakaa bila kuongezewa muda na Omada inamkata kiotomatiki ndani ya dakika 10 hata bila API ya unauth!
+setInterval(async () => {
+  try {
+    const conf = getOmadaConfig();
+    if (!conf.slidingLeaseEnabled || !conf.omadaUrl || !conf.operatorUser) return;
+
+    loadSavedSessions();
+    const now = Date.now();
+    for (const session of savedActiveSessions) {
+      const expiresMs = new Date(session.expiresAt).getTime();
+      if (expiresMs > now && session.macAddress) {
+        try {
+          const leaseMinutes = conf.slidingLeaseMinutes || 10;
+          await omadaAuthorize({
+            clientMac: session.macAddress,
+            apMac: session.apMac || '',
+            ssidName: session.ssidName || 'Lema Fast WiFi',
+            radioId: session.radioId || 0,
+            durationMs: leaseMinutes * 60 * 1000
+          });
+        } catch (e: any) {
+          console.warn(`[Sliding Lease Auto-Renew] ${session.macAddress} notice:`, e.message);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Sliding Lease Worker Exception]:', err.message);
+  }
+}, 4 * 60 * 1000); // Kila dakika 4
+
 
 // ==========================================
 // 🔗 TP-LINK OMADA CLOUD CONTROLLER WEBHOOK
@@ -2989,8 +3119,13 @@ _Asante kwa kutumia Lema Fast WiFi! Msaada: 0653 578 184._`;
   return res.status(200).json({ status: 'acknowledged' });
 });
 
-// 4. SIMULATE / MANUAL CONFIRM (Inasaidia kuthibitisha papo hapo kwa ajili ya majaribio)
-app.post('/api/v1/payments/simulate-confirm', async (req, res) => {
+// 4. SIMULATE / MANUAL CONFIRM (Inasaidia majaribio ya kimaendeleo tu chini ya ulinzi wa Admin)
+app.post('/api/v1/payments/simulate-confirm', requireAdmin, async (req, res) => {
+  if (process.env.PAYMENTS_ENABLED === '1') {
+    return res.status(403).json({
+      error: 'Njia ya simulate-confirm imezimwa kwenye uzalishaji (production). Malipo yanapaswa kupitia webhook rasmi pekee.'
+    });
+  }
   const { orderId } = req.body;
   const order = paymentOrders.get(orderId);
   if (!order) {

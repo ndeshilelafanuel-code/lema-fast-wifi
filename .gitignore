@@ -11,3 +11,12 @@ coverage/
 *.avi
 .tempmediaStorage/
 **/.tempmediaStorage/
+
+# Sensitive Runtime Data & Configurations
+vouchers-data.json
+active-sessions.json
+omada-config.json
+whatsapp-config.json
+wifi-clients.json
+hardware-inventory.json
+towers-data.json

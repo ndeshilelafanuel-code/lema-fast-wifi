@@ -38,30 +38,39 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   const [rememberMe, setRememberMe] = useState(true);
   const [selectedDemoAccount, setSelectedDemoAccount] = useState<string>('admin');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setIsSubmitting(true);
 
     const inputUser = username.trim().toLowerCase();
     const inputPass = password.trim();
 
-    // 1. Super Admin Check
-    const superAdminUser = (settings.adminUsername || 'admin').trim().toLowerCase();
-    const superAdminPass = (settings.adminPassword || 'admin123').trim();
-    const isSuperAdmin =
-      (inputUser === superAdminUser && inputPass === superAdminPass) ||
-      (inputUser === 'admin' && inputPass === 'admin123') ||
-      (inputUser === 'superadmin' && inputPass === 'lema2026');
+    try {
+      // 1. Server-Side Authentication (/api/v1/admin/login)
+      const res = await fetch('/api/v1/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: inputUser, pass: inputPass }),
+      });
 
-    if (isSuperAdmin) {
-      localStorage.setItem('admin_api_key', 'lema_admin_secret_key_2026');
-      if (rememberMe) {
-        localStorage.setItem('hotspot_admin_auth', 'true');
-      } else {
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success && data?.key) {
+        sessionStorage.setItem('admin_api_key', data.key);
         sessionStorage.setItem('hotspot_admin_auth', 'true');
+        if (rememberMe) {
+          localStorage.setItem('admin_api_key', data.key);
+          localStorage.setItem('hotspot_admin_auth', 'true');
+        }
+        setIsSubmitting(false);
+        onSuccess();
+        return;
       }
-      onSuccess();
-      return;
+    } catch (err) {
+      console.warn('[Admin Login Network Notice]:', err);
     }
 
     // 2. Individual Client/Tenant Check
@@ -70,42 +79,33 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
         (t.settings?.adminUsername || '').toLowerCase().trim(),
         (t.subdomain || '').toLowerCase().trim(),
         t.id.toLowerCase().trim(),
-        t.id.replace('tenant-', '').toLowerCase().trim(),
         (t.ownerPhone || '').replace(/[^0-9]/g, '')
       ].filter(Boolean);
 
       const userMatches = usernameList.includes(inputUser);
-
-      const validPasswords = [
-        (t.settings?.adminPassword || '').trim(),
-        'password123',
-        'admin123',
-        'admin',
-        '123456'
-      ].filter(Boolean);
-
-      const passMatches = validPasswords.includes(inputPass);
+      const targetPass = (t.settings?.adminPassword || '').trim();
+      const passMatches = targetPass && targetPass === inputPass;
 
       return userMatches && passMatches;
     });
 
     if (matchedTenant) {
-      // Automatically switch context to this client's venue/hotspot
       switchTenant(matchedTenant.id);
-
       if (rememberMe) {
         localStorage.setItem('hotspot_admin_auth', 'true');
       } else {
         sessionStorage.setItem('hotspot_admin_auth', 'true');
       }
+      setIsSubmitting(false);
       onSuccess();
       return;
     }
 
+    setIsSubmitting(false);
     setErrorMessage(
       lang === 'sw'
-        ? 'Jina la mtumiaji (Username) au nenosiri (Password) siyo sahihi. Hakikisha umeingiza taarifa sahihi za akaunti yako ya mfumo.'
-        : 'Invalid username or password. Please verify your hotspot tenant credentials.'
+        ? 'Jina la mtumiaji (Username) au nenosiri (Password) siyo sahihi. Hakikisha umeingiza taarifa sahihi zilizowekwa kwenye seva.'
+        : 'Invalid username or password. Please verify your admin credentials.'
     );
   };
 
@@ -230,42 +230,22 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </button>
         </form>
 
-        {/* Real Admin Quick-Fill (Lema Fast WiFi Owner) */}
-        <div className="p-4 rounded-2xl bg-stone-950/90 border border-stone-800 text-xs text-stone-400 space-y-3">
+        {/* Real Admin Guidance Card */}
+        <div className="p-4 rounded-2xl bg-stone-950/90 border border-stone-800 text-xs text-stone-400 space-y-2">
           <div className="flex items-center justify-between text-[11px] border-b border-stone-800/80 pb-2">
             <span className="font-semibold text-stone-200 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>{lang === 'sw' ? 'Akaunti Rasmi ya Msimamizi Mkuu:' : 'Official Admin Credentials:'}</span>
+              <span>{lang === 'sw' ? 'Uthibitisho wa Seva (Server Auth)' : 'Server Authentication'}</span>
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 font-mono font-medium">
-              Lema Fast WiFi
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono font-medium">
+              Protected by API Key
             </span>
           </div>
-
-          <div
-            onClick={() => fillAccount('admin', 'admin123', 'tenant-lema-hq')}
-            className="p-3 rounded-xl text-left border bg-stone-900/60 border-stone-800 hover:border-amber-400/50 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
-          >
-            <div>
-              <strong className="text-white text-xs block group-hover:text-amber-300 transition-colors">
-                👑 Jimmy Lema (Msimamizi Mkuu)
-              </strong>
-              <div className="text-[11px] font-mono text-stone-400 mt-1">
-                Username: <span className="text-amber-300 font-semibold">admin</span> • Nenosiri: <span className="text-amber-300 font-semibold">admin123</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                loginDirectlyAs('admin', 'admin123', 'tenant-lema-hq');
-              }}
-              className="text-xs px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black transition-colors shrink-0 cursor-pointer shadow-md"
-            >
-              {lang === 'sw' ? 'Ingia Papo Hapo ➔' : 'Quick Login ➔'}
-            </button>
-          </div>
+          <p className="text-[11px] text-stone-400 leading-relaxed">
+            {lang === 'sw'
+              ? 'Ingia kwa kutumia taarifa zako za msimamizi (ADMIN_USER na ADMIN_PASSWORD) zilizowekwa kwenye faili la mazingira ya seva (.env).'
+              : 'Sign in using the administrator credentials (ADMIN_USER & ADMIN_PASSWORD) configured in the server environment.'}
+          </p>
         </div>
 
         {/* Self-Onboarding for new venue/hotspot owners */}
