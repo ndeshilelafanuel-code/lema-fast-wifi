@@ -459,6 +459,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [omadaUserInput, setOmadaUserInput] = useState<string>('');
   const [omadaPassInput, setOmadaPassInput] = useState<string>('');
   const [showOmadaPass, setShowOmadaPass] = useState<boolean>(false);
+  const [omadaAdminUserInput, setOmadaAdminUserInput] = useState<string>('');
+  const [omadaAdminPassInput, setOmadaAdminPassInput] = useState<string>('');
+  const [showOmadaAdminPass, setShowOmadaAdminPass] = useState<boolean>(false);
   const [omadaStrictTlsInput, setOmadaStrictTlsInput] = useState<boolean>(false);
   const [isTestingOmada, setIsTestingOmada] = useState<boolean>(false);
   const [isDetectingOmadaId, setIsDetectingOmadaId] = useState<boolean>(false);
@@ -481,6 +484,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           setOmadaUrlInput(data.config.omadaUrl || '');
           setOmadaIdInput(data.config.controllerId || '');
           setOmadaUserInput(data.config.operatorUser || '');
+          if (data.config.adminUser) {
+            setOmadaAdminUserInput(data.config.adminUser);
+          }
           setOmadaStrictTlsInput(Boolean(data.config.strictTls));
         }
       })
@@ -502,13 +508,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           controllerId: omadaIdInput.trim(),
           operatorUser: omadaUserInput.trim(),
           operatorPass: omadaPassInput.trim(),
+          adminUser: omadaAdminUserInput.trim(),
+          adminPass: omadaAdminPassInput.trim(),
           strictTls: omadaStrictTlsInput
         })
       });
       const data = await res.json();
       if (data?.success) {
-        showToast('Omada Settings Zimehifadhiwa', 'Mipangilio ya Omada Controller imehifadhiwa kikamilifu!');
-        setOmadaConnStatus({ success: true, message: 'Mipangilio imehifadhiwa kwenye seva.' });
+        showToast('Omada Settings Zimehifadhiwa ✅', 'Mipangilio ya Omada Controller imehifadhiwa kikamilifu!');
+        setOmadaConnStatus({ success: true, message: 'Mipangilio imehifadhiwa kikamilifu kwenye faili la omada-config.json.' });
+        if (omadaUrlInput.trim()) {
+          setNewRouterControllerUrl(omadaUrlInput.trim());
+          localStorage.setItem('lema_omada_controller_url', omadaUrlInput.trim());
+        }
+        if (omadaUserInput.trim()) {
+          setOmadaDevUser(omadaUserInput.trim());
+          localStorage.setItem('lema_omada_dev_user', omadaUserInput.trim());
+        }
       } else {
         showToast('Hitilafu', data?.message || 'Imeshindikana kuhifadhi', 'error');
       }
@@ -562,6 +578,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           controllerId: omadaIdInput.trim(),
           operatorUser: omadaUserInput.trim(),
           operatorPass: omadaPassInput.trim(),
+          adminUser: omadaAdminUserInput.trim(),
+          adminPass: omadaAdminPassInput.trim(),
           strictTls: omadaStrictTlsInput
         })
       });
@@ -4625,11 +4643,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-stone-300 font-semibold block mb-1">Controller Inform URL:</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-stone-300 font-semibold block">Controller Inform URL & OMADA_ID:</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowEditCredentialsModal(true)}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        <span>Sanidi Anwani, OMADA_ID & Nywila</span>
+                      </button>
+                    </div>
                     <input
                       type="text"
                       readOnly
-                      value={newRouterControllerUrl}
+                      value={omadaUrlInput || newRouterControllerUrl}
                       className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-950 text-emerald-400 text-xs font-mono"
                     />
                   </div>
@@ -4782,8 +4810,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
 
                         <button
+                          type="button"
+                          onClick={() => {
+                            if (!omadaUrlInput && routerItem.controllerUrl) setOmadaUrlInput(routerItem.controllerUrl);
+                            setShowEditCredentialsModal(true);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 rounded-xl transition-all cursor-pointer shadow-sm"
+                        >
+                          <Settings className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Sanidi Omada & ID</span>
+                        </button>
+
+                        <button
                           onClick={() => setShowAddRouterForm(true)}
-                          className="px-3 py-2 text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-xl"
+                          className="px-3 py-2 text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-xl cursor-pointer"
                         >
                           Edit
                         </button>
@@ -5757,127 +5797,352 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* MODAL 2: EDIT CONTROLLER ADDRESS & DEVICE CREDENTIALS */}
             {showEditCredentialsModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-                <div className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
-                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-                    <div className="flex items-center gap-2.5">
+                <div className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between p-5 border-b border-stone-800 bg-stone-900/90 shrink-0">
+                    <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
-                        <Edit3 className="w-5 h-5" />
+                        <Settings className="w-5 h-5 text-amber-400" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">Badilisha Anwani & Login za Omada</h4>
-                        <p className="text-[11px] text-stone-400">Weka anwani halisi ya controller na taarifa za AP zako</p>
+                        <h4 className="text-base font-bold text-white flex items-center gap-2">
+                          <span>Mipangilio ya TP-Link Omada Controller</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                            v5.x / v6.x
+                          </span>
+                        </h4>
+                        <p className="text-xs text-stone-400">Sanidi anwani ya Controller, OMADA_ID ya herufi 32, na nywila za Operator & Admin</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowEditCredentialsModal(false)}
-                      className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 cursor-pointer"
+                      className="text-stone-400 hover:text-white p-1.5 rounded-lg hover:bg-stone-800 cursor-pointer transition-colors"
+                      aria-label="Funga"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
 
-                  <div className="space-y-4 text-xs">
-                    {/* Quick presets */}
-                    <div>
-                      <label className="text-stone-400 block mb-1.5 font-bold">Chagua Anwani ya Haraka (Preset):</label>
-                      <div className="grid grid-cols-2 gap-2">
+                  {/* Scrollable Content Body */}
+                  <div className="p-6 overflow-y-auto space-y-6 text-xs text-stone-300 flex-1">
+                    {/* 1. CONTROLLER ADDRESS & PRESETS */}
+                    <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
+                      <label className="text-stone-200 font-bold block">1. Anwani ya Omada Controller (URL / Inform URL):</label>
+                      
+                      {/* Presets Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <button
                           type="button"
-                          onClick={() => setEditControllerInput('https://omada.tplinkcloud.com')}
+                          onClick={() => setOmadaUrlInput('https://127.0.0.1:8043')}
                           className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
-                            editControllerInput === 'https://omada.tplinkcloud.com'
-                              ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                              : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
+                            omadaUrlInput.includes('127.0.0.1')
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                              : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
                           }`}
                         >
-                          <strong className="block text-[11px]">TP-Link Cloud (Rasmi)</strong>
-                          <span className="text-[9px] font-mono text-stone-500 block truncate">omada.tplinkcloud.com</span>
+                          <strong className="block text-[11px]">Local PC</strong>
+                          <span className="text-[9px] font-mono text-stone-500 block truncate">127.0.0.1:8043</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditControllerInput('https://192.168.0.254:8043')}
+                          onClick={() => setOmadaUrlInput('https://192.168.0.100:8043')}
                           className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
-                            editControllerInput.includes('192.168')
-                              ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                              : 'bg-stone-950 border-stone-800 text-stone-400 hover:border-stone-700'
+                            omadaUrlInput.includes('192.168.0.100')
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                              : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
                           }`}
                         >
-                          <strong className="block text-[11px]">Local OC200 / PC</strong>
+                          <strong className="block text-[11px]">LAN Controller</strong>
+                          <span className="text-[9px] font-mono text-stone-500 block truncate">192.168.0.100:8043</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOmadaUrlInput('https://192.168.0.254:8043')}
+                          className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
+                            omadaUrlInput.includes('192.168.0.254')
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                              : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
+                          }`}
+                        >
+                          <strong className="block text-[11px]">OC200 Hardware</strong>
                           <span className="text-[9px] font-mono text-stone-500 block truncate">192.168.0.254:8043</span>
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setOmadaUrlInput('https://omada.tplinkcloud.com')}
+                          className={`p-2 rounded-xl text-left border transition-colors cursor-pointer ${
+                            omadaUrlInput.includes('tplinkcloud')
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                              : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
+                          }`}
+                        >
+                          <strong className="block text-[11px]">TP-Link Cloud</strong>
+                          <span className="text-[9px] font-mono text-stone-500 block truncate">omada.tplinkcloud</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-1 pt-1">
+                        <input
+                          type="text"
+                          value={omadaUrlInput}
+                          onChange={(e) => setOmadaUrlInput(e.target.value)}
+                          placeholder="https://127.0.0.1:8043 au https://192.168.0.100:8043"
+                          className="w-full px-3.5 py-2.5 bg-stone-900 border border-stone-700 rounded-xl text-emerald-400 font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-1.5 text-[11px] text-stone-400">
+                          <Info className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                          <span>Bandika anwani ya controller yako. Bandari (port) 8043 na 8443 hutumia HTTPS pekee kwa usalama (TLS).</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <label className="text-stone-300 font-bold block mb-1">
-                        Controller Address / Inform URL:
-                      </label>
+                    {/* 2. OMADA_ID / omadacId SECTION */}
+                    <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-stone-200 font-bold block">
+                          2. Kitambulisho cha Omada (OMADA_ID / Controller ID):
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleDetectOmadaId}
+                          disabled={isDetectingOmadaId || !omadaUrlInput}
+                          className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          {isDetectingOmadaId ? (
+                            <span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3 h-3" />
+                          )}
+                          <span>Tafuta Kiotomatiki (Auto-Detect)</span>
+                        </button>
+                      </div>
+
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5 text-[11px] text-amber-200 leading-relaxed">
+                        <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                          <span>💡 Jinsi ya kupata OMADA_ID yako (Herufi 32):</span>
+                        </div>
+                        <p>
+                          1. Fungua Omada Controller kwenye kivinjari chako cha kompyuta (k.m. <code className="bg-stone-900 px-1 py-0.5 rounded text-white font-mono">{omadaUrlInput || 'https://127.0.0.1:8043'}</code>).
+                        </p>
+                        <p>
+                          2. Angalia sehemu ya anwani ya juu (URL bar). Utaona kiungo chenye muundo kama huu:
+                          <br />
+                          <code className="text-emerald-300 font-mono block mt-1 bg-stone-900/90 p-1.5 rounded border border-stone-800 text-[10px]">
+                            https://127.0.0.1:8043/<strong className="text-amber-400 underline">[HERUFI_32_ZA_HEX]</strong>/login
+                          </code>
+                        </p>
+                        <p>
+                          3. Nakili hizo herufi 32 zilizopo kabla ya <code className="text-stone-300 font-mono">/login</code> na ubandike kwenye kisanduku hapa chini.
+                        </p>
+                      </div>
+
                       <input
                         type="text"
-                        value={editControllerInput}
-                        onChange={(e) => setEditControllerInput(e.target.value)}
-                        placeholder="https://omada.tplinkcloud.com"
-                        className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-emerald-400 font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                        value={omadaIdInput}
+                        onChange={(e) => setOmadaIdInput(e.target.value.trim())}
+                        placeholder="k.m. 5a43ee4a5b28a474c76763d3ab99e821"
+                        className="w-full px-3.5 py-2.5 bg-stone-900 border border-stone-700 rounded-xl text-amber-300 font-mono text-xs tracking-wider focus:ring-1 focus:ring-amber-500 focus:outline-none uppercase"
                       />
-                      <span className="text-[10px] text-stone-500 mt-1 block">
-                        Hii ndiyo anwani utakayo-copy na kuweka kwenye AP yako au browser.
-                      </span>
                     </div>
 
-                    <div>
-                      <label className="text-stone-300 font-bold block mb-1">
-                        Device Username:
-                      </label>
-                      <input
-                        type="text"
-                        value={editUserInput}
-                        onChange={(e) => setEditUserInput(e.target.value)}
-                        placeholder="admin au lema-adm9x"
-                        className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
+                    {/* 3. DUAL-SESSION CREDENTIALS */}
+                    <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-4">
+                      <div>
+                        <strong className="text-white text-xs block">3. Taarifa za Kuingia (Dual-Session Authentication):</strong>
+                        <span className="text-[11px] text-stone-400">
+                          Mfumo wa Lema Fast WiFi hutumia vikao viwili maalum kwa usalama wa kiwango cha juu.
+                        </span>
+                      </div>
+
+                      {/* Operator Credentials */}
+                      <div className="p-3.5 rounded-xl bg-stone-900 border border-stone-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                            <strong className="text-white text-xs">Kikao 1: Hotspot Operator (Kuidhinisha Vocha)</strong>
+                          </div>
+                          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                            Authorize Clients
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-stone-400 block mb-1 text-[11px]">Operator Username:</label>
+                            <input
+                              type="text"
+                              value={omadaUserInput}
+                              onChange={(e) => setOmadaUserInput(e.target.value)}
+                              placeholder="operator"
+                              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-stone-400 text-[11px]">Operator Password:</label>
+                              <button
+                                type="button"
+                                onClick={() => setShowOmadaPass(!showOmadaPass)}
+                                className="text-[10px] text-stone-500 hover:text-stone-300 flex items-center gap-1 cursor-pointer"
+                              >
+                                {showOmadaPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                <span>{showOmadaPass ? 'Ficha' : 'Onyesha'}</span>
+                              </button>
+                            </div>
+                            <input
+                              type={showOmadaPass ? 'text' : 'password'}
+                              value={omadaPassInput}
+                              onChange={(e) => setOmadaPassInput(e.target.value)}
+                              placeholder="Nenosiri la Operator"
+                              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Admin Credentials */}
+                      <div className="p-3.5 rounded-xl bg-stone-900 border border-stone-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-rose-400" />
+                            <strong className="text-white text-xs">Kikao 2: Controller Admin (Kukata & Kuzuia)</strong>
+                          </div>
+                          <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
+                            Unauth & Block
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-stone-400 block mb-1 text-[11px]">Controller Admin Username:</label>
+                            <input
+                              type="text"
+                              value={omadaAdminUserInput}
+                              onChange={(e) => setOmadaAdminUserInput(e.target.value)}
+                              placeholder="admin"
+                              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-stone-400 text-[11px]">Controller Admin Password:</label>
+                              <button
+                                type="button"
+                                onClick={() => setShowOmadaAdminPass(!showOmadaAdminPass)}
+                                className="text-[10px] text-stone-500 hover:text-stone-300 flex items-center gap-1 cursor-pointer"
+                              >
+                                {showOmadaAdminPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                <span>{showOmadaAdminPass ? 'Ficha' : 'Onyesha'}</span>
+                              </button>
+                            </div>
+                            <input
+                              type={showOmadaAdminPass ? 'text' : 'password'}
+                              value={omadaAdminPassInput}
+                              onChange={(e) => setOmadaAdminPassInput(e.target.value)}
+                              placeholder="Nenosiri la Admin"
+                              className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="text-stone-300 font-bold block mb-1">
-                        Device Password:
-                      </label>
+                    {/* 4. SECURITY & TLS TOGGLE */}
+                    <div className="p-3.5 rounded-2xl bg-stone-950 border border-stone-800 flex items-start gap-3">
                       <input
-                        type="text"
-                        value={editPassInput}
-                        onChange={(e) => setEditPassInput(e.target.value)}
-                        placeholder="admin au neno lako la siri"
-                        className="w-full px-3 py-2 bg-stone-950 border border-stone-700 rounded-xl text-white font-mono text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                        type="checkbox"
+                        id="strictTlsToggle"
+                        checked={!omadaStrictTlsInput}
+                        onChange={(e) => setOmadaStrictTlsInput(!e.target.checked)}
+                        className="mt-0.5 w-4 h-4 text-amber-500 rounded bg-stone-900 border-stone-700 cursor-pointer"
                       />
+                      <label htmlFor="strictTlsToggle" className="cursor-pointer select-none space-y-0.5">
+                        <strong className="text-white block text-xs">Ruhusu Vyeti vya Ndani vya SSL (Self-Signed Certificates)</strong>
+                        <span className="text-[11px] text-stone-400 block">
+                          Inashauriwa ikiwa Omada Controller yako inatumia cheti cha ndani kwenye IP kama 192.168.x.x au 127.0.0.1.
+                        </span>
+                      </label>
                     </div>
+
+                    {/* LIVE CONNECTION STATUS RESULT */}
+                    {omadaConnStatus && (
+                      <div
+                        className={`p-4 rounded-2xl border text-xs leading-relaxed animate-fadeIn ${
+                          omadaConnStatus.success
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                            : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 font-bold mb-1">
+                          {omadaConnStatus.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                          )}
+                          <span>{omadaConnStatus.success ? 'Muunganisho Umethibitishwa! 🟢' : 'Taarifa ya Muunganisho ⚠️'}</span>
+                        </div>
+                        <div className="font-mono text-[11px] whitespace-pre-wrap">{omadaConnStatus.message}</div>
+                        {omadaConnStatus.details && (
+                          <div className="mt-2 pt-2 border-t border-stone-800 text-[10px] font-mono text-stone-400 space-y-0.5">
+                            <div>Version: {omadaConnStatus.details.controllerVersion || 'v5.x/v6.x'}</div>
+                            <div>Controller ID: {omadaConnStatus.details.controllerId || omadaIdInput || 'Haijulikani'}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-stone-800">
+                  {/* Modal Action Footer */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-5 border-t border-stone-800 bg-stone-900/90 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setShowEditCredentialsModal(false)}
-                      className="px-4 py-2 text-stone-400 hover:text-white text-xs cursor-pointer"
+                      disabled={isTestingOmada}
+                      onClick={handleTestOmadaConnection}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-stone-800 hover:bg-stone-750 text-sky-300 hover:text-white rounded-xl font-bold text-xs border border-stone-700 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
-                      Ghairi
+                      {isTestingOmada ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                          <span>Inapima Mawasiliano...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Activity className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Pima Muunganisho (Test)</span>
+                        </>
+                      )}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const cleanUrl = editControllerInput.trim() || 'https://omada.tplinkcloud.com';
-                        const cleanUser = editUserInput.trim() || 'admin';
-                        const cleanPass = editPassInput.trim() || 'admin';
-                        setNewRouterControllerUrl(cleanUrl);
-                        setOmadaDevUser(cleanUser);
-                        setOmadaDevPass(cleanPass);
-                        localStorage.setItem('lema_omada_controller_url', cleanUrl);
-                        localStorage.setItem('lema_omada_dev_user', cleanUser);
-                        setShowEditCredentialsModal(false);
-                        showToast('Hifadhi Imekamilika ✅', 'Anwani ya Controller na logins zimehifadhiwa kikamilifu!', 'success');
-                      }}
-                      className="px-5 py-2 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-400/20"
-                    >
-                      Hifadhi Mabadiliko
-                    </button>
+
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditCredentialsModal(false)}
+                        className="px-4 py-2 text-stone-400 hover:text-white text-xs cursor-pointer"
+                      >
+                        Funga
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSavingOmada}
+                        onClick={async () => {
+                          await handleSaveOmadaConfig();
+                        }}
+                        className="px-5 py-2.5 font-bold text-xs text-stone-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-400/20 flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {isSavingOmada ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                            <span>Inahifadhi...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5" />
+                            <span>Hifadhi Mipangilio</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
