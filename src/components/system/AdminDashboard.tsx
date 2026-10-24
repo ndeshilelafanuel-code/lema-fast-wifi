@@ -25,6 +25,8 @@ import {
   CreditCard,
   ArrowRight,
   Lock,
+  Eye,
+  EyeOff,
   BadgeCheck,
   Code2,
   Activity,
@@ -453,6 +455,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [omadaIdInput, setOmadaIdInput] = useState<string>('');
   const [omadaUserInput, setOmadaUserInput] = useState<string>('');
   const [omadaPassInput, setOmadaPassInput] = useState<string>('');
+  const [showOmadaPass, setShowOmadaPass] = useState<boolean>(false);
   const [omadaStrictTlsInput, setOmadaStrictTlsInput] = useState<boolean>(false);
   const [isTestingOmada, setIsTestingOmada] = useState<boolean>(false);
   const [isDetectingOmadaId, setIsDetectingOmadaId] = useState<boolean>(false);
@@ -2744,13 +2747,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                     <div>
                       <label className="text-stone-400 block mb-1">Admin / Operator Password:</label>
-                      <input
-                        type="password"
-                        value={omadaPassInput}
-                        onChange={(e) => setOmadaPassInput(e.target.value)}
-                        placeholder="Nenosiri la Admin"
-                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showOmadaPass ? 'text' : 'password'}
+                          value={omadaPassInput}
+                          onChange={(e) => setOmadaPassInput(e.target.value)}
+                          placeholder="Nenosiri la Admin"
+                          className="w-full px-3 py-2 pr-10 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowOmadaPass(!showOmadaPass)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white cursor-pointer"
+                        >
+                          {showOmadaPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 

@@ -282,23 +282,27 @@ export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
   csrf = '';
   console.log(`[Omada Controller] Attempting Controller Admin login as "${currentConfig.operatorUser}" to controller ${id}...`);
 
-  // 1. Try Controller Admin Login first (POST /<controllerId>/api/v2/login)
-  try {
-    const adminRes = await call('POST', `/${id}/api/v2/login`, {
-      username: currentConfig.operatorUser,
-      password: currentConfig.operatorPass,
-    });
+  // 1. Try Controller Admin Login across global and controller-scoped endpoints
+  const adminEndpoints = [
+    '/api/v2/login',
+    `/${id}/api/v2/login`
+  ];
 
-    if (adminRes.json?.errorCode === 0) {
-      csrf = adminRes.json?.result?.token || '';
-      const cookiesList = adminRes.setCookie || [];
-      cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
-      loggedAt = Date.now();
-      console.log('[Omada Controller] ✅ Admin Login successful! Full administrator session active.');
-      return { csrf, cookie };
-    }
-  } catch (e: any) {
-    console.warn('[Omada Controller] Admin login attempt notice:', e.message);
+  for (const ep of adminEndpoints) {
+    try {
+      const adminRes = await call('POST', ep, {
+        username: currentConfig.operatorUser,
+        password: currentConfig.operatorPass,
+      });
+      if (adminRes.json?.errorCode === 0) {
+        csrf = adminRes.json?.result?.token || '';
+        const cookiesList = adminRes.setCookie || [];
+        cookie = cookiesList.map((c) => c.split(';')[0]).join('; ');
+        loggedAt = Date.now();
+        console.log(`[Omada Controller] ✅ Admin Login successful via ${ep}! Full administrator session active.`);
+        return { csrf, cookie };
+      }
+    } catch (e) {}
   }
 
   console.log('[Omada Controller] Falling back to Hotspot Operator login (/api/v2/hotspot/login)...');
