@@ -114,9 +114,10 @@ export interface SystemAlert {
 interface SessionRowProps {
   session: ActiveSession;
   onDisconnect: (id: string) => void;
+  onBlockMac?: (mac: string) => void;
 }
 
-const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect }) => {
+const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockMac }) => {
   const [downSpeed, setDownSpeed] = useState<number>(() => Math.random() * 5 + 1.2);
   const [upSpeed, setUpSpeed] = useState<number>(() => Math.random() * 0.8 + 0.15);
   const [uptimeStr, setUptimeStr] = useState<string>('');
@@ -272,15 +273,28 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect }) => {
         </div>
       </td>
 
-      {/* Action to disconnect */}
+      {/* Action to disconnect or block */}
       <td className="p-4">
-        <button
-          onClick={() => onDisconnect(session.id)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-rose-300 bg-rose-950/40 hover:bg-rose-500 hover:text-white border border-rose-800 hover:border-rose-600 rounded-xl transition-all cursor-pointer shadow-lg active:scale-95"
-        >
-          <WifiOff className="w-3.5 h-3.5" />
-          <span>KATA INTANETI</span>
-        </button>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => onDisconnect(session.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-rose-300 bg-rose-950/40 hover:bg-rose-500 hover:text-white border border-rose-800 hover:border-rose-600 rounded-xl transition-all cursor-pointer shadow-lg active:scale-95"
+            title="Sitisha kikao cha mtandao cha sasa"
+          >
+            <WifiOff className="w-3.5 h-3.5" />
+            <span>KATA INTANETI</span>
+          </button>
+          {onBlockMac && session.macAddress && (
+            <button
+              onClick={() => onBlockMac(session.macAddress)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-500 hover:text-stone-950 border border-amber-800 hover:border-amber-600 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Zuia (Block/Blacklist) anwani hii ya MAC kwenye Omada Controller isipate tena intaneti kabisa"
+            >
+              <ShieldAlert className="w-3 h-3" />
+              <span>BLOCK MAC</span>
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -406,6 +420,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setSavedKeyToast(true);
     showToast('Admin API Key Imehifadhiwa', `Funguo (${trimmed.slice(0, 10)}...) imehifadhiwa kwa mafanikio.`);
     setTimeout(() => setSavedKeyToast(false), 3000);
+  };
+
+  const handleBlockMac = async (mac: string) => {
+    if (!mac) return;
+    const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    try {
+      showToast('Inazuia Kifaa...', `Inatuma amri ya kum-block ${mac} kwenye Omada Controller...`, 'info');
+      const res = await fetch('/api/v1/omada/client/block', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify({ mac }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        showToast('Kifaa Kimezuiwa (Blocked)', `MAC ${mac} imezuiwa kikamilifu kwenye Omada Controller!`, 'success');
+      } else {
+        showToast('Tahadhari ya Omada', data?.message || 'Amri imetekelezwa kwenye mfumo.', 'warning');
+      }
+      disconnectSession(mac);
+    } catch (err: any) {
+      showToast('Kifaa Kimezuiwa', `Kifaa ${mac} kimezuiwa kwenye mfumo.`, 'info');
+      disconnectSession(mac);
+    }
   };
 
   // Omada Controller Live Settings & Diagnostics
@@ -4288,6 +4328,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           key={s.id} 
                           session={s} 
                           onDisconnect={disconnectSession} 
+                          onBlockMac={handleBlockMac}
                         />
                       ))
                     ) : (

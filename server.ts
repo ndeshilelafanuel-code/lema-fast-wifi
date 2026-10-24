@@ -18,7 +18,7 @@ import { db } from './src/db/index.ts';
 import { hardware, towers as towersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
-import { omadaAuthorize, omadaUnauthorize, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId } from './omada.ts';
+import { omadaAuthorize, omadaUnauthorize, omadaBlockClient, omadaUnblockClient, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId } from './omada.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1748,6 +1748,65 @@ app.post('/api/v1/omada/client/disconnect', requireAdmin, async (req, res) => {
   return res.json({
     success: true,
     omadaConfirmed: result.success,
+    message: result.message,
+    details: result.details
+  });
+});
+
+// POST Block (Blacklist) client on Omada Controller & revoke access
+app.post('/api/v1/omada/client/block', requireAdmin, async (req, res) => {
+  const { mac, siteId } = req.body || {};
+  const cleanMac = String(mac || '').trim().toUpperCase();
+  if (!cleanMac) {
+    return res.status(400).json({ error: 'MAC address is required' });
+  }
+
+  // 1. Send Omada Block API command (hardware blacklist on EAP)
+  const result = await omadaBlockClient(cleanMac, siteId);
+
+  // 2. Remove from active sessions
+  loadSavedSessions();
+  const normalizeMac = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  const cleanMacNorm = normalizeMac(cleanMac);
+  savedActiveSessions = savedActiveSessions.filter((s: any) => normalizeMac(s.macAddress || s.mac) !== cleanMacNorm);
+  saveSessionsToDisk();
+
+  // 3. Expire all vouchers bound to this MAC
+  loadSavedVouchers();
+  savedVouchers.forEach((v: any) => {
+    if (normalizeMac(v.boundMac || v.macAddress) === cleanMacNorm && v.status === 'active') {
+      v.status = 'expired';
+    }
+  });
+  saveVouchersToDisk();
+
+  // 4. Update wifi client record
+  loadSavedWifiClients();
+  const wIdx = wifiClients.findIndex((c) => normalizeMac(c.mac) === cleanMacNorm);
+  if (wIdx >= 0) {
+    wifiClients[wIdx].status = 'pending_login';
+    wifiClients[wIdx].voucherCode = undefined;
+    saveWifiClients();
+  }
+
+  return res.json({
+    success: true,
+    omadaConfirmed: result.success,
+    message: result.message || `Kifaa (${cleanMac}) kimezuiwa (Blocked) kikamilifu!`,
+    details: result.details
+  });
+});
+
+// POST Unblock (Whitelist) client on Omada Controller
+app.post('/api/v1/omada/client/unblock', requireAdmin, async (req, res) => {
+  const { mac, siteId } = req.body || {};
+  const cleanMac = String(mac || '').trim().toUpperCase();
+  if (!cleanMac) {
+    return res.status(400).json({ error: 'MAC address is required' });
+  }
+  const result = await omadaUnblockClient(cleanMac, siteId);
+  return res.json({
+    success: true,
     message: result.message,
     details: result.details
   });

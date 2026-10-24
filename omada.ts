@@ -631,6 +631,97 @@ export async function omadaUnauthorize(
 
 
 /**
+ * Block (Blacklist) client device on Omada Controller to physically drop and prevent reconnect
+ */
+export async function omadaBlockClient(
+  clientMac: string,
+  siteIdParam?: string
+): Promise<{ success: boolean; message: string; details?: any }> {
+  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+    return {
+      success: false,
+      message: 'OMADA_URL au OMADA_OPERATOR haijawekwa kwenye mfumo.'
+    };
+  }
+
+  const clientMacFormatted = formatMac(clientMac);
+  console.log(`[Omada Controller] 🚫 Kuzuia (Block/Blacklist) kifaa ${clientMacFormatted}...`);
+
+  try {
+    const id = await resolveControllerId();
+
+    if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
+      await omadaLogin();
+    }
+
+    // Step 1: Unauthorize and kick first
+    await omadaUnauthorize(clientMacFormatted);
+
+    // Step 2: Call Omada Controller block command across sites
+    const site = siteIdParam || currentConfig.siteId || 'Default';
+    const blockRes = await call(
+      'POST',
+      `/${id}/api/v2/sites/${site}/cmd/clients/${clientMacFormatted}/block`,
+      { mac: clientMacFormatted },
+      { 'Csrf-Token': csrf }
+    );
+
+    const isOk = blockRes.json?.errorCode === 0;
+    return {
+      success: isOk,
+      message: isOk
+        ? `Kifaa ${clientMacFormatted} kimezuiwa (Blocked/Blacklisted) kikamilifu kwenye Omada Controller.`
+        : `Omada Block response: ${blockRes.json?.msg || blockRes.json?.message || 'Error ' + blockRes.json?.errorCode}`,
+      details: blockRes.json
+    };
+  } catch (err: any) {
+    console.error(`[Omada Controller] Hitilafu ya kum-block ${clientMacFormatted}:`, err.message);
+    return {
+      success: false,
+      message: `Hitilafu ya kum-block mteja kwenye Omada: ${err.message}`
+    };
+  }
+}
+
+/**
+ * Unblock (Whitelist) client device on Omada Controller
+ */
+export async function omadaUnblockClient(
+  clientMac: string,
+  siteIdParam?: string
+): Promise<{ success: boolean; message: string; details?: any }> {
+  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+    return {
+      success: false,
+      message: 'OMADA_URL au OMADA_OPERATOR haijawekwa kwenye mfumo.'
+    };
+  }
+
+  const clientMacFormatted = formatMac(clientMac);
+  try {
+    const id = await resolveControllerId();
+    if (!cookie || !csrf || Date.now() - loggedAt > 15 * 60 * 1000) {
+      await omadaLogin();
+    }
+    const site = siteIdParam || currentConfig.siteId || 'Default';
+    const unblockRes = await call(
+      'POST',
+      `/${id}/api/v2/sites/${site}/cmd/clients/${clientMacFormatted}/unblock`,
+      { mac: clientMacFormatted },
+      { 'Csrf-Token': csrf }
+    );
+    const isOk = unblockRes.json?.errorCode === 0;
+    return {
+      success: isOk,
+      message: isOk ? `Kifaa ${clientMacFormatted} kimefunguliwa (Unblocked).` : unblockRes.json?.msg,
+      details: unblockRes.json
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+/**
  * Comprehensive connectivity check and operator test
  */
 export async function testOmadaConnection(): Promise<{ success: boolean; message: string; details?: any }> {
@@ -659,3 +750,4 @@ export async function testOmadaConnection(): Promise<{ success: boolean; message
     };
   }
 }
+
