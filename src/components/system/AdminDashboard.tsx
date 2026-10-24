@@ -2705,6 +2705,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </p>
                 </div>
 
+                {/* Omada Port Conflict Quick Fix Guide */}
+                <div className="p-3 bg-stone-950/80 border border-stone-800 rounded-xl text-[11px] text-stone-300 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Ukiona Kosa: "Port 27217, 29810... already in use"?</span>
+                    </span>
+                    <a
+                      href="/download/fix-omada-ports.bat"
+                      download="fix-omada-ports.bat"
+                      className="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded text-[10px] font-bold transition-colors inline-flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Pakua Fix Script (.bat)</span>
+                    </a>
+                  </div>
+                  <p className="text-stone-400 leading-relaxed">
+                    Hii inamaanisha Omada Controller au database yake (<code>mongod.exe</code> / <code>java.exe</code>) <strong>tayari inafanya kazi chinichini</strong> au ilikwama. Kwanza jaribu kufungua kivinjari chako moja kwa moja kwenye: <code className="text-emerald-400 bg-stone-900 px-1 py-0.5 rounded">https://127.0.0.1:8043</code>. Kama haifunguki, fungua CMD kama Administrator kisha paste amri hii:
+                  </p>
+                  <div className="p-1.5 bg-stone-900 rounded font-mono text-[10px] text-amber-300 select-all border border-stone-800">
+                    taskkill /F /IM mongod.exe &amp; taskkill /F /IM javaw.exe &amp; taskkill /F /IM java.exe
+                  </div>
+                </div>
+
                 <div className="space-y-3 text-xs">
                   <div>
                     <label className="text-stone-400 block mb-1">Anwani ya Omada (URL au Ngrok):</label>
