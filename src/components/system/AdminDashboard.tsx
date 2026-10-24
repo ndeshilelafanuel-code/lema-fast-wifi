@@ -2733,7 +2733,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-stone-400 block mb-1">Hotspot Operator User:</label>
+                      <label className="text-stone-400 block mb-1">Omada Admin / Operator User:</label>
                       <input
                         type="text"
                         value={omadaUserInput}
@@ -2743,12 +2743,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-stone-400 block mb-1">Operator Password:</label>
+                      <label className="text-stone-400 block mb-1">Admin / Operator Password:</label>
                       <input
                         type="password"
                         value={omadaPassInput}
                         onChange={(e) => setOmadaPassInput(e.target.value)}
-                        placeholder="Nenosiri la Operator"
+                        placeholder="Nenosiri la Admin"
                         className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
                       />
                     </div>
