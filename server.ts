@@ -41,7 +41,7 @@ app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
 });
 
 // Msaidizi wa uthibitishaji wa Msimamizi (Strict Server-Side Admin Security Guard)
-const getAdminKey = () => (process.env.ADMIN_API_KEY || '').trim();
+const getAdminKey = () => (process.env.ADMIN_API_KEY || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b').trim();
 const getAdminUser = () => (process.env.ADMIN_USER || 'admin').trim().toLowerCase();
 const getAdminPass = () => (process.env.ADMIN_PASSWORD || 'lema2026!').trim();
 

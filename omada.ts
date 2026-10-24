@@ -30,6 +30,29 @@ export interface OmadaConfig {
 
 const CONFIG_FILE = path.resolve(process.cwd(), 'omada-config.json');
 
+/**
+ * Standardize and normalize Omada URL:
+ * - If protocol missing, default to https:// (especially for ports 8043, 8443, 443, ngrok)
+ * - If port is 8043 or 8443 and user entered http://, automatically upgrade to https://
+ *   to avoid "Bad Request: This combination of host and port requires TLS."
+ */
+export function normalizeOmadaUrl(rawUrl: string): string {
+  let url = (rawUrl || '').trim().replace(/\/+$/, '');
+  if (!url) return '';
+
+  // Port 8043 and 8443 are SSL/TLS-only ports on TP-Link Omada Controller.
+  if (url.startsWith('http://') && (url.includes(':8043') || url.includes(':8443'))) {
+    url = url.replace(/^http:\/\//i, 'https://');
+  }
+
+  // Prepend https:// if no protocol was supplied
+  if (!/^https?:\/\//i.test(url)) {
+    url = 'https://' + url;
+  }
+
+  return url;
+}
+
 // In-memory config initialized from disk and environment variables
 let currentConfig: OmadaConfig = loadInitialConfig();
 
@@ -47,7 +70,7 @@ function loadInitialConfig(): OmadaConfig {
   const opPass = (disk.operatorPass || process.env.OMADA_OPERATOR_PASSWORD || '').trim();
 
   return {
-    omadaUrl: (disk.omadaUrl || process.env.OMADA_URL || '').trim().replace(/\/$/, ''),
+    omadaUrl: normalizeOmadaUrl(disk.omadaUrl || process.env.OMADA_URL || ''),
     controllerId: (disk.controllerId || process.env.OMADA_ID || '').trim(),
     operatorUser: opUser,
     operatorPass: opPass,
@@ -71,7 +94,7 @@ export function updateOmadaConfig(patch: Partial<OmadaConfig>): OmadaConfig {
     ...patch,
   };
   if (currentConfig.omadaUrl) {
-    currentConfig.omadaUrl = currentConfig.omadaUrl.trim().replace(/\/$/, '');
+    currentConfig.omadaUrl = normalizeOmadaUrl(currentConfig.omadaUrl);
   }
   if (currentConfig.controllerId) {
     currentConfig.controllerId = currentConfig.controllerId.trim();
@@ -126,7 +149,7 @@ function call(
 ): Promise<CallResponse> {
   return new Promise((resolve, reject) => {
     const cfg = cfgOverride || currentConfig;
-    const base = cfg.omadaUrl;
+    const base = normalizeOmadaUrl(cfg.omadaUrl);
     if (!base) {
       return reject(new Error('OMADA_URL haijawekwa kwenye mfumo. Weka anwani ya Omada Controller au Ngrok kwenye Mipangilio.'));
     }
@@ -168,6 +191,20 @@ function call(
         let buf = '';
         res.on('data', (c) => (buf += c));
         res.on('end', () => {
+          // If server returns "Bad Request This combination of host and port requires TLS."
+          // Automatically upgrade currentConfig.omadaUrl to https:// and retry!
+          if ((res.statusCode === 400 || res.statusCode === 403) && buf.toLowerCase().includes('requires tls')) {
+            console.warn('[Omada] Server returned "requires TLS" - automatically upgrading to HTTPS and retrying...');
+            const upgradedBase = base.replace(/^http:\/\//i, 'https://');
+            if (upgradedBase !== base || !isHttps) {
+              const secureUrl = upgradedBase.startsWith('https://') ? upgradedBase : `https://${upgradedBase}`;
+              updateOmadaConfig({ omadaUrl: secureUrl });
+              return call(method, reqPath, body, extra, sessionOverride, { ...cfg, omadaUrl: secureUrl })
+                .then(resolve)
+                .catch(reject);
+            }
+          }
+
           let json: any = {};
           try {
             json = JSON.parse(buf);
@@ -853,7 +890,7 @@ export async function testOmadaConnection(
   };
 
   if (testCfg.omadaUrl) {
-    testCfg.omadaUrl = testCfg.omadaUrl.trim().replace(/\/$/, '');
+    testCfg.omadaUrl = normalizeOmadaUrl(testCfg.omadaUrl);
   }
   if (testCfg.controllerId) {
     testCfg.controllerId = testCfg.controllerId.trim();
