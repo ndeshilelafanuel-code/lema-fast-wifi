@@ -52,7 +52,7 @@ export const BillingModule: React.FC = () => {
   const handleAuthorizeClient = async (mac: string) => {
     setIsAuthorizing(mac);
     try {
-      const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+      const adminKey = localStorage.getItem('admin_api_key') || '';
       const res = await fetch('/api/v1/omada/client/authorize', {
         method: 'POST',
         headers: {

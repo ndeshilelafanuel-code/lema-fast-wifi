@@ -41,23 +41,22 @@ app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
 });
 
 // Msaidizi wa uthibitishaji wa Msimamizi (Real Server-Side Admin Security Guard)
-const getAdminKey = () => (process.env.ADMIN_API_KEY || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b').trim();
+const getAdminKey = () => (process.env.ADMIN_API_KEY || '').trim();
 const getAdminUser = () => (process.env.ADMIN_USER || 'admin').trim();
 const getAdminPass = () => (process.env.ADMIN_PASSWORD || 'lema2026!').trim();
 
 const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const key = getAdminKey();
-  const provided = (req.get('x-admin-key') || (req.query.admin_key as string) || '').trim();
-  const validKeys = [key, 'lema_admin_secret_key_2026', 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b'];
-  if (process.env.ADMIN_API_KEY) {
-    validKeys.push(process.env.ADMIN_API_KEY.trim());
+  if (!key) {
+    return res.status(503).json({ success: false, message: 'ADMIN_API_KEY haijawekwa kwenye mfumo.' });
   }
+  const provided = (req.get('x-admin-key') || (req.query.admin_key as string) || '').trim();
 
-  if (provided && validKeys.includes(provided)) {
+  if (provided && provided === key) {
     return next();
   }
 
-  console.warn(`[Admin Auth 401] Access denied for ${req.method} ${req.path}. Received x-admin-key: "${provided ? '***' : 'empty'}"`);
+  console.warn(`[Admin Auth 401] Access denied for ${req.method} ${req.path}`);
   return res.status(401).json({
     success: false,
     message: 'Ruhusa imekataliwa (Unauthorized: x-admin-key sahihi inahitajika kuendelea).'
@@ -94,29 +93,15 @@ app.post('/api/v1/admin/login', (req, res) => {
   });
 });
 
-// 2. Kila kitu chini ya /api/v1 ni cha admin, isipokuwa routes hizi maalum za wateja na vifaa
+// 2. Kila kitu chini ya /api/v1 ni cha admin, isipokuwa routes hizi maalum za wateja pekee
 const isPublicV1Route = (method: string, path: string): boolean => {
   if (method === 'POST' && path === '/admin/login') return true;
   if (method === 'POST' && path === '/vouchers/redeem') return true;
-  if (method === 'POST' && path === '/vouchers/trial') return true;
-  if (method === 'POST' && path === '/payments/stk-push') return true;
-  if (method === 'GET' && path.startsWith('/payments/order-status/')) return true;
   if (method === 'POST' && path === '/payments/webhook') return true;
-  if ((method === 'GET' || method === 'POST') && path === '/whatsapp/webhook') return true;
+  if (method === 'POST' && path === '/omada/webhook') return true;
   if ((method === 'GET' || method === 'POST') && path === '/hardware/heartbeat') return true;
   if ((method === 'GET' || method === 'POST') && path === '/hardware/alert/outage') return true;
-  if (method === 'POST' && path === '/omada/webhook') return true;
-  if (method === 'GET' && path === '/omada/webhook-info') return true;
-  if (method === 'GET' && path === '/towers') return true;
-  // Real-time synchronization routes for Portal and Dashboard
-  if (method === 'GET' && (path === '/sessions/active' || path === '/sessions/sync')) return true;
-  if (method === 'POST' && (path === '/sessions/active' || path === '/sessions/sync')) return true;
-  if (method === 'DELETE' && path.startsWith('/sessions/active/')) return true;
-  if (method === 'GET' && path === '/vouchers') return true;
-  if (method === 'POST' && path === '/vouchers') return true;
-  if (method === 'GET' && path === '/omada/clients') return true;
-  if (method === 'GET' && path === '/hardware/inventory') return true;
-  if (method === 'GET' && path === '/hardware/outage-alerts') return true;
+  if ((method === 'GET' || method === 'POST') && path === '/whatsapp/webhook') return true;
   return false;
 };
 
@@ -1050,9 +1035,13 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
     }
   }
 
-  // Ikiwa Omada ipo na imeshindwa kukata, weka tu onyo lakini ruhusu session kufutwa (Non-blocking)
-  if (omadaResult && !omadaResult.success) {
-    console.warn(`[Omada Disconnect Warning] Omada haikukata ${clientMac}:`, omadaResult.message);
+  if (omadaResult && !omadaResult.success && !force) {
+    console.error(`[Omada Disconnect Error] Omada haikuthibitisha kukata ${clientMac}:`, omadaResult.message);
+    return res.status(502).json({
+      success: false,
+      message: `Omada Controller imeshindwa kukata intaneti ya mteja (${clientMac}): ${omadaResult.message}`,
+      details: omadaResult.details
+    });
   }
 
   // Update associated voucher to expired (it has been used)
@@ -1253,55 +1242,20 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Nambari ya vocha inahitajika.' });
   }
 
-  // Derive client MAC address with reliable fallback so user is never blocked
-  let effectiveClientMac = String(clientMac || macAddress || '').trim().toUpperCase();
-  if (!effectiveClientMac || effectiveClientMac === 'UNKNOWN' || effectiveClientMac === 'NULL') {
-    const rawIp = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || '192.168.88.100').replace(/[^0-9]/g, '');
-    const suffix = (rawIp.slice(-6) || '112233').padEnd(6, '0');
-    effectiveClientMac = `48:D7:05:${suffix.slice(0, 2)}:${suffix.slice(2, 4)}:${suffix.slice(4, 6)}`.toUpperCase();
-  }
+  const effectiveClientMac = String(clientMac || macAddress || '').trim().toUpperCase();
+  const effectiveApMac = String(apMac || '').trim().toUpperCase();
 
-  // Derive AP MAC address from request, saved hardware inventory, or default Omada AP
-  let effectiveApMac = String(apMac || '').trim().toUpperCase();
-  if (!effectiveApMac) {
-    loadSavedHardware();
-    const apDevice = savedHardware.find((h) => h.category === 'ap' || h.macAddress);
-    effectiveApMac = apDevice?.macAddress?.toUpperCase() || 'D4:D6:DF:0D:B3:A0';
+  if (!effectiveClientMac || effectiveClientMac === 'UNKNOWN' || !effectiveApMac) {
+    return res.status(400).json({
+      success: false,
+      message: 'Anwani ya kifaa (Client MAC) na Anwani ya AP (AP MAC) zinahitajika ili kuwasha vocha.'
+    });
   }
 
   const effectiveClientIp = String(clientIp || ipAddress || req.ip || '192.168.88.150').trim();
 
   loadSavedVouchers();
-  let found: any = savedVouchers.find((v) => v.code === trimmed);
-
-  // If not in server memory yet, check if client provided local voucher object
-  if (!found && incomingVoucher && (incomingVoucher.code === trimmed || String(incomingVoucher.code).trim() === trimmed)) {
-    found = {
-      ...incomingVoucher,
-      code: trimmed,
-      status: incomingVoucher.status || 'unused',
-      createdAt: incomingVoucher.createdAt || new Date().toISOString(),
-    };
-    savedVouchers.push(found);
-    saveVouchersToDisk();
-  }
-
-  // If still not found, allow valid 4-8 digit numeric codes by registering on-the-fly
-  if (!found && /^[0-9A-Za-z]{4,8}$/.test(trimmed)) {
-    found = {
-      id: `v-auto-${Date.now()}`,
-      code: trimmed,
-      packageId: 'pkg-1day',
-      packageName: 'Saa 24 (Siku 1)',
-      price: 1000,
-      durationHours: 24,
-      speedLimit: '2.5M/1.0M',
-      status: 'unused',
-      createdAt: new Date().toISOString(),
-    };
-    savedVouchers.push(found);
-    saveVouchersToDisk();
-  }
+  const found: any = savedVouchers.find((v) => v.code === trimmed);
 
   if (!found) {
     return res.status(404).json({
@@ -1353,7 +1307,11 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
       });
       console.log(`[Omada Controller v6.3] Successfully authorized ${effectiveClientMac} on AP ${effectiveApMac}`);
     } catch (omadaErr: any) {
-      console.warn('[Omada Controller Warning - Direct AP Fallback]:', omadaErr?.message || omadaErr);
+      console.error('[Omada Controller Error - Authorization Failed]:', omadaErr?.message || omadaErr);
+      return res.status(502).json({
+        success: false,
+        message: `Omada Controller imeshindwa kuruhusu kifaa (${effectiveClientMac}): ${omadaErr?.message || 'Unknown error'}`
+      });
     }
   } else {
     console.log('[Lema Fast WiFi] Authorized voucher in standalone/AP mode:', {

@@ -456,50 +456,7 @@ export async function omadaUnauthorize(
       }
     }
 
-    // -------------------------------------------------------------
-    // STRATEGY 1: Official extPortal/auth expire lease (time: 0 / 1ms)
-    // -------------------------------------------------------------
-    try {
-      const sendExpire = (timeVal: number) =>
-        call(
-          'POST',
-          `/${id}/api/v2/hotspot/extPortal/auth`,
-          {
-            clientMac: clientMacFormatted,
-            clientIp: '',
-            apMac: apMacFormatted,
-            ssidName: options?.ssidName || 'Lema Fast WiFi',
-            radioId: Number(options?.radioId) || 0,
-            time: timeVal,
-            authType: 4,
-            originUrl: '',
-            totalTrafficLimitBytes: 0,
-            downloadRateLimitKbps: 0,
-            uploadRateLimitKbps: 0,
-          },
-          { 'Csrf-Token': csrf }
-        );
 
-      let r = await sendExpire(0);
-      if (r.json?.errorCode !== 0) {
-        r = await sendExpire(1);
-      }
-      if (r.json?.errorCode !== 0 && (r.statusCode === 401 || r.statusCode === 403)) {
-        await omadaLogin();
-        r = await sendExpire(0);
-      }
-      results.expireAuth = {
-        statusCode: r.statusCode,
-        errorCode: r.json?.errorCode,
-        msg: r.json?.msg || r.json?.message
-      };
-      console.log(
-        `[Omada Controller] ⏱️ Strategy 1 (extPortal/auth expire) result: errorCode=${r.json?.errorCode} (HTTP ${r.statusCode})`
-      );
-    } catch (e: any) {
-      results.expireAuth = { error: e.message };
-      console.warn('[Omada Controller] Strategy 1 notice:', e.message);
-    }
 
     // -------------------------------------------------------------
     // STRATEGY 2: Legacy / Direct extPortal/unauth

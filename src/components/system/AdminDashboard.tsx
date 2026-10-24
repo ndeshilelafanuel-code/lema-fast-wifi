@@ -409,12 +409,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const [adminApiKeyInput, setAdminApiKeyInput] = useState<string>(() => {
-    return localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    return localStorage.getItem('admin_api_key') || '';
   });
   const [savedKeyToast, setSavedKeyToast] = useState<boolean>(false);
 
   const handleSaveAdminApiKey = () => {
-    const trimmed = adminApiKeyInput.trim() || 'lema_admin_secret_key_2026';
+    const trimmed = adminApiKeyInput.trim();
     localStorage.setItem('admin_api_key', trimmed);
     setAdminApiKeyInput(trimmed);
     setSavedKeyToast(true);
@@ -424,7 +424,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleBlockMac = async (mac: string) => {
     if (!mac) return;
-    const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    const adminKey = localStorage.getItem('admin_api_key') || '';
     try {
       showToast('Inazuia Kifaa...', `Inatuma amri ya kum-block ${mac} kwenye Omada Controller...`, 'info');
       const res = await fetch('/api/v1/omada/client/block', {
@@ -465,7 +465,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Load Omada config on mount
   useEffect(() => {
-    const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    const adminKey = localStorage.getItem('admin_api_key') || '';
     fetch('/api/v1/omada/config', {
       headers: { 'x-admin-key': adminKey }
     })
@@ -483,7 +483,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveOmadaConfig = async () => {
     setIsSavingOmada(true);
-    const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    const adminKey = localStorage.getItem('admin_api_key') || '';
     try {
       const res = await fetch('/api/v1/omada/config', {
         method: 'POST',
@@ -515,7 +515,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDetectOmadaId = async () => {
     setIsDetectingOmadaId(true);
-    const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    const adminKey = localStorage.getItem('admin_api_key') || '';
     try {
       const res = await fetch('/api/v1/omada/detect-id', {
         method: 'POST',
@@ -543,7 +543,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleTestOmadaConnection = async () => {
     setIsTestingOmada(true);
     setOmadaConnStatus(null);
-    const adminKey = localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026';
+    const adminKey = localStorage.getItem('admin_api_key') || '';
     try {
       const res = await fetch('/api/v1/omada/test-connection', {
         method: 'POST',

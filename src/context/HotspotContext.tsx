@@ -289,8 +289,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchServerSessions = async () => {
       try {
-        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
-        const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+        const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
         const res = await fetch('/api/v1/sessions/active', {
           headers: {
             'x-admin-key': adminKey,
@@ -360,8 +359,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchServerVouchers = async () => {
       try {
-        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
-        const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+        const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
         const res = await fetch('/api/v1/vouchers', {
           headers: {
             'x-admin-key': adminKey,
@@ -416,15 +414,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
-  // Hakikisha admin_api_key ipo kwenye localStorage kwa ajili ya maombi ya seva
-  useEffect(() => {
-    try {
-      const existing = localStorage.getItem('admin_api_key');
-      if (!existing || !existing.trim()) {
-        localStorage.setItem('admin_api_key', 'lema_admin_secret_key_2026');
-      }
-    } catch {}
-  }, []);
+
 
   useEffect(() => {
     localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(activeSessions));
@@ -785,7 +775,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026') : 'lema_admin_secret_key_2026',
+        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '',
       },
       body: JSON.stringify({ vouchers: [updatedVoucher] }),
     }).catch(() => {});
@@ -916,7 +906,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || 'lema_admin_secret_key_2026') : 'lema_admin_secret_key_2026',
+        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '',
       },
       body: JSON.stringify({ vouchers: [voucher] }),
     }).catch(() => {});
@@ -934,8 +924,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const disconnectSession = async (sessionId: string) => {
-    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
-    const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
+    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
 
     const targetSession = activeSessions.find(
       (s) => s.id === sessionId || s.macAddress?.toUpperCase() === sessionId.toUpperCase()
