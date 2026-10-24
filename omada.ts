@@ -345,7 +345,10 @@ export async function getOperatorSession(cfgParam?: OmadaConfig, forceFresh = fa
 
   const endpoints = [
     `/${id}/api/v2/hotspot/login`,
+    `/${id}/api/v2/login`,
     '/api/v2/hotspot/login',
+    '/api/v2/login',
+    `/${id}/api/v2/hotspot/extPortal/login`,
   ];
 
   let lastErrorCode: number | undefined;
@@ -417,7 +420,9 @@ export async function getAdminSession(cfgParam?: OmadaConfig, forceFresh = false
 
   const endpoints = [
     `/${id}/api/v2/login`,
+    `/${id}/api/v2/hotspot/login`,
     '/api/v2/login',
+    '/api/v2/hotspot/login',
   ];
 
   let lastErrorCode: number | undefined;
@@ -679,7 +684,11 @@ export async function omadaUnauthorize(
         const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': sessionForSiteCmd.csrf }, sessionForSiteCmd);
         const list = sitesRes.json?.result?.data || (Array.isArray(sitesRes.json?.result) ? sitesRes.json.result : []);
         if (Array.isArray(list)) {
-          siteIds = list.map((s: any) => s.id || s.siteId).filter(Boolean);
+          for (const s of list) {
+            if (s.id) siteIds.push(s.id);
+            if (s.siteId && !siteIds.includes(s.siteId)) siteIds.push(s.siteId);
+            if (s.name && !siteIds.includes(s.name)) siteIds.push(s.name);
+          }
         }
       } catch (e) {}
 
@@ -687,11 +696,11 @@ export async function omadaUnauthorize(
         siteIds.unshift(currentConfig.siteId);
       }
       if (siteIds.length === 0) {
-        siteIds = ['Default', 'default'];
+        siteIds = ['Mbezi', 'mbezi', 'Default', 'default'];
       }
 
       for (const siteId of siteIds) {
-        // Admin Site Command: Unauth
+        // Admin Site Command: Unauth (Single & Batch endpoints)
         if (admSess) {
           try {
             const adminUnauthRes = await call(
@@ -705,6 +714,22 @@ export async function omadaUnauthorize(
               results[`admin_site_unauth_${siteId}`] = {
                 errorCode: adminUnauthRes.json?.errorCode,
                 msg: adminUnauthRes.json?.msg
+              };
+            }
+          } catch (e: any) {}
+
+          try {
+            const adminBatchUnauth = await call(
+              'POST',
+              `/${id}/api/v2/sites/${siteId}/cmd/clients/unauth`,
+              { macs: [clientMacFormatted] },
+              { 'Csrf-Token': admSess.csrf },
+              admSess
+            );
+            if (adminBatchUnauth.json?.errorCode !== undefined) {
+              results[`admin_batch_unauth_${siteId}`] = {
+                errorCode: adminBatchUnauth.json?.errorCode,
+                msg: adminBatchUnauth.json?.msg
               };
             }
           } catch (e: any) {}

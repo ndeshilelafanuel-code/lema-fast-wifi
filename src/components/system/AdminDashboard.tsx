@@ -453,6 +453,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleDisconnectWithFeedback = async (sessionId: string) => {
+    const targetSession = activeSessions.find(
+      (s) => s.id === sessionId || s.macAddress?.toUpperCase() === sessionId.toUpperCase()
+    );
+    const mac = targetSession?.macAddress || sessionId;
+    const adminKey = localStorage.getItem('admin_api_key') || '';
+    showToast('Inakata Intaneti...', `Inatuma amri kwa Omada Controller kukata kifaa ${mac}...`, 'info');
+    try {
+      const res = await fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-key': adminKey,
+        },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        showToast('Intaneti Imekatwa ✅', data?.message || `Kifaa ${mac} kimekatwa kikamilifu kwenye Omada!`, 'success');
+        disconnectSession(sessionId);
+      } else {
+        showToast(
+          'Omada Haikukata Kifaa ⚠️',
+          data?.message || 'Omada imekataa amri ya unauth kwa sababu ya kukosa akaunti ya Administrator. Tafadhali weka Omada Admin login kwenye Mipangilio au bonyeza BLOCK MAC.',
+          'error'
+        );
+      }
+    } catch (e: any) {
+      showToast('Hitilafu ya Mtandao', e.message, 'error');
+    }
+  };
+
   // Omada Controller Live Settings & Diagnostics
   const [omadaUrlInput, setOmadaUrlInput] = useState<string>('');
   const [omadaIdInput, setOmadaIdInput] = useState<string>('');
@@ -4423,7 +4453,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <SessionRow 
                           key={s.id} 
                           session={s} 
-                          onDisconnect={disconnectSession} 
+                          onDisconnect={handleDisconnectWithFeedback} 
                           onBlockMac={handleBlockMac}
                         />
                       ))
