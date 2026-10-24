@@ -1050,16 +1050,9 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
     }
   }
 
-  // Ikiwa Omada ipo na imeshindwa kukata, USIFUTE session wala vocha isipokuwa msimamizi aweke force=true
-  if (omadaResult && !omadaResult.success && !force) {
-    console.warn(`[Omada Disconnect Blocked] Omada haikukata ${clientMac}. Session haijafutwa ili msimamizi aone bado yupo.`);
-    return res.status(400).json({
-      success: false,
-      omadaConfirmed: false,
-      message: `Omada Controller haikukata idhini ya mteja (${clientMac}). Session na vocha hazijafutwa ili usipoteze udhibiti wa mteja.`,
-      details: omadaResult.details,
-      sessions: savedActiveSessions
-    });
+  // Ikiwa Omada ipo na imeshindwa kukata, weka tu onyo lakini ruhusu session kufutwa (Non-blocking)
+  if (omadaResult && !omadaResult.success) {
+    console.warn(`[Omada Disconnect Warning] Omada haikukata ${clientMac}:`, omadaResult.message);
   }
 
   // Update associated voucher to expired (it has been used)

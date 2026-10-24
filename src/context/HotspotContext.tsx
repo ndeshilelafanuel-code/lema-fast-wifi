@@ -933,7 +933,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setVouchers((prev) => prev.filter((v) => v.id !== id));
   };
 
-  const disconnectSession = (sessionId: string) => {
+  const disconnectSession = async (sessionId: string) => {
     const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
     const adminKey = (rawKey && rawKey.trim()) ? rawKey.trim() : 'lema_admin_secret_key_2026';
 
@@ -944,15 +944,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const apMac = (targetSession as any)?.apMac || '';
     const vCode = targetSession?.voucherCode;
 
-    // Send DELETE to server API so Omada Controller is instructed to terminate internet access
-    fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}&apMac=${encodeURIComponent(apMac)}`, {
-      method: 'DELETE',
-      headers: {
-        'x-admin-key': adminKey,
-      },
-    }).catch((err) => console.error('[Disconnect Network Error]:', err));
-
-    // Update local vouchers list: mark voucher as expired (used)
+    // Immediately update local UI state for instant response
     if (vCode) {
       setVouchers((prev) =>
         prev.map((v) =>
@@ -974,11 +966,28 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         (s) => s.id !== sessionId && s.macAddress?.toUpperCase() !== sessionId.toUpperCase()
       )
     );
+
     if (
       currentClientSession?.id === sessionId ||
       (mac && currentClientSession?.macAddress?.toUpperCase() === mac.toUpperCase())
     ) {
       setCurrentClientSession(null);
+    }
+
+    // Send DELETE to server API so Omada Controller is instructed to terminate internet access
+    try {
+      const res = await fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}&apMac=${encodeURIComponent(apMac)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-key': adminKey,
+        },
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.success && Array.isArray(data.sessions)) {
+        setActiveSessions(data.sessions);
+      }
+    } catch (err) {
+      console.error('[Disconnect Network Error]:', err);
     }
   };
 
