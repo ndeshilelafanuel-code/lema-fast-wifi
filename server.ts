@@ -1099,12 +1099,13 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
   }
 
   if (omadaResult && !omadaResult.success && !force) {
-    console.error(`[Omada Disconnect Error] Omada haikuthibitisha kukata ${clientMac}:`, omadaResult.message);
-    return res.status(502).json({
-      success: false,
-      message: `Omada Controller imeshindwa kukata intaneti ya mteja (${clientMac}): ${omadaResult.message}`,
-      details: omadaResult.details
-    });
+    console.warn(`[Omada Disconnect Warning] Omada unauth warning for ${clientMac}:`, omadaResult.message);
+    // Attempt block as fail-safe fallback to ensure internet stays off
+    try {
+      await omadaBlockClient(clientMac);
+    } catch (be: any) {
+      console.warn('[Omada Block Fallback Notice]:', be?.message);
+    }
   }
 
   // Update associated voucher to expired (it has been used)
