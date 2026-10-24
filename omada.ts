@@ -291,7 +291,7 @@ export async function omadaLogin(): Promise<{ csrf: string; cookie: string }> {
   for (const ep of adminEndpoints) {
     try {
       const adminRes = await call('POST', ep, {
-        username: currentConfig.operatorUser,
+        name: currentConfig.operatorUser,
         password: currentConfig.operatorPass,
       });
       if (adminRes.json?.errorCode === 0) {
