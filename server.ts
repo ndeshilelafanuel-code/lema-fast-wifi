@@ -1086,11 +1086,22 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
       (queryMac && (s.macAddress || '').trim().toUpperCase() === queryMac)
   );
 
-  const clientMac =
-    sessionToDelete?.macAddress ||
-    sessionToDelete?.mac ||
-    queryMac ||
-    (targetId.includes(':') || targetId.includes('-') ? targetId : '');
+  const isValidMac = (m?: string): boolean => {
+    if (!m) return false;
+    const clean = m.replace(/[^0-9A-Fa-f]/g, '');
+    return clean.length === 12;
+  };
+
+  let clientMac = '';
+  if (isValidMac(queryMac)) {
+    clientMac = queryMac;
+  } else if (isValidMac(sessionToDelete?.macAddress)) {
+    clientMac = sessionToDelete!.macAddress;
+  } else if (isValidMac(sessionToDelete?.mac)) {
+    clientMac = sessionToDelete!.mac;
+  } else if (isValidMac(targetId)) {
+    clientMac = targetId;
+  }
 
   const apMac = sessionToDelete?.apMac || (req.query.apMac as string) || '';
   const ssidName = sessionToDelete?.ssidName || (req.query.ssid as string) || 'Lema Fast WiFi';

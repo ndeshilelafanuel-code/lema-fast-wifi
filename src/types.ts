@@ -56,6 +56,9 @@ export interface ActiveSession {
   speedLimit: string;
   bytesDown: number;
   bytesUp: number;
+  apMac?: string;
+  ssidName?: string;
+  radioId?: number;
 }
 
 export interface NetworkTower {

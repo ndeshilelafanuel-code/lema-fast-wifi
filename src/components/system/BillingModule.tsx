@@ -34,7 +34,11 @@ export const BillingModule: React.FC = () => {
   // Fetch Wi-Fi associated clients (devices on Omada_5Ghz)
   useEffect(() => {
     const fetchOmadaClients = () => {
-      fetch('/api/v1/omada/clients')
+      const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+      if (!adminKey) return;
+      fetch('/api/v1/omada/clients', {
+        headers: { 'x-admin-key': adminKey }
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data && Array.isArray(data.clients)) {
@@ -45,7 +49,7 @@ export const BillingModule: React.FC = () => {
     };
 
     fetchOmadaClients();
-    const interval = setInterval(fetchOmadaClients, 3500);
+    const interval = setInterval(fetchOmadaClients, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -67,7 +71,9 @@ export const BillingModule: React.FC = () => {
           `[${new Date().toLocaleTimeString()}] [ADMIN-GRANT] ✅ Mteja (${mac}) ameruhusiwa intaneti (ACTIVE)! Vocha iliyotengenezwa: ${data.session?.voucherCode || '9412'}`,
           ...prev
         ].slice(-50));
-        const cRes = await fetch('/api/v1/omada/clients');
+        const cRes = await fetch('/api/v1/omada/clients', {
+          headers: adminKey ? { 'x-admin-key': adminKey } : {}
+        });
         const cData = await cRes.json();
         if (cData && Array.isArray(cData.clients)) {
           setOmadaClients(cData.clients);

@@ -244,7 +244,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchServerSessions = async () => {
       try {
-        const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+        const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
+        if (!adminKey) {
+          return;
+        }
         const res = await fetch('/api/v1/sessions/active', {
           headers: {
             'x-admin-key': adminKey,
@@ -283,11 +286,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     const key = (s.macAddress || s.id).toUpperCase();
                     if (!mergedMap.has(key)) {
                       mergedMap.set(key, s);
-                      fetch('/api/v1/sessions/active', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(s),
-                      }).catch(() => {});
+                      if (adminKey) {
+                        fetch('/api/v1/sessions/active', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+                          body: JSON.stringify(s),
+                        }).catch(() => {});
+                      }
                     }
                   }
                 }
@@ -717,22 +722,27 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ]);
     setCurrentClientSession(newSession);
 
-    // Push active session to backend server immediately
-    fetch('/api/v1/sessions/active', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newSession),
-    }).catch(() => {});
+    // Push active session to backend server if admin key is present
+    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+    if (adminKey) {
+      fetch('/api/v1/sessions/active', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify(newSession),
+      }).catch(() => {});
 
-    // Push updated active voucher to backend server immediately
-    fetch('/api/v1/vouchers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '',
-      },
-      body: JSON.stringify({ vouchers: [updatedVoucher] }),
-    }).catch(() => {});
+      fetch('/api/v1/vouchers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify({ vouchers: [updatedVoucher] }),
+      }).catch(() => {});
+    }
 
     return {
       success: true,
@@ -848,22 +858,27 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     ]);
     setCurrentClientSession(session);
 
-    // Push active session to backend server immediately
-    fetch('/api/v1/sessions/active', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(session),
-    }).catch(() => {});
+    // Push active session to backend server if admin key is present
+    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+    if (adminKey) {
+      fetch('/api/v1/sessions/active', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify(session),
+      }).catch(() => {});
 
-    // Push updated active voucher to backend server immediately
-    fetch('/api/v1/vouchers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-key': typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '',
-      },
-      body: JSON.stringify({ vouchers: [voucher] }),
-    }).catch(() => {});
+      fetch('/api/v1/vouchers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify({ vouchers: [voucher] }),
+      }).catch(() => {});
+    }
 
     return {
       success: true,

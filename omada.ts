@@ -420,9 +420,7 @@ export async function getAdminSession(cfgParam?: OmadaConfig, forceFresh = false
 
   const endpoints = [
     `/${id}/api/v2/login`,
-    `/${id}/api/v2/hotspot/login`,
     '/api/v2/login',
-    '/api/v2/hotspot/login',
   ];
 
   let lastErrorCode: number | undefined;
@@ -590,6 +588,43 @@ export async function omadaUnauthorize(
       opSess = await getOperatorSession();
     } catch (oe: any) {
       console.warn('[Omada Unauthorize] Operator session warning:', oe.message);
+    }
+
+    // 2. Short Lease Override (Instant Disconnect via External Portal Auth)
+    // Sending time: 1 ms overrides the active lease and forces the AP to immediately expire guest access!
+    if (opSess) {
+      try {
+        console.log(`[Omada Controller v6.3] ⚡ Attempting Short Lease Override for ${clientMacFormatted} on AP ${apMacFormatted || 'any'}...`);
+        const shortAuthRes = await call(
+          'POST',
+          `/${id}/api/v2/hotspot/extPortal/auth`,
+          {
+            clientMac: clientMacFormatted,
+            clientIp: '',
+            apMac: apMacFormatted,
+            ssidName: options?.ssidName || 'Lema Fast WiFi',
+            radioId: Number(options?.radioId) || 0,
+            time: 1, // 1 ms expiration immediately drops the authorized state on AP
+            authType: 4,
+            originUrl: '',
+            totalTrafficLimitBytes: 0,
+            downloadRateLimitKbps: 0,
+            uploadRateLimitKbps: 0,
+          },
+          { 'Csrf-Token': opSess.csrf },
+          opSess
+        );
+        results.shortLeaseOverride = {
+          statusCode: shortAuthRes.statusCode,
+          errorCode: shortAuthRes.json?.errorCode,
+          msg: shortAuthRes.json?.msg || shortAuthRes.json?.message
+        };
+        if (shortAuthRes.json?.errorCode === 0) {
+          console.log(`[Omada Controller v6.3] ✅ Short Lease Override succeeded for ${clientMacFormatted} (immediate disconnect on AP)!`);
+        }
+      } catch (sle: any) {
+        results.shortLeaseOverride = { error: sle.message };
+      }
     }
 
     // 2. Custom Endpoint captured via DevTools (if configured)

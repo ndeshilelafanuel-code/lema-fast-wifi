@@ -59,12 +59,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.success && data?.key) {
+        localStorage.setItem('admin_api_key', data.key);
+        localStorage.setItem('hotspot_admin_auth', 'true');
         sessionStorage.setItem('admin_api_key', data.key);
         sessionStorage.setItem('hotspot_admin_auth', 'true');
-        if (rememberMe) {
-          localStorage.setItem('admin_api_key', data.key);
-          localStorage.setItem('hotspot_admin_auth', 'true');
-        }
         setIsSubmitting(false);
         onSuccess();
         return;

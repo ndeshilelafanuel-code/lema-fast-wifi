@@ -46,7 +46,10 @@ export const SmsTemplateConfigPanel: React.FC<SmsTemplateConfigPanelProps> = ({ 
   const checkSmsBalance = async () => {
     setIsLoadingBalance(true);
     try {
-      const res = await fetch('/api/v1/sms/balance');
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      const res = await fetch('/api/v1/sms/balance', {
+        headers: adminKey ? { 'x-admin-key': adminKey } : {}
+      });
       const data = await res.json();
       if (data.success) {
         setSmsBalance({
