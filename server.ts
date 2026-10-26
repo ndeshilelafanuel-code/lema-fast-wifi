@@ -30,6 +30,16 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health check / Keep-Alive endpoint kwa ajili ya UptimeRobot, cron-job, na Render probes
+app.get(['/api/v1/health', '/api/health', '/healthz'], (_req, res) => {
+  return res.status(200).json({
+    status: 'ok',
+    service: 'Lema Fast WiFi API',
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Malipo bado pending: zima API zote za malipo na trial iwapo PAYMENTS_ENABLED !== '1'
 app.use(['/api/v1/payments', '/api/v1/vouchers/trial'], (req, res, next) => {
   if (process.env.PAYMENTS_ENABLED === '1') return next();
@@ -1088,13 +1098,23 @@ app.delete('/api/v1/sessions/active/:id', async (req, res) => {
   const omadaConf = getOmadaConfig();
   let omadaResult: { success: boolean; message: string; details?: any; omadaConfirmed?: boolean } | null = null;
 
-  if (clientMac && omadaConf.omadaUrl && omadaConf.operatorUser) {
+  if (clientMac && omadaConf.omadaUrl && (omadaConf.operatorUser || omadaConf.adminUser)) {
     try {
-      console.log(`[Omada Disconnect] Blocking and unauthorizing MAC ${clientMac} on AP ${apMac || 'any'}`);
-      omadaResult = await omadaBlockClient(clientMac);
-      addBlockedMac(clientMac, 'Disconnected by Admin (KATA INTANETI)');
+      const isBlockRequest = req.query.block === 'true' || req.body?.block === true;
+      if (isBlockRequest) {
+        console.log(`[Omada Block] 🚫 Blocking MAC ${clientMac}`);
+        omadaResult = await omadaBlockClient(clientMac);
+        addBlockedMac(clientMac, 'Blocked by Admin (Piga Marufuku)');
+      } else {
+        console.log(`[Omada Disconnect] 🛑 Unauthorizing MAC ${clientMac} on AP ${apMac || 'any'}`);
+        omadaResult = await omadaUnauthorize(clientMac, {
+          apMac,
+          ssidName,
+          radioId: Number(radioId) || 0
+        });
+      }
     } catch (err: any) {
-      console.warn('[Omada Block Notice]:', err?.message);
+      console.warn('[Omada Disconnect Notice]:', err?.message);
       omadaResult = { success: false, omadaConfirmed: false, message: err?.message };
     }
   }
