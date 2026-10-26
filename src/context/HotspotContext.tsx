@@ -469,9 +469,11 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchTowersAndHardware = async () => {
       try {
+        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+        const headers: Record<string, string> = rawKey ? { 'x-admin-key': rawKey } : {};
         const [towerRes, hwRes] = await Promise.all([
-          fetch('/api/v1/towers').then((r) => r.json()).catch(() => null),
-          fetch('/api/v1/hardware/inventory').then((r) => r.json()).catch(() => null),
+          fetch('/api/v1/towers', { headers }).then((r) => r.json()).catch(() => null),
+          fetch('/api/v1/hardware/inventory', { headers }).then((r) => r.json()).catch(() => null),
         ]);
 
         let apStatus: 'online' | 'offline' | null = null;

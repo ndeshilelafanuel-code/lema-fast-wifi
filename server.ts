@@ -172,6 +172,7 @@ const isPublicV1Route = (method: string, path: string): boolean => {
   if (method === 'POST' && path === '/vouchers/redeem') return true;
   if (method === 'POST' && path === '/payments/webhook') return true;
   if (method === 'POST' && path === '/omada/webhook') return true;
+  if (method === 'GET' && (path === '/hardware/inventory' || path === '/towers')) return true;
   if ((method === 'GET' || method === 'POST') && path === '/hardware/heartbeat') return true;
   if ((method === 'GET' || method === 'POST') && path === '/hardware/alert/outage') return true;
   if ((method === 'GET' || method === 'POST') && path === '/whatsapp/webhook') return true;

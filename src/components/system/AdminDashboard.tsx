@@ -723,7 +723,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let isMounted = true;
     const syncServerHardware = async () => {
       try {
-        const res = await fetch('/api/v1/hardware/inventory');
+        const adminKey = localStorage.getItem('admin_api_key') || '';
+        const res = await fetch('/api/v1/hardware/inventory', {
+          headers: adminKey ? { 'x-admin-key': adminKey } : {}
+        });
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.inventory)) {
