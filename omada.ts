@@ -620,13 +620,7 @@ export async function omadaUnauthorize(
           msg: shortAuthRes.json?.msg || shortAuthRes.json?.message
         };
         if (shortAuthRes.json?.errorCode === 0) {
-          console.log(`[Omada Controller v6.3] ✅ Short Lease Override succeeded for ${clientMacFormatted} (immediate disconnect on AP)!`);
-          return {
-            success: true,
-            omadaConfirmed: true,
-            message: `Intaneti ya kifaa ${clientMacFormatted} imezimwa na idhini imefutwa kikamilifu kwenye Omada Controller (errorCode: 0).`,
-            details: results
-          };
+          console.log(`[Omada Controller v6.3] ✅ Short Lease Override succeeded for ${clientMacFormatted} (portal lease invalidated)!`);
         }
 
         if (shortAuthRes.json?.errorCode === -41501) {

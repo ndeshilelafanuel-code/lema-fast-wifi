@@ -25,6 +25,8 @@ import {
   CreditCard,
   ArrowRight,
   Lock,
+  KeyRound,
+  ShieldCheck,
   Eye,
   EyeOff,
   BadgeCheck,
@@ -2844,48 +2846,91 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-stone-400 block mb-1">Omada Admin / Operator User:</label>
-                      <input
-                        type="text"
-                        value={omadaUserInput}
-                        onChange={(e) => setOmadaUserInput(e.target.value)}
-                        placeholder="admin au jina la operator"
-                        className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
-                      />
+                  {/* 1. OPERATOR ACCOUNT */}
+                  <div className="p-3 bg-stone-900/60 border border-stone-800 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                        <span>1. Akaunti ya Hotspot Operator (Vocha & Idhini ya Portal):</span>
+                      </span>
+                      <span className="text-[10px] text-stone-500">Inatoa intaneti kwa wateja</span>
                     </div>
-                    <div>
-                      <label className="text-stone-400 block mb-1">Admin / Operator Password:</label>
-                      <div className="relative">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-stone-400 block mb-1 text-[11px]">Operator Username:</label>
                         <input
-                          type={showOmadaPass ? 'text' : 'password'}
-                          value={omadaPassInput}
-                          onChange={(e) => setOmadaPassInput(e.target.value)}
-                          placeholder="Nenosiri la Admin"
-                          className="w-full px-3 py-2 pr-10 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs"
+                          type="text"
+                          value={omadaUserInput}
+                          onChange={(e) => setOmadaUserInput(e.target.value)}
+                          placeholder="mfano: Jimson"
+                          className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs font-mono"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowOmadaPass(!showOmadaPass)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white cursor-pointer"
-                        >
-                          {showOmadaPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                      </div>
+                      <div>
+                        <label className="text-stone-400 block mb-1 text-[11px]">Operator Password:</label>
+                        <div className="relative">
+                          <input
+                            type={showOmadaPass ? 'text' : 'password'}
+                            value={omadaPassInput}
+                            onChange={(e) => setOmadaPassInput(e.target.value)}
+                            placeholder="Nenosiri la Operator"
+                            className="w-full px-3 py-2 pr-10 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowOmadaPass(!showOmadaPass)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white cursor-pointer"
+                          >
+                            {showOmadaPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-3 bg-stone-950/70 border border-stone-800/80 rounded-xl text-[11px] text-stone-300 leading-relaxed space-y-1.5">
-                    <p className="font-bold text-amber-300 flex items-center gap-1.5">
-                      <span>💡 Aina ya Akaunti ya Omada Inayotumika:</span>
+                  {/* 2. MASTER ADMIN ACCOUNT FOR INSTANT DEAUTH */}
+                  <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-300 text-xs flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>2. Akaunti ya Master Admin wa Omada (Kukata Papo Hapo - 0.1s Deauth):</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">Inakata sekunde hiyo hiyo</span>
+                    </div>
+                    <p className="text-[11px] text-stone-300 leading-relaxed">
+                      Jaza akaunti unayotumia kuingilia kwenye <strong>Omada Controller kwenye kompyuta yako (127.0.0.1:8043)</strong>. Akaunti hii inahitajika ili kutuma amri ya 802.11 Deauth kwenye AP na kumkata mteja <strong>papohapo sekunde hiyo hiyo</strong> badala ya kusubiri.
                     </p>
-                    <p>
-                      <strong>1. Hotspot Operator (Inayopendekezwa):</strong> Kwenye Omada Controller, nenda <em>Hotspot Manager</em> (au <em>Settings &gt; Authentication &gt; Hotspot</em>) &gt; <em>Operators</em> &gt; Bofya <strong>+ Add</strong> kutengeneza jina la Operator na nenosiri lake.
-                    </p>
-                    <p>
-                      <strong>2. Controller Admin:</strong> Unaweza pia kutumia jina na nenosiri la Msimamizi wa Ndani (Local Admin). <em>Tahadhari:</em> Usiweke barua pepe ya TP-Link Cloud ID (kama mfano@gmail.com).
-                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-stone-400 block mb-1 text-[11px]">Controller Admin Username:</label>
+                        <input
+                          type="text"
+                          value={omadaAdminUserInput}
+                          onChange={(e) => setOmadaAdminUserInput(e.target.value)}
+                          placeholder="mfano: admin"
+                          className="w-full px-3 py-2 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-stone-400 block mb-1 text-[11px]">Controller Admin Password:</label>
+                        <div className="relative">
+                          <input
+                            type={showOmadaAdminPass ? 'text' : 'password'}
+                            value={omadaAdminPassInput}
+                            onChange={(e) => setOmadaAdminPassInput(e.target.value)}
+                            placeholder="Nenosiri la Mkuu wa Omada"
+                            className="w-full px-3 py-2 pr-10 border border-stone-700 rounded-xl bg-stone-850 text-white text-xs font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowOmadaAdminPass(!showOmadaAdminPass)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white cursor-pointer"
+                          >
+                            {showOmadaAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {omadaConnStatus && (
