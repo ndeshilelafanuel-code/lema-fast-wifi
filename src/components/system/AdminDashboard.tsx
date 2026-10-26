@@ -504,21 +504,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     details?: any;
   } | null>(null);
 
-  // Load Omada config on mount
+  // Load Omada config on mount and restore inputs
   useEffect(() => {
-    const adminKey = localStorage.getItem('admin_api_key') || '';
+    // 1. Immediately restore from localStorage so fields are never blank
+    try {
+      const localCached = localStorage.getItem('lema_omada_cached_cfg');
+      if (localCached) {
+        const c = JSON.parse(localCached);
+        if (c.omadaUrl) setOmadaUrlInput(c.omadaUrl);
+        if (c.controllerId) setOmadaIdInput(c.controllerId);
+        if (c.operatorUser) setOmadaUserInput(c.operatorUser);
+        if (c.operatorPass) setOmadaPassInput(c.operatorPass);
+        if (c.adminUser) setOmadaAdminUserInput(c.adminUser);
+        if (c.adminPass) setOmadaAdminPassInput(c.adminPass);
+        if (c.strictTls !== undefined) setOmadaStrictTlsInput(Boolean(c.strictTls));
+      }
+    } catch {}
+
+    // 2. Fetch verified server configuration
+    const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
     fetch('/api/v1/omada/config', {
-      headers: { 'x-admin-key': adminKey }
+      headers: adminKey ? { 'x-admin-key': adminKey } : {}
     })
       .then((r) => r.json())
       .then((data) => {
         if (data?.success && data?.config) {
-          setOmadaUrlInput(data.config.omadaUrl || '');
-          setOmadaIdInput(data.config.controllerId || '');
-          setOmadaUserInput(data.config.operatorUser || '');
-          if (data.config.adminUser) {
-            setOmadaAdminUserInput(data.config.adminUser);
-          }
+          if (data.config.omadaUrl) setOmadaUrlInput(data.config.omadaUrl);
+          if (data.config.controllerId) setOmadaIdInput(data.config.controllerId);
+          if (data.config.operatorUser) setOmadaUserInput(data.config.operatorUser);
+          if (data.config.operatorPass) setOmadaPassInput(data.config.operatorPass);
+          if (data.config.adminUser) setOmadaAdminUserInput(data.config.adminUser);
+          if (data.config.adminPass) setOmadaAdminPassInput(data.config.adminPass);
           setOmadaStrictTlsInput(Boolean(data.config.strictTls));
         }
       })
@@ -527,7 +543,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveOmadaConfig = async () => {
     setIsSavingOmada(true);
-    const adminKey = localStorage.getItem('admin_api_key') || '';
+    const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+    const configToSave = {
+      omadaUrl: omadaUrlInput.trim(),
+      controllerId: omadaIdInput.trim(),
+      operatorUser: omadaUserInput.trim(),
+      operatorPass: omadaPassInput.trim(),
+      adminUser: omadaAdminUserInput.trim(),
+      adminPass: omadaAdminPassInput.trim(),
+      strictTls: omadaStrictTlsInput
+    };
+
+    // Save locally in browser immediately
+    try {
+      localStorage.setItem('lema_omada_cached_cfg', JSON.stringify(configToSave));
+    } catch {}
+
     try {
       const res = await fetch('/api/v1/omada/config', {
         method: 'POST',
@@ -535,15 +566,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           'Content-Type': 'application/json',
           'x-admin-key': adminKey
         },
-        body: JSON.stringify({
-          omadaUrl: omadaUrlInput.trim(),
-          controllerId: omadaIdInput.trim(),
-          operatorUser: omadaUserInput.trim(),
-          operatorPass: omadaPassInput.trim(),
-          adminUser: omadaAdminUserInput.trim(),
-          adminPass: omadaAdminPassInput.trim(),
-          strictTls: omadaStrictTlsInput
-        })
+        body: JSON.stringify(configToSave)
       });
       const data = await res.json();
       if (data?.success) {

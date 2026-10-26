@@ -621,6 +621,22 @@ export async function omadaUnauthorize(
         };
         if (shortAuthRes.json?.errorCode === 0) {
           console.log(`[Omada Controller v6.3] ✅ Short Lease Override succeeded for ${clientMacFormatted} (immediate disconnect on AP)!`);
+          return {
+            success: true,
+            omadaConfirmed: true,
+            message: `Intaneti ya kifaa ${clientMacFormatted} imezimwa na idhini imefutwa kikamilifu kwenye Omada Controller (errorCode: 0).`,
+            details: results
+          };
+        }
+
+        if (shortAuthRes.json?.errorCode === -41501) {
+          console.log(`[Omada Controller v6.3] ℹ️ Kifaa ${clientMacFormatted} tayari kimeshakatwa au hakipo mtandaoni (errorCode: -41501).`);
+          return {
+            success: true,
+            omadaConfirmed: true,
+            message: `Kifaa ${clientMacFormatted} tayari kilikuwa kimekatwa au hakipo mtandaoni kwenye AP.`,
+            details: results
+          };
         }
       } catch (sle: any) {
         results.shortLeaseOverride = { error: sle.message };
@@ -712,8 +728,8 @@ export async function omadaUnauthorize(
       console.warn('[Omada Unauthorize] Admin session warning:', ae.message);
     }
 
-    const sessionForSiteCmd = admSess || opSess;
-    if (sessionForSiteCmd) {
+    if (admSess) {
+      const sessionForSiteCmd = admSess;
       let siteIds: string[] = [];
       try {
         const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': sessionForSiteCmd.csrf }, sessionForSiteCmd);
