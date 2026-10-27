@@ -5412,10 +5412,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <td className="py-3.5 px-4 text-right">
                               <button
                                 onClick={() => {
-                                  setAccessPoints(accessPoints.filter(item => item.mac !== ap.mac));
-                                  showToast('AP Removed', `AP ${ap.mac} imeondolewa.`, 'info');
+                                  const targetMac = (ap.mac || '').toUpperCase();
+                                  const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+
+                                  // 1. Remove from accessPoints state
+                                  setAccessPoints((prev) => prev.filter((item) => (item.mac || '').toUpperCase() !== targetMac));
+
+                                  // 2. Remove from equipmentInventory state
+                                  setEquipmentInventory((prev) => prev.filter((item) => (item.macAddress || '').toUpperCase() !== targetMac));
+
+                                  // 3. Remove from localStorage
+                                  try {
+                                    const savedEq = localStorage.getItem('lema_wifi_equipment_inventory');
+                                    if (savedEq) {
+                                      const parsed = JSON.parse(savedEq).filter((i: any) => (i.macAddress || '').toUpperCase() !== targetMac);
+                                      localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(parsed));
+                                    }
+                                    const savedAps = localStorage.getItem('lema_wifi_aps');
+                                    if (savedAps) {
+                                      const parsedAps = JSON.parse(savedAps).filter((i: any) => (i.mac || '').toUpperCase() !== targetMac);
+                                      localStorage.setItem('lema_wifi_aps', JSON.stringify(parsedAps));
+                                    }
+                                  } catch (e) {}
+
+                                  // 4. Send DELETE request to backend server API
+                                  const deleteUrl = `/api/v1/hardware/equipment/${encodeURIComponent(targetMac)}?mac=${encodeURIComponent(targetMac)}`;
+                                  fetch(deleteUrl, {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'x-admin-key': adminKey,
+                                    },
+                                  }).catch(() => {});
+
+                                  showToast('AP Removed', `AP ${ap.mac} imeondolewa kikamilifu kwenye mfumo na database.`, 'info');
                                 }}
-                                className="text-stone-400 hover:text-rose-400 font-sans text-xs transition-colors"
+                                className="text-stone-400 hover:text-rose-400 font-sans text-xs transition-colors cursor-pointer"
                               >
                                 Remove
                               </button>
