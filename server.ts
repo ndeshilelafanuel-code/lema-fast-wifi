@@ -711,23 +711,31 @@ app.post('/api/v1/hardware/inventory', (req, res) => {
 // API: Delete hardware equipment
 app.delete('/api/v1/hardware/equipment/:id', async (req, res) => {
   const { id } = req.params;
-  const macQuery = req.query.mac ? String(req.query.mac).toUpperCase() : '';
-  const targetId = id.toUpperCase();
-  savedHardware = savedHardware.filter(
-    (h) =>
-      h.id !== id &&
-      h.id.toUpperCase() !== targetId &&
-      h.macAddress.toUpperCase() !== targetId &&
-      (!macQuery || h.macAddress.toUpperCase() !== macQuery)
-  );
+  const macQuery = req.query.mac ? String(req.query.mac) : '';
+  const cleanNorm = (m: string) => (m || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+  const cleanId = cleanNorm(id);
+  const cleanMac = cleanNorm(macQuery);
+
+  loadSavedHardware();
+  savedHardware = savedHardware.filter((h) => {
+    const hId = (h.id || '').toUpperCase();
+    const hMac = cleanNorm(h.macAddress);
+    if (h.id === id || hId === id.toUpperCase()) return false;
+    if (cleanId && (hId === cleanId || hMac === cleanId)) return false;
+    if (cleanMac && hMac === cleanMac) return false;
+    return true;
+  });
   saveHardwareToDisk();
 
   try {
-    await db.delete(hardware).where(eq(hardware.macAddress, targetId));
-    if (macQuery) {
-      await db.delete(hardware).where(eq(hardware.macAddress, macQuery));
+    const allRows = await db.select().from(hardware);
+    for (const r of allRows) {
+      const rId = (r.id || '').toUpperCase();
+      const rMac = cleanNorm(r.macAddress);
+      if (r.id === id || rId === id.toUpperCase() || (cleanId && (rId === cleanId || rMac === cleanId)) || (cleanMac && rMac === cleanMac)) {
+        await db.delete(hardware).where(eq(hardware.id, r.id));
+      }
     }
-    await db.delete(hardware).where(eq(hardware.id, id));
     console.log(`[Hardware Inventory] 🗑️ Kifaa kimeondolewa kwenye database na seva: ${id}`);
   } catch (dbErr) {
     console.error('[Hardware Inventory] Hitilafu ya kufuta kifaa:', dbErr);

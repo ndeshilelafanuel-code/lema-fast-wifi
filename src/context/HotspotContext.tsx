@@ -1057,9 +1057,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
     setTowers((prev) => {
       const updated = [newTower, ...prev];
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
       fetch('/api/v1/towers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
         body: JSON.stringify({ towers: updated }),
       }).catch(() => {});
       return updated;
@@ -1070,9 +1074,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateTower = (id: string, updates: Partial<NetworkTower>) => {
     setTowers((prev) => {
       const updated = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
       fetch('/api/v1/towers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
         body: JSON.stringify({ towers: updated }),
       }).catch(() => {});
 
@@ -1092,9 +1100,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteTower = (id: string) => {
     setTowers((prev) => {
       const updated = prev.filter((t) => t.id !== id);
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
       fetch('/api/v1/towers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
         body: JSON.stringify({ towers: updated }),
       }).catch(() => {});
       return updated;

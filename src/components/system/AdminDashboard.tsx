@@ -855,10 +855,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       !item.site?.toLowerCase().includes('golani') &&
                       item.id !== 'eq-1'
                   );
+                  const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
                   for (const item of realItems) {
                     await fetch('/api/v1/hardware/register', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-key': adminKey,
+                      },
                       body: JSON.stringify(item),
                     });
                   }
@@ -5511,10 +5515,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         };
                         setAccessPoints([...accessPoints.filter(a => a.mac !== cleanMac), newAp]);
 
-                        // Persist to PostgreSQL database
+                        const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
                         fetch('/api/v1/hardware/register', {
                           method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'x-admin-key': adminKey,
+                          },
                           body: JSON.stringify({
                             id: `ap-${cleanMac.replace(/[^A-Z0-9]/g, '')}`,
                             name: apName,
@@ -5652,9 +5659,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             return a;
                           }));
                           // Update in PostgreSQL database
+                          const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
                           fetch('/api/v1/hardware/register', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'x-admin-key': adminKey,
+                            },
                             body: JSON.stringify({
                               id: `ap-${adoptingApModal.mac.replace(/[^A-Z0-9]/g, '')}`,
                               name: adoptingApModal.name || `Access Point ${adoptingApModal.mac.slice(-5)}`,
@@ -6768,17 +6779,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   }
                 } catch (e) {}
 
+                const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
                 const deleteUrl = `/api/v1/hardware/equipment/${encodeURIComponent(id)}${
                   targetMac ? `?mac=${encodeURIComponent(targetMac)}` : ''
                 }`;
-                fetch(deleteUrl, { method: 'DELETE' }).catch(() => {});
+                fetch(deleteUrl, {
+                  method: 'DELETE',
+                  headers: {
+                    'x-admin-key': adminKey,
+                  },
+                }).catch(() => {});
               }}
 
               onAddManual={(item) => {
                 setEquipmentInventory((prev) => [item, ...prev]);
+                const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
                 fetch('/api/v1/hardware/register', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-key': adminKey,
+                  },
                   body: JSON.stringify(item),
                 }).catch(() => {});
                 showToast('Kifaa Kimesajiliwa', `${item.name} kimesajiliwa kwenye stoo.`, 'success');
@@ -7990,10 +8011,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             // 1. Add to equipment inventory
             setEquipmentInventory((prev) => [newEq, ...prev]);
 
-            // Sync to backend server disk so PC, Phone, and all devices see it immediately!
+            const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
             fetch('/api/v1/hardware/register', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey,
+              },
               body: JSON.stringify(newEq),
             }).catch((err) => console.warn('Could not save to server:', err));
 
