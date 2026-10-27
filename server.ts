@@ -505,11 +505,10 @@ function loadSavedHardware() {
   try {
     if (fs.existsSync(HARDWARE_FILE)) {
       const data = JSON.parse(fs.readFileSync(HARDWARE_FILE, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         savedHardware = data.map((h) => ({
           ...h,
-          // Guarantee default online status unless explicitly down
-          status: (h.status === 'pending' ? 'pending' : 'online') as any,
+          status: (h.status === 'pending' ? 'pending' : (h.status || 'online')) as any,
         }));
         console.log(`[Hardware Inventory] Imepakua vifaa ${savedHardware.length} kutoka kwenye diski.`);
         return;
@@ -3778,10 +3777,10 @@ function loadSavedTowers(): any[] {
   try {
     if (fs.existsSync(TOWERS_FILE)) {
       const data = JSON.parse(fs.readFileSync(TOWERS_FILE, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data.map((t: any) => ({
           ...t,
-          status: t.status === 'maintenance' ? 'maintenance' : 'online'
+          status: t.status === 'maintenance' ? 'maintenance' : (t.status || 'online')
         }));
       }
     }
@@ -3846,6 +3845,13 @@ app.post('/api/v1/towers', async (req, res) => {
   if (Array.isArray(incomingTowers)) {
     saveTowersToFile(incomingTowers);
     try {
+      const incomingIds = new Set(incomingTowers.map((t: any) => t.id));
+      const dbRows = await db.select().from(towersTable);
+      for (const row of dbRows) {
+        if (!incomingIds.has(row.id)) {
+          await db.delete(towersTable).where(eq(towersTable.id, row.id));
+        }
+      }
       for (const t of incomingTowers) {
         if (!t.id || !t.name) continue;
         await db.insert(towersTable).values({
