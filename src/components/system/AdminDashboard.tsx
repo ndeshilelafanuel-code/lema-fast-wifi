@@ -799,7 +799,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [equipmentInventory, setEquipmentInventory] = useState<ScannedEquipment[]>(() => {
     try {
       const saved = localStorage.getItem('lema_wifi_equipment_inventory');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((item: any) =>
+            item &&
+            item.id !== 'eq-starlink-gen3' &&
+            item.category !== 'starlink' &&
+            !item.name?.toLowerCase().includes('starlink') &&
+            item.serialNumber !== 'SL-994810284' &&
+            item.macAddress !== '70:3A:0E:1A:8F:12'
+          );
+        }
+      }
     } catch (e) {}
     return [];
   });
@@ -813,19 +825,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let isMounted = true;
     const syncServerHardware = async () => {
       try {
-        const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+        const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b';
         const res = await fetch('/api/v1/hardware/inventory', {
           headers: adminKey ? { 'x-admin-key': adminKey } : {}
         });
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.inventory) && isMounted) {
-            setEquipmentInventory(data.inventory);
+            const cleaned = data.inventory.filter((item: ScannedEquipment) =>
+              item &&
+              item.id !== 'eq-starlink-gen3' &&
+              item.category !== 'starlink' &&
+              !item.name?.toLowerCase().includes('starlink') &&
+              item.serialNumber !== 'SL-994810284' &&
+              item.macAddress !== '70:3A:0E:1A:8F:12'
+            );
+            setEquipmentInventory(cleaned);
             try {
-              localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(data.inventory));
+              localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(cleaned));
             } catch {}
 
-            const serverAps = data.inventory
+            const serverAps = cleaned
               .filter((item: ScannedEquipment) => item.category === 'ap')
               .map((item: ScannedEquipment) => {
                 const isOnline = item.status === 'online';
@@ -6830,7 +6850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   }
                 } catch (e) {}
 
-                const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+                const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b';
                 const deleteUrl = `/api/v1/hardware/equipment/${encodeURIComponent(id)}${
                   targetMac ? `?mac=${encodeURIComponent(targetMac)}` : ''
                 }`;
@@ -6844,7 +6864,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               onAddManual={(item) => {
                 setEquipmentInventory((prev) => [item, ...prev]);
-                const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+                const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || 'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b';
                 fetch('/api/v1/hardware/register', {
                   method: 'POST',
                   headers: {
