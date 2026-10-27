@@ -457,6 +457,10 @@ export async function getAdminSession(cfgParam?: OmadaConfig, forceFresh = false
     }
   }
 
+  if (lastErrorCode === -30138) {
+    throw new Error('Akaunti ya Admin ina Ulinzi wa Hatua Mbili (Two-Factor Authentication / 2FA). TP-Link Omada inahitaji utengeneze akaunti mpya ya Local Admin isiyo na 2FA (Settings > Users/Admins > Add Local Admin) ili kuwezesha amri za kukata intaneti sekunde hiyo hiyo.');
+  }
+
   throw new Error(`Omada Admin login imeshindikana (Kosa ${lastErrorCode ?? 'N/A'}): ${lastErrorMsg || 'Invalid admin credentials'}`);
 }
 
@@ -676,7 +680,7 @@ export async function omadaUnauthorize(
       }
     }
 
-    // 3. Direct extPortal/unauth (Operator Session)
+    // 3. Direct extPortal/unauth and extPortal/logout (Operator Session)
     if (opSess) {
       try {
         const r = await call(
@@ -693,6 +697,23 @@ export async function omadaUnauthorize(
         };
       } catch (e: any) {
         results.extPortalUnauth = { error: e.message };
+      }
+
+      try {
+        const r = await call(
+          'POST',
+          `/${id}/api/v2/hotspot/extPortal/logout`,
+          { clientMac: clientMacFormatted, mac: clientMacFormatted, apMac: apMacFormatted },
+          { 'Csrf-Token': opSess.csrf },
+          opSess
+        );
+        results.extPortalLogout = {
+          statusCode: r.statusCode,
+          errorCode: r.json?.errorCode,
+          msg: r.json?.msg || r.json?.message
+        };
+      } catch (e: any) {
+        results.extPortalLogout = { error: e.message };
       }
 
       // 4. Hotspot Guests Unauth
@@ -1029,5 +1050,88 @@ export async function testOmadaConnection(
         controllerId: testCfg.controllerId || '(Haijawekwa)',
       },
     };
+  }
+}
+
+/**
+ * Real-Time Device Monitoring: Fetch live AP status directly from Omada Controller
+ */
+export async function getOmadaDevices(): Promise<Array<{ mac: string; name: string; model: string; ip: string; status: 'online' | 'offline'; rawStatus: any }>> {
+  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+    return [];
+  }
+
+  try {
+    const id = await resolveControllerId();
+    let sess: OmadaSession | null = null;
+    try {
+      sess = await getOperatorSession();
+    } catch {
+      return [];
+    }
+
+    let siteIds = ['Default', 'default'];
+    if (currentConfig.siteId) {
+      siteIds.unshift(currentConfig.siteId);
+    }
+
+    try {
+      const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': sess.csrf }, sess);
+      const list = sitesRes.json?.result?.data || (Array.isArray(sitesRes.json?.result) ? sitesRes.json.result : []);
+      if (Array.isArray(list)) {
+        for (const s of list) {
+          if (s.id && !siteIds.includes(s.id)) siteIds.push(s.id);
+          if (s.siteId && !siteIds.includes(s.siteId)) siteIds.push(s.siteId);
+          if (s.name && !siteIds.includes(s.name)) siteIds.push(s.name);
+        }
+      }
+    } catch (e) {}
+
+    const devicesList: Array<{ mac: string; name: string; model: string; ip: string; status: 'online' | 'offline'; rawStatus: any }> = [];
+
+    for (const site of siteIds) {
+      try {
+        const endpoints = [
+          `/${id}/api/v2/sites/${site}/devices`,
+          `/${id}/api/v2/devices`,
+          `/api/v2/sites/${site}/devices`,
+          `/api/v2/devices`,
+        ];
+
+        for (const ep of endpoints) {
+          const res = await call('GET', ep, undefined, { 'Csrf-Token': sess.csrf }, sess);
+          const rawDevices = res.json?.result?.data || (Array.isArray(res.json?.result) ? res.json.result : []);
+          if (Array.isArray(rawDevices) && rawDevices.length > 0) {
+            for (const d of rawDevices) {
+              const mac = (d.mac || d.macAddress || '').trim().toUpperCase();
+              if (mac) {
+                const isOnline =
+                  d.status === 1 ||
+                  d.statusCategory === 1 ||
+                  String(d.status).toLowerCase() === 'online' ||
+                  String(d.status).toLowerCase() === 'connected' ||
+                  String(d.status).toLowerCase() === 'running';
+
+                devicesList.push({
+                  mac,
+                  name: d.name || d.model || 'Omada AP',
+                  model: d.model || 'EAP',
+                  ip: d.ip || d.ipAddress || '',
+                  status: isOnline ? 'online' : 'offline',
+                  rawStatus: d.status,
+                });
+              }
+            }
+            if (devicesList.length > 0) break;
+          }
+        }
+      } catch (e) {}
+      if (devicesList.length > 0) break;
+    }
+
+    return devicesList;
+  } catch (err: any) {
+    console.warn('[Omada Devices Sync] Could not query Omada devices:', err.message);
+    return [];
   }
 }

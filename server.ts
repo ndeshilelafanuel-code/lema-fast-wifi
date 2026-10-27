@@ -18,7 +18,7 @@ import { db } from './src/db/index.ts';
 import { hardware, towers as towersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
-import { omadaAuthorize, omadaUnauthorize, omadaBlockClient, omadaUnblockClient, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId } from './omada.ts';
+import { omadaAuthorize, omadaUnauthorize, omadaBlockClient, omadaUnblockClient, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId, getOmadaDevices } from './omada.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -487,8 +487,43 @@ function saveHardwareToDisk() {
 
 loadSavedHardware();
 
-// API: Get Hardware Inventory (synchronized with Cloud SQL PostgreSQL & disk backup)
+// API: Get Hardware Inventory (synchronized with live Omada Controller, Cloud SQL PostgreSQL & disk backup)
 app.get('/api/v1/hardware/inventory', async (_req, res) => {
+  loadSavedHardware();
+
+  // 1. Sync live AP status directly from Omada Controller
+  try {
+    const liveDevices = await getOmadaDevices();
+    if (liveDevices && liveDevices.length > 0) {
+      let changed = false;
+      liveDevices.forEach((d) => {
+        const dMac = d.mac.replace(/[:-]/g, '').toUpperCase();
+        const found = savedHardware.find(
+          (h) => h.macAddress.replace(/[:-]/g, '').toUpperCase() === dMac || (d.ip && h.ipAddress === d.ip)
+        );
+        if (found) {
+          if (found.status !== d.status) {
+            found.status = d.status;
+            changed = true;
+          }
+          if (d.ip && d.ip.startsWith('192.168.')) found.ipAddress = d.ip;
+          found.lastSeen = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+      });
+      if (changed) {
+        saveHardwareToDisk();
+        for (const h of savedHardware) {
+          if (h.macAddress) {
+            db.update(hardware)
+              .set({ status: h.status, lastSeen: h.lastSeen || '' })
+              .where(eq(hardware.macAddress, h.macAddress.toUpperCase()))
+              .catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
   try {
     const rows = await db.select().from(hardware);
     if (rows && rows.length > 0) {
@@ -520,7 +555,6 @@ app.get('/api/v1/hardware/inventory', async (_req, res) => {
     console.warn('[Cloud SQL] Database read failed, using disk fallback:', dbErr);
   }
 
-  loadSavedHardware();
   res.json({
     success: true,
     source: 'disk_backup',
@@ -3565,19 +3599,49 @@ async function startServer() {
     console.warn('[DB Init] Background table setup notice:', err?.message || err);
   });
 
-  // Background Watchdog: Mark APs offline if no heartbeat received for 30 seconds (Bila MikroTik)
-  setInterval(() => {
+  // Background Watchdog: Query Omada Controller live status and mark APs offline if disconnected
+  setInterval(async () => {
     loadSavedHardware();
     const now = Date.now();
     let hwUpdated = false;
 
+    // Step 1: Query live AP devices directly from Omada Controller
+    try {
+      const liveDevices = await getOmadaDevices();
+      if (liveDevices && liveDevices.length > 0) {
+        liveDevices.forEach((d) => {
+          const dMac = d.mac.replace(/[:-]/g, '').toUpperCase();
+          const found = savedHardware.find(
+            (h) => h.macAddress.replace(/[:-]/g, '').toUpperCase() === dMac || (d.ip && h.ipAddress === d.ip)
+          );
+          if (found) {
+            if (found.status !== d.status) {
+              const previousStatus = found.status;
+              found.status = d.status;
+              hwUpdated = true;
+              console.log(`[Omada Watchdog] ⚡ AP ${found.name} (${found.ipAddress}) updated to ${d.status.toUpperCase()} (was ${previousStatus})`);
+              if (d.status === 'offline' && previousStatus === 'online') {
+                processApOutageAlert({
+                  status: 'down',
+                  apIp: found.ipAddress,
+                  apMac: found.macAddress,
+                  apName: found.name,
+                  site: found.site
+                }).catch(() => {});
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {}
+
+    // Step 2: Check heartbeats and mark stagnant devices offline
     savedHardware.forEach((h) => {
       const last = (h as any).lastHeartbeat || 0;
-      // If item is online and last heartbeat was more than 35 seconds ago
-      if (h.status === 'online' && last > 0 && now - last > 35000) {
+      if (h.status === 'online' && (last === 0 || now - last > 40000)) {
         h.status = 'offline';
         hwUpdated = true;
-        console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) haijatuma heartbeat kwa zaidi ya sekunde 35 - Imebadilishwa kuwa OFFLINE!`);
+        console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) is OFFLINE (no recent heartbeat/Omada signal)!`);
         processApOutageAlert({
           status: 'down',
           apIp: h.ipAddress,
