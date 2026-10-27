@@ -211,6 +211,7 @@ const isPublicV1Route = (method: string, path: string): boolean => {
   if (method === 'POST' && path === '/payments/webhook') return true;
   if (method === 'POST' && path === '/omada/webhook') return true;
   if (method === 'GET' && (path === '/hardware/inventory' || path === '/towers')) return true;
+  if (method === 'GET' && (path === '/routers' || path === '/settings' || path === '/ads' || path === '/tenants')) return true;
   if ((method === 'GET' || method === 'POST') && path === '/hardware/heartbeat') return true;
   if ((method === 'GET' || method === 'POST') && path === '/hardware/alert/outage') return true;
   if ((method === 'GET' || method === 'POST') && path === '/whatsapp/webhook') return true;
@@ -3880,6 +3881,279 @@ app.post('/api/v1/towers', async (req, res) => {
     return res.json({ success: true, count: incomingTowers.length });
   }
   return res.status(400).json({ success: false, error: 'Invalid format: towers must be an array' });
+});
+
+// DELETE single tower by ID
+app.delete('/api/v1/towers/:id', async (req, res) => {
+  const { id } = req.params;
+  const current = loadSavedTowers();
+  const filtered = current.filter((t: any) => t.id !== id);
+  saveTowersToFile(filtered);
+  try {
+    await db.delete(towersTable).where(eq(towersTable.id, id));
+  } catch (e) {}
+  return res.json({ success: true, towers: filtered, count: filtered.length, message: 'Mnara umefutwa kikamilifu.' });
+});
+
+// =========================================================================
+// ROUTERS & CLOUD CONTROLLERS PERSISTENCE (Synced across all devices)
+// =========================================================================
+const ROUTERS_FILE = path.resolve(__dirname, 'routers-data.json');
+let savedRouters: any[] = [];
+
+function loadSavedRouters(): any[] {
+  try {
+    if (fs.existsSync(ROUTERS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ROUTERS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        savedRouters = data;
+        return savedRouters;
+      }
+    }
+  } catch (e) {
+    console.warn('[Routers] Error reading routers-data.json:', e);
+  }
+  savedRouters = [];
+  return savedRouters;
+}
+
+function saveRoutersToDisk(routersList: any[]) {
+  try {
+    savedRouters = routersList;
+    fs.writeFileSync(ROUTERS_FILE, JSON.stringify(routersList, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Routers] Error writing routers-data.json:', e);
+  }
+}
+
+loadSavedRouters();
+
+app.get('/api/v1/routers', (_req, res) => {
+  const r = loadSavedRouters();
+  return res.json({ success: true, count: r.length, routers: r });
+});
+
+app.post('/api/v1/routers', (req, res) => {
+  const body = req.body;
+  const current = loadSavedRouters();
+  if (Array.isArray(body?.routers)) {
+    saveRoutersToDisk(body.routers);
+    return res.json({ success: true, count: body.routers.length, routers: body.routers });
+  } else if (body && body.id) {
+    const existingIdx = current.findIndex((r) => r.id === body.id);
+    if (existingIdx >= 0) {
+      current[existingIdx] = { ...current[existingIdx], ...body };
+    } else {
+      current.unshift(body);
+    }
+    saveRoutersToDisk(current);
+    return res.json({ success: true, count: current.length, routers: current, router: body });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid router payload' });
+});
+
+app.delete('/api/v1/routers/:id', (req, res) => {
+  const { id } = req.params;
+  const current = loadSavedRouters();
+  const filtered = current.filter((r) => r.id !== id);
+  saveRoutersToDisk(filtered);
+  return res.json({ success: true, message: 'Router imefutwa kikamilifu', count: filtered.length, routers: filtered });
+});
+
+// =========================================================================
+// HOTSPOT SETTINGS PERSISTENCE (Synchronized across all browsers/devices)
+// =========================================================================
+const SETTINGS_FILE = path.resolve(__dirname, 'settings-data.json');
+let savedSettings: any = null;
+
+function loadSavedSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+      if (data && typeof data === 'object') {
+        savedSettings = data;
+        return savedSettings;
+      }
+    }
+  } catch (e) {
+    console.warn('[Settings] Error reading settings-data.json:', e);
+  }
+
+  savedSettings = {
+    hotspotName: 'Lema Fast WiFi',
+    tagline: 'Intaneti ya Kasi ya Fiber & Starlink',
+    supportPhone: '0653 578 184',
+    currency: 'TZS',
+    paymentGateway: 'paypack',
+    merchantNumber: '5849201 (Lipa Namba)',
+    accountOwnerName: 'Jimmy Lema (Wewe Mmiliki)',
+    payoutMethod: 'lipa_namba',
+    packages: [
+      { id: 'pkg-2hrs', name: 'Saa 2 za Haraka', price: 500, durationHours: 2, speedDownload: '2.5M', speedUpload: '1.0M' },
+      { id: 'pkg-1day', name: 'Saa 24 (Siku 1)', price: 1000, durationHours: 24, speedDownload: '2.5M', speedUpload: '1.0M', isPopular: true },
+      { id: 'pkg-1week', name: 'Siku 7 (Wiki 1)', price: 5000, durationHours: 168, speedDownload: '3.0M', speedUpload: '1.5M' },
+      { id: 'pkg-1month', name: 'Siku 30 (Mwezi 1)', price: 25000, durationHours: 720, speedDownload: '3.5M', speedUpload: '2.0M' },
+    ]
+  };
+  saveSettingsToDisk(savedSettings);
+  return savedSettings;
+}
+
+function saveSettingsToDisk(data: any) {
+  try {
+    savedSettings = data;
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Settings] Error saving settings-data.json:', e);
+  }
+}
+
+loadSavedSettings();
+
+app.get('/api/v1/settings', (_req, res) => {
+  const current = loadSavedSettings();
+  return res.json({ success: true, settings: current });
+});
+
+app.post('/api/v1/settings', (req, res) => {
+  const updates = req.body;
+  if (!updates || typeof updates !== 'object') {
+    return res.status(400).json({ success: false, error: 'Invalid settings object' });
+  }
+  const current = loadSavedSettings();
+  const merged = { ...current, ...updates };
+  saveSettingsToDisk(merged);
+  return res.json({ success: true, settings: merged });
+});
+
+// =========================================================================
+// ADVERTISEMENTS PERSISTENCE (Synchronized across all browsers/devices)
+// =========================================================================
+const ADS_FILE = path.resolve(__dirname, 'ads-data.json');
+let savedAds: any[] = [];
+
+function loadSavedAds(): any[] {
+  try {
+    if (fs.existsSync(ADS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ADS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        savedAds = data;
+        return savedAds;
+      }
+    }
+  } catch (e) {
+    console.warn('[Ads] Error reading ads-data.json:', e);
+  }
+  savedAds = [];
+  return savedAds;
+}
+
+function saveAdsToDisk(adsList: any[]) {
+  try {
+    savedAds = adsList;
+    fs.writeFileSync(ADS_FILE, JSON.stringify(adsList, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Ads] Error saving ads-data.json:', e);
+  }
+}
+
+loadSavedAds();
+
+app.get('/api/v1/ads', (_req, res) => {
+  const current = loadSavedAds();
+  return res.json({ success: true, count: current.length, ads: current });
+});
+
+app.post('/api/v1/ads', (req, res) => {
+  const body = req.body;
+  const current = loadSavedAds();
+  if (Array.isArray(body?.ads)) {
+    saveAdsToDisk(body.ads);
+    return res.json({ success: true, count: body.ads.length, ads: body.ads });
+  } else if (body && body.id) {
+    const existingIdx = current.findIndex((a) => a.id === body.id);
+    if (existingIdx >= 0) {
+      current[existingIdx] = { ...current[existingIdx], ...body };
+    } else {
+      current.unshift(body);
+    }
+    saveAdsToDisk(current);
+    return res.json({ success: true, count: current.length, ads: current });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid ad payload' });
+});
+
+app.delete('/api/v1/ads/:id', (req, res) => {
+  const { id } = req.params;
+  const current = loadSavedAds();
+  const filtered = current.filter((a) => a.id !== id);
+  saveAdsToDisk(filtered);
+  return res.json({ success: true, count: filtered.length, ads: filtered, message: 'Tangazo limefutwa kikamilifu.' });
+});
+
+// =========================================================================
+// TENANTS PERSISTENCE (Multi-Tenant SaaS Synchronized across all devices)
+// =========================================================================
+const TENANTS_FILE = path.resolve(__dirname, 'tenants-data.json');
+let savedTenants: any[] = [];
+
+function loadSavedTenants(): any[] {
+  try {
+    if (fs.existsSync(TENANTS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TENANTS_FILE, 'utf-8'));
+      if (Array.isArray(data)) {
+        savedTenants = data;
+        return savedTenants;
+      }
+    }
+  } catch (e) {
+    console.warn('[Tenants] Error reading tenants-data.json:', e);
+  }
+  savedTenants = [];
+  return savedTenants;
+}
+
+function saveTenantsToDisk(tenantsList: any[]) {
+  try {
+    savedTenants = tenantsList;
+    fs.writeFileSync(TENANTS_FILE, JSON.stringify(tenantsList, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Tenants] Error saving tenants-data.json:', e);
+  }
+}
+
+loadSavedTenants();
+
+app.get('/api/v1/tenants', (_req, res) => {
+  const current = loadSavedTenants();
+  return res.json({ success: true, count: current.length, tenants: current });
+});
+
+app.post('/api/v1/tenants', (req, res) => {
+  const body = req.body;
+  const current = loadSavedTenants();
+  if (Array.isArray(body?.tenants)) {
+    saveTenantsToDisk(body.tenants);
+    return res.json({ success: true, count: body.tenants.length, tenants: body.tenants });
+  } else if (body && body.id) {
+    const existingIdx = current.findIndex((t) => t.id === body.id);
+    if (existingIdx >= 0) {
+      current[existingIdx] = { ...current[existingIdx], ...body };
+    } else {
+      current.unshift(body);
+    }
+    saveTenantsToDisk(current);
+    return res.json({ success: true, count: current.length, tenants: current });
+  }
+  return res.status(400).json({ success: false, error: 'Invalid tenant payload' });
+});
+
+app.delete('/api/v1/tenants/:id', (req, res) => {
+  const { id } = req.params;
+  const current = loadSavedTenants();
+  const filtered = current.filter((t) => t.id !== id);
+  saveTenantsToDisk(filtered);
+  return res.json({ success: true, count: filtered.length, tenants: filtered, message: 'Tenant imefutwa kikamilifu.' });
 });
 
 

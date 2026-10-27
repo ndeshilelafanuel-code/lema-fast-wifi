@@ -315,7 +315,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchServerVouchers = async () => {
       try {
-        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
         // CRITICAL SECURITY: Customer devices do not have admin_api_key and must NEVER query /api/v1/vouchers
         if (!rawKey) return;
         const res = await fetch('/api/v1/vouchers', {
@@ -470,21 +470,100 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let isMounted = true;
     const fetchTowersAndHardware = async () => {
       try {
-        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '') : '';
+        const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
         const headers: Record<string, string> = rawKey ? { 'x-admin-key': rawKey } : {};
-        const [towerRes, hwRes] = await Promise.all([
-          fetch('/api/v1/towers', { headers }).then((r) => r.json()).catch(() => null),
-          fetch('/api/v1/hardware/inventory', { headers }).then((r) => r.json()).catch(() => null),
-        ]);
+        const towerRes = await fetch('/api/v1/towers', { headers }).then((r) => r.json()).catch(() => null);
 
-        if (isMounted && towerRes?.success && Array.isArray(towerRes.towers) && towerRes.towers.length > 0) {
+        // Authoritative: if server returns empty towers (deleted), update state to []
+        if (isMounted && towerRes?.success && Array.isArray(towerRes.towers)) {
           setTowers(towerRes.towers);
+          try {
+            localStorage.setItem('wifi_hotspot_towers', JSON.stringify(towerRes.towers));
+          } catch {}
         }
       } catch (e) {}
     };
 
     fetchTowersAndHardware();
     const interval = setInterval(fetchTowersAndHardware, 2500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sync Hotspot Settings with backend server so configuration updates across all browsers
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/v1/settings');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && data.settings && isMounted) {
+            setSettings((prev) => ({ ...prev, ...data.settings }));
+            try {
+              localStorage.setItem('wifi_hotspot_settings', JSON.stringify(data.settings));
+            } catch {}
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchSettings();
+    const interval = setInterval(fetchSettings, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sync Advertisements with backend server
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAds = async () => {
+      try {
+        const res = await fetch('/api/v1/ads');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Array.isArray(data.ads) && isMounted) {
+            setAds(data.ads);
+            try {
+              localStorage.setItem('wifi_hotspot_ads', JSON.stringify(data.ads));
+            } catch {}
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchAds();
+    const interval = setInterval(fetchAds, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sync Multi-Tenant accounts with backend server
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTenants = async () => {
+      try {
+        const res = await fetch('/api/v1/tenants');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Array.isArray(data.tenants) && isMounted) {
+            setTenants(data.tenants);
+            try {
+              localStorage.setItem('wifi_hotspot_tenants', JSON.stringify(data.tenants));
+            } catch {}
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchTenants();
+    const interval = setInterval(fetchTenants, 4000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -575,7 +654,22 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [currentClientSession]);
 
   const updateSettings = (newSettings: Partial<HotspotSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const merged = { ...prev, ...newSettings };
+      try {
+        localStorage.setItem('wifi_hotspot_settings', JSON.stringify(merged));
+      } catch {}
+      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
+      fetch('/api/v1/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(rawKey ? { 'x-admin-key': rawKey } : {}),
+        },
+        body: JSON.stringify(merged),
+      }).catch(() => {});
+      return merged;
+    });
   };
 
   const generateVouchers = (packageId: string, count: number): Voucher[] => {
@@ -601,7 +695,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setVouchers((prev) => [...newVouchers, ...prev]);
     // Sync with backend server with admin authentication header
-    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+    const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
     if (!rawKey) {
       console.warn('[Vouchers Sync] No admin key stored in session.');
       return newVouchers;
@@ -618,7 +712,6 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (!r.ok) {
           const errData = await r.json().catch(() => null);
           console.error('[Vouchers Sync] Server rejected with status', r.status, errData);
-          alert(`Tahadhari: Vocha hazikuhifadhiwa kwenye seva (Hitilafu ${r.status}). Thibitisha ADMIN_API_KEY.`);
         }
       })
       .catch((err) => {
@@ -891,7 +984,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // 3. Send permanent DELETE request to server API
     try {
-      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
       if (rawKey) {
         await fetch(`/api/v1/vouchers/${encodeURIComponent(id)}`, {
           method: 'DELETE',
@@ -923,7 +1016,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // 3. Send DELETE clear_expired to server
     try {
-      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+      const rawKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
       if (rawKey) {
         await fetch('/api/v1/vouchers?action=clear_expired', {
           method: 'DELETE',
@@ -938,7 +1031,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const disconnectSession = async (sessionId: string) => {
-    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || '').trim() : '';
+    const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '').trim() : '';
 
     const targetSession = activeSessions.find(
       (s) => s.id === sessionId || s.macAddress?.toUpperCase() === sessionId.toUpperCase()
@@ -1100,7 +1193,16 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteTower = (id: string) => {
     setTowers((prev) => {
       const updated = prev.filter((t) => t.id !== id);
+      try {
+        localStorage.setItem('wifi_hotspot_towers', JSON.stringify(updated));
+      } catch {}
       const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch(`/api/v1/towers/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-key': adminKey,
+        },
+      }).catch(() => {});
       fetch('/api/v1/towers', {
         method: 'POST',
         headers: {
@@ -1123,7 +1225,17 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
       const prevIds = new Set(prev.map((t) => t.id));
       const brandNew = newTowers.filter((t) => !prevIds.has(t.id));
-      return [...brandNew, ...updatedPrev];
+      const merged = [...brandNew, ...updatedPrev];
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch('/api/v1/towers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify({ towers: merged }),
+      }).catch(() => {});
+      return merged;
     });
   };
 
@@ -1139,15 +1251,58 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       bgGradient: adData.bgGradient || 'from-amber-950/80 via-yellow-950/60 to-stone-900 border-amber-500/40 text-amber-200',
       badgeColor: adData.badgeColor || 'bg-amber-500 text-stone-950',
     };
-    setAds((prev) => [newAd, ...prev]);
+    setAds((prev) => {
+      const updated = [newAd, ...prev];
+      try {
+        localStorage.setItem('wifi_hotspot_ads', JSON.stringify(updated));
+      } catch {}
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch('/api/v1/ads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify(newAd),
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const updateAd = (id: string, updates: Partial<HotspotAdvertisement>) => {
-    setAds((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
+    setAds((prev) => {
+      const updated = prev.map((a) => (a.id === id ? { ...a, ...updates } : a));
+      try {
+        localStorage.setItem('wifi_hotspot_ads', JSON.stringify(updated));
+      } catch {}
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch('/api/v1/ads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify({ ads: updated }),
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const deleteAd = (id: string) => {
-    setAds((prev) => prev.filter((a) => a.id !== id));
+    setAds((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      try {
+        localStorage.setItem('wifi_hotspot_ads', JSON.stringify(updated));
+      } catch {}
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch(`/api/v1/ads/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-key': adminKey,
+        },
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const recordAdImpression = (id: string) => {
@@ -1172,16 +1327,59 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: `tenant-${Date.now()}`,
       createdAt: new Date().toISOString()
     };
-    setTenants((prev) => [newTenant, ...prev]);
+    setTenants((prev) => {
+      const updated = [newTenant, ...prev];
+      try {
+        localStorage.setItem('wifi_hotspot_tenants', JSON.stringify(updated));
+      } catch {}
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch('/api/v1/tenants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify(newTenant),
+      }).catch(() => {});
+      return updated;
+    });
     return newTenant;
   };
 
   const updateTenant = (id: string, updates: Partial<HotspotTenant>) => {
-    setTenants((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+    setTenants((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, ...updates } : t));
+      try {
+        localStorage.setItem('wifi_hotspot_tenants', JSON.stringify(updated));
+      } catch {}
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch('/api/v1/tenants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminKey,
+        },
+        body: JSON.stringify({ tenants: updated }),
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const deleteTenant = (id: string) => {
-    setTenants((prev) => prev.filter((t) => t.id !== id));
+    setTenants((prev) => {
+      const updated = prev.filter((t) => t.id !== id);
+      try {
+        localStorage.setItem('wifi_hotspot_tenants', JSON.stringify(updated));
+      } catch {}
+      const adminKey = typeof window !== 'undefined' ? (localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '') : '';
+      fetch(`/api/v1/tenants/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          'x-admin-key': adminKey,
+        },
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const renewTenantSubscription = (id: string, months: number = 1, ref?: string) => {

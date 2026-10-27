@@ -808,70 +808,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(equipmentInventory));
   }, [equipmentInventory]);
 
-  // Sync Hardware Inventory with backend server disk (so PC, Phone, and all devices share the exact same APs in real time)
+  // Sync Hardware Inventory with backend server disk (authoritative source of truth across all devices)
   useEffect(() => {
     let isMounted = true;
     const syncServerHardware = async () => {
       try {
-        const adminKey = localStorage.getItem('admin_api_key') || '';
+        const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
         const res = await fetch('/api/v1/hardware/inventory', {
           headers: adminKey ? { 'x-admin-key': adminKey } : {}
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.inventory)) {
-            if (data.inventory.length > 0) {
-              if (isMounted) {
-                setEquipmentInventory(data.inventory);
-                const serverAps = data.inventory
-                  .filter((item: ScannedEquipment) => item.category === 'ap')
-                  .map((item: ScannedEquipment) => {
-                    const isOnline = item.status === 'online';
-                    return {
-                      mac: item.macAddress,
-                      model: item.model,
-                      site: item.site,
-                      status: isOnline ? 'connected' : 'disconnected',
-                      uptime: isOnline
-                        ? ((item as any).lastSeen ? `Online (Seen: ${(item as any).lastSeen})` : 'Online (Imeunganishwa)')
-                        : 'Offline (Imezimwa / Hakuna Mawasiliano)',
-                    };
-                  });
-                if (serverAps.length > 0) {
-                  setAccessPoints(serverAps);
-                }
-              }
-            } else {
-              // If server is empty but this device (phone) has local scanned items, push them to server!
-              const saved = localStorage.getItem('lema_wifi_equipment_inventory');
-              if (saved) {
-                const localItems = JSON.parse(saved);
-                if (Array.isArray(localItems) && localItems.length > 0) {
-                  const realItems = localItems.filter(
-                    (item: any) =>
-                      item &&
-                      item.macAddress &&
-                      !item.name?.toLowerCase().includes('golani') &&
-                      !item.site?.toLowerCase().includes('golani') &&
-                      item.id !== 'eq-1'
-                  );
-                  const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
-                  for (const item of realItems) {
-                    await fetch('/api/v1/hardware/register', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'x-admin-key': adminKey,
-                      },
-                      body: JSON.stringify(item),
-                    });
-                  }
-                  if (realItems.length > 0) {
-                    console.log('[Hardware Sync] Pushed real APs to server database.');
-                  }
-                }
-              }
-            }
+          if (data && Array.isArray(data.inventory) && isMounted) {
+            setEquipmentInventory(data.inventory);
+            try {
+              localStorage.setItem('lema_wifi_equipment_inventory', JSON.stringify(data.inventory));
+            } catch {}
+
+            const serverAps = data.inventory
+              .filter((item: ScannedEquipment) => item.category === 'ap')
+              .map((item: ScannedEquipment) => {
+                const isOnline = item.status === 'online';
+                return {
+                  mac: item.macAddress,
+                  model: item.model,
+                  site: item.site,
+                  status: isOnline ? 'connected' : 'disconnected',
+                  uptime: isOnline
+                    ? ((item as any).lastSeen ? `Online (Seen: ${(item as any).lastSeen})` : 'Online (Imeunganishwa)')
+                    : 'Offline (Imezimwa / Hakuna Mawasiliano)',
+                };
+              });
+
+            // Authoritative: always mirror the server state so deletions sync immediately
+            setAccessPoints(serverAps);
+            try {
+              localStorage.setItem('lema_wifi_aps', JSON.stringify(serverAps));
+            } catch {}
           }
         }
       } catch (e) {
@@ -880,7 +853,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
 
     syncServerHardware();
-    const interval = setInterval(syncServerHardware, 3000);
+    const interval = setInterval(syncServerHardware, 2500);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Sync Routers with backend server so all browsers and devices show the exact same routers
+  useEffect(() => {
+    let isMounted = true;
+    const syncServerRouters = async () => {
+      try {
+        const res = await fetch('/api/v1/routers');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.routers) && isMounted) {
+            setRouters(data.routers);
+            try {
+              localStorage.setItem('lema_wifi_routers', JSON.stringify(data.routers));
+            } catch {}
+          }
+        }
+      } catch (e) {}
+    };
+
+    syncServerRouters();
+    const interval = setInterval(syncServerRouters, 3000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -4908,6 +4907,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         apiLatency: '12ms'
                       };
                       setRouters([...routers.filter(r => r.type !== 'TP-Link Omada'), nr]);
+                      const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+                      fetch('/api/v1/routers', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'x-admin-key': adminKey,
+                        },
+                        body: JSON.stringify(nr),
+                      }).catch(() => {});
                       setShowAddRouterForm(false);
                       showToast('TP-Link Omada', `Router/Controller "${newRouterName}" imeunganishwa kikamilifu!`, 'success');
                     }}
@@ -4986,12 +4994,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         <button
                           onClick={() => {
-                            if (confirm(`Una uhakika unataka kuondoa router ${routerItem.name}?`)) {
-                              setRouters(routers.filter(r => r.id !== routerItem.id));
-                              showToast('Router Imeondolewa', `Router ${routerItem.name} imeondolewa.`, 'info');
-                            }
+                            const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
+                            setRouters((prev) => prev.filter((r) => r.id !== routerItem.id));
+                            try {
+                              const saved = localStorage.getItem('lema_wifi_routers');
+                              if (saved) {
+                                const parsed = JSON.parse(saved);
+                                localStorage.setItem('lema_wifi_routers', JSON.stringify(parsed.filter((r: any) => r.id !== routerItem.id)));
+                              }
+                            } catch {}
+                            fetch(`/api/v1/routers/${encodeURIComponent(routerItem.id)}`, {
+                              method: 'DELETE',
+                              headers: {
+                                'x-admin-key': adminKey,
+                              },
+                            }).catch(() => {});
+                            showToast('Router Imeondolewa', `Router ${routerItem.name} imeondolewa kikamilifu kwenye vifaa vyote.`, 'info');
                           }}
-                          className="p-2 text-stone-400 hover:text-rose-400 bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-xl transition-colors"
+                          className="p-2 text-stone-400 hover:text-rose-400 bg-stone-800 hover:bg-stone-750 border border-stone-700 rounded-xl transition-colors cursor-pointer"
                           title="Futa kifaa"
                         >
                           <Trash2 className="w-4 h-4" />
