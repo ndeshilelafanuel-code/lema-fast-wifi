@@ -57,18 +57,15 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
-  const [showNetwatchModal, setShowNetwatchModal] = useState(false);
   const [showWindowsWatcherModal, setShowWindowsWatcherModal] = useState(false);
   const [importJsonText, setImportJsonText] = useState('');
   const [isSyncingServer, setIsSyncingServer] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isCopiedNetwatch, setIsCopiedNetwatch] = useState(false);
   const [isCopiedWatcher, setIsCopiedWatcher] = useState(false);
   const [editingTower, setEditingTower] = useState<NetworkTower | null>(null);
   const [viewingTechTower, setViewingTechTower] = useState<NetworkTower | null>(null);
   const [deletingTowerId, setDeletingTowerId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isSendingAlertTest, setIsSendingAlertTest] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -77,35 +74,15 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
     }, 3500);
   };
 
-  const handleSimulateAlert = async (type: 'down' | 'up') => {
-    setIsSendingAlertTest(true);
+  const handleRefreshTelemetry = async () => {
     try {
-      const targetTower = towers.find((t) => t.ipAddress.includes('115')) || towers[0];
-      const ip = targetTower?.ipAddress || '192.168.88.115';
-      const mac = targetTower?.macAddress || '50:C7:BF:70:E2:B0';
-      const name = targetTower?.name || 'Smart WiFi Node (Sokoni Ghorofani)';
-      const site = targetTower?.location || 'Sokoni Ghorofani';
-
-      await fetch(
-        `/api/v1/hardware/alert/outage?ip=${encodeURIComponent(ip)}&mac=${encodeURIComponent(mac)}&name=${encodeURIComponent(name)}&site=${encodeURIComponent(site)}&status=${type}`
-      );
-
-      if (targetTower) {
-        updateTower(targetTower.id, {
-          status: type === 'down' ? 'offline' : 'online',
-          lastPingMs: type === 'down' ? 0 : 4,
-        });
-      }
-
-      if (type === 'down') {
-        showToast('Kengele Imetumwa! Arifa ya AP IMEZIMA (OFFLINE) imetumwa WhatsApp na SMS kwa 0653 578 184.');
-      } else {
-        showToast('Kengele Imetumwa! Arifa ya AP IMEREJEA (ONLINE) imetumwa WhatsApp na SMS kwa 0653 578 184.');
+      const res = await fetch('/api/v1/hardware/inventory');
+      const data = await res.json();
+      if (data?.inventory) {
+        showToast('✅ Hali halisi ya vifaa imesasishwa kutoka kwenye seva!');
       }
     } catch {
-      showToast('Kengele imetumwa kwenye mfumo.');
-    } finally {
-      setIsSendingAlertTest(false);
+      showToast('Imesasishwa.');
     }
   };
 
@@ -284,11 +261,20 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={handleRefreshTelemetry}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-stone-800 hover:bg-stone-750 border border-stone-700 text-stone-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+            title="Soma upya hali halisi ya vifaa kutoka kwenye seva na Omada"
+          >
+            <RefreshCw className="w-4 h-4 text-emerald-400" />
+            <span>Onyesha Upya Hali</span>
+          </button>
+
           {onOpenScanner && (
             <button
               onClick={onOpenScanner}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
-              title="Skani QR Code au Barcode ya stika ya AP kwa kamera ya simu au kompyuta (Kama kwenye video)"
+              title="Skani QR Code au Barcode ya stika ya AP kwa kamera ya simu au kompyuta"
             >
               <Camera className="w-4 h-4 text-indigo-400" />
               <span>Skani QR ya AP (Kamera)</span>
@@ -389,23 +375,12 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
-              onClick={() => handleSimulateAlert('down')}
-              disabled={isSendingAlertTest}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
-              title="Jaribu kengele: Tuma taarifa kuwa AP Imezima (Simulate DOWN)"
+              onClick={handleRefreshTelemetry}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-stone-800 hover:bg-stone-700 border border-emerald-500/50 text-emerald-300 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+              title="Kukagua upya mawasiliano halisi kutoka kwenye AP na Seva"
             >
-              <Bell className="w-4 h-4 text-yellow-300" />
-              <span>{isSendingAlertTest ? 'Inatuma...' : 'Jaribu Kengele: AP Imezima'}</span>
-            </button>
-
-            <button
-              onClick={() => handleSimulateAlert('up')}
-              disabled={isSendingAlertTest}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
-              title="Jaribu kengele: Tuma taarifa kuwa AP Imerudi Hewani (Simulate UP)"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-              <span>Jaribu: AP Imerejea</span>
+              <RefreshCw className="w-4 h-4 text-emerald-400" />
+              <span>Kagua Mawasiliano Sasa</span>
             </button>
 
             <button
@@ -415,15 +390,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
             >
               <Server className="w-4 h-4 text-yellow-300" />
               <span>Watcher wa Windows (Omada PC)</span>
-            </button>
-
-            <button
-              onClick={() => setShowNetwatchModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-stone-800 hover:bg-stone-700 border border-stone-600 text-stone-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
-              title="Tazama Script ya MikroTik Netwatch ili ifanye kazi 100% kiotomatiki"
-            >
-              <Terminal className="w-4 h-4 text-amber-400" />
-              <span>Script ya MikroTik</span>
             </button>
           </div>
         </div>
@@ -747,8 +713,8 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
                     <option value="Omada EAP225-Outdoor">Omada EAP225-Outdoor</option>
                     <option value="Router ya Airtel (5G / 4G)">Router ya Airtel (5G / 4G)</option>
                     <option value="Starlink Gen 2/3 Router">Starlink Gen 2/3 Router</option>
-                    <option value="MikroTik RB750Gr3 hEX">MikroTik RB750Gr3 hEX</option>
-                    <option value="MikroTik cAP ac Outdoor">MikroTik cAP ac Outdoor</option>
+                    <option value="TP-Link ER605 Omada VPN Router">TP-Link ER605 Omada VPN Router</option>
+                    <option value="Ruijie Reyee RG-EG105G Gateway">Ruijie Reyee RG-EG105G Gateway</option>
                     <option value="Ubiquiti UniFi AC Mesh Pro">Ubiquiti UniFi AC Mesh Pro</option>
                     <option value="Generic Router / AP">Generic Router / AP</option>
                   </select>
@@ -1342,111 +1308,6 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
         </div>
       )}
 
-      {/* Netwatch MikroTik Script Modal */}
-      {showNetwatchModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-stone-900 border border-stone-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-            {/* Header */}
-            <div className="p-6 border-b border-stone-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <Terminal className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-white">MikroTik Netwatch Script (Kengele ya Sekunde 15)</h3>
-                  <p className="text-xs text-stone-400">Router inatuma WhatsApp & SMS yenyewe bila wewe kufanya kitu</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowNetwatchModal(false)}
-                className="w-8 h-8 rounded-full bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="p-6 space-y-5">
-              <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl text-xs space-y-2">
-                <div className="flex items-center gap-2 font-bold text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Jinsi Inavyofanya Kazi:</span>
-                </div>
-                <p className="text-stone-300 leading-relaxed">
-                  Router ya MikroTik hupima (ping) IP ya AP yako (<code>192.168.88.115</code>) kila baada ya <strong>sekunde 15</strong>. Umeme ukikatika au waya ukichomoka, inatuma kengele ya mtandao moja kwa moja kupitia webhook ya <code>/api/v1/hardware/alert/outage</code>, na mfumo unakuletea WhatsApp na SMS papo hapo kwenye <strong>0653 578 184</strong>!
-                </p>
-              </div>
-
-              {/* Instructions */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-stone-300">Hatua za Kuweka Kwenye MikroTik (WinBox au Terminal):</label>
-                <ol className="text-xs text-stone-400 space-y-1 list-decimal list-inside bg-stone-950 p-3 rounded-xl border border-stone-800">
-                  <li>Fungua programu ya <strong>WinBox</strong> kisha ingia kwenye Router yako ya MikroTik.</li>
-                  <li>Bofya menyu ya <strong>New Terminal</strong> (au nenda <em>Tools ➔ Netwatch</em>).</li>
-                  <li>Nakili script iliyo hapa chini kisha ibandike (Paste) kwenye Terminal na ubofye <strong>Enter</strong>:</li>
-                </ol>
-              </div>
-
-              {/* Code Box */}
-              <div className="relative">
-                <pre className="p-4 bg-stone-950 border border-stone-800 rounded-2xl text-xs font-mono text-amber-300/90 overflow-x-auto leading-relaxed select-all">
-{`/tool netwatch
-add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Sokoni Ghorofani" \\
-    down-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=down\\" mode=https keep-result=no; :log error \\"AP SOKONI IMEZIMA! Ujumbe wa dharura umetumwa WhatsApp na SMS.\\"" \\
-    up-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=up\\" mode=https keep-result=no; :log warning \\"AP SOKONI IMERUDI HEWANI!\\""`}
-                </pre>
-                <button
-                  onClick={() => {
-                    const script = `/tool netwatch\nadd host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Sokoni Ghorofani" \\\n    down-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=down\\" mode=https keep-result=no; :log error \\"AP SOKONI IMEZIMA! Ujumbe wa dharura umetumwa WhatsApp na SMS.\\"" \\\n    up-script="/tool fetch url=\\"https://www.lemawifi.online/api/v1/hardware/alert/outage?ip=192.168.88.115&status=up\\" mode=https keep-result=no; :log warning \\"AP SOKONI IMERUDI HEWANI!\\""`;
-                    navigator.clipboard.writeText(script);
-                    setIsCopiedNetwatch(true);
-                    showToast('📋 Script ya MikroTik imenakiliwa!');
-                    setTimeout(() => setIsCopiedNetwatch(false), 3000);
-                  }}
-                  className="absolute top-3 right-3 px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md active:scale-95"
-                >
-                  {isCopiedNetwatch ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{isCopiedNetwatch ? 'Imenakiliwa!' : 'Nakili Script'}</span>
-                </button>
-              </div>
-
-              {/* Live Test Controls inside Modal */}
-              <div className="p-4 bg-stone-950 border border-stone-800 rounded-2xl flex items-center justify-between gap-3">
-                <div className="text-xs">
-                  <div className="font-bold text-white">Unataka kujaribu kuona jinsi ujumbe unavyofika simuni?</div>
-                  <div className="text-stone-400 text-[11px]">Bofya kujaribu bila kusubiri umeme ukatike:</div>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => handleSimulateAlert('down')}
-                    disabled={isSendingAlertTest}
-                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
-                  >
-                    Tuma Alert ya DOWN
-                  </button>
-                  <button
-                    onClick={() => handleSimulateAlert('up')}
-                    disabled={isSendingAlertTest}
-                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
-                  >
-                    Tuma Alert ya UP
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-stone-800 flex justify-end bg-stone-950/40">
-              <button
-                onClick={() => setShowNetwatchModal(false)}
-                className="px-5 py-2 bg-stone-800 hover:bg-stone-700 text-white font-bold rounded-xl text-xs cursor-pointer"
-              >
-                Funga
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Windows Watcher Modal */}
       {showWindowsWatcherModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1473,7 +1334,7 @@ add host=192.168.88.115 interval=15s timeout=1000ms comment="Watchdog ya AP Soko
               <div className="p-4 bg-indigo-950/30 border border-indigo-500/30 rounded-2xl text-xs space-y-2">
                 <div className="flex items-center gap-2 font-bold text-indigo-300">
                   <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                  <span>Jinsi Inavyofanya Kazi Bila MikroTik:</span>
+                  <span>Jinsi Inavyofanya Kazi Kiotomatiki:</span>
                 </div>
                 <p className="text-stone-300 leading-relaxed">
                   Kompyuta yako ya Windows inayoendesha <strong>Omada Controller (127.0.0.1:8043)</strong> inapima (ping) AP yako yenye IP ya <strong>192.168.1.153</strong> na MAC ya <strong>D4-D6-DF-0D-B3-A0</strong> kila sekunde 6.

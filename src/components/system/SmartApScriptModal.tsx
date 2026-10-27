@@ -148,7 +148,7 @@ chmod +x /usr/bin/hotspot-expiry-sync.sh
   // 4. Cloud REST API Specifications for Hardware Controller
   const saasApiGuide = `{
   "platform": "Lema Fast WiFi Standalone TP-Link Omada AP SaaS Engine",
-  "version": "v2.0.0 (Zero-MikroTik Architecture)",
+  "version": "v2.0.0 (Standalone Cloud AP Architecture)",
   "hotspot_name": "${settings.hotspotName}",
   "merchant_id": "${settings.merchantNumber}",
   "endpoints": {
@@ -191,7 +191,7 @@ chmod +x /usr/bin/hotspot-expiry-sync.sh
 
   // 5. Architecture Comparison & Roadmap Guide
   const architectureGuide = `# ==============================================================
-# BLUEPRINT YA USANIFU: TP-LINK OMADA AP + MODEM YA ISP (ZERO MIKROTIK)
+# BLUEPRINT YA USANIFU: TP-LINK OMADA AP + MODEM YA ISP (STANDALONE AP)
 # ==============================================================
 
 1. MFUMO WA TP-LINK OMADA AP + MODEM YA ISP (Architecture Rasmi ya Lema Fast WiFi)
@@ -203,11 +203,11 @@ chmod +x /usr/bin/hotspot-expiry-sync.sh
      • Inarusha mawimbi yenye nguvu mtaani (mita 150 hadi 250).
      • Ina ukurasa wa vocha ndani yake (Captive Portal).
      • Inafunga na kufungulia wateja intaneti kulingana na malipo ya M-Pesa.
-     • Inadhibiti spidi (Bandwidth Management) bila kuhitaji MikroTik!
+     • Inadhibiti spidi (Bandwidth Management) moja kwa moja kwenye AP!
 
 2. KWA NINI TUNATUMIA TP-LINK OMADA AP PEKEE?
-   ✓ Gharama Ndogo Sana: Huhitaji kununua router ya ziada ya MikroTik.
-   ✓ Usanidi Rahisi: Hakuna script ngumu za RouterOS; kila kitu kinasanidiwa kwa simu kupitia Omada App au Omada Cloud.
+   ✓ Gharama Ndogo Sana: Huhitaji kununua router ya ziada ya gharama kubwa.
+   ✓ Usanidi Rahisi: Kila kitu kinasanidiwa kwa simu kupitia Omada App au Omada Cloud.
    ✓ Uimara wa Umeme: Vifaa vichache vinavyotumia umeme (AP moja na Modemu moja tu).
    ✓ Matengenezo Machache: Hakuna tatizo la router kuganda au kujaza RAM.`;
 
@@ -255,7 +255,7 @@ chmod +x /usr/bin/hotspot-expiry-sync.sh
           <div className="flex items-center gap-3">
             <LemaLogo variant="horizontal" size="xs" theme="dark" showSlogan={false} />
             <span className="text-stone-500 text-xs hidden sm:inline">|</span>
-            <span className="text-white font-bold text-xs sm:text-sm">TP-Link Omada AP Setup (Bila MikroTik)</span>
+            <span className="text-white font-bold text-xs sm:text-sm">TP-Link Omada AP Setup (Standalone AP)</span>
           </div>
           <button
             onClick={onClose}
@@ -336,7 +336,7 @@ chmod +x /usr/bin/hotspot-expiry-sync.sh
             {activeTab === 'walled-garden' && 'Vikoa vya malipo ya M-Pesa, Mixx by Yas, na Tigo bila vocha'}
             {activeTab === 'openwrt' && 'OpenWrt OpenNDS configuration script'}
             {activeTab === 'saas-api' && 'REST API schema ya kusawazisha na TP-Link Omada Cloud'}
-            {activeTab === 'architecture' && 'Mwongozo wa kutumia TP-Link Omada AP + Modemu ya ISP bila MikroTik'}
+            {activeTab === 'architecture' && 'Mwongozo wa kutumia TP-Link Omada AP + Modemu ya ISP moja kwa moja'}
           </div>
 
           <div className="flex items-center gap-2 ml-auto">

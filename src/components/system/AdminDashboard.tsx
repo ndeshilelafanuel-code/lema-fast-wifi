@@ -95,7 +95,6 @@ import { TowerManagementModule } from './TowerManagementModule';
 import { SpeedTestWidget } from './SpeedTestWidget';
 import { NetworkDiagnosticsModule } from './NetworkDiagnosticsModule';
 import { HardwareWiringGuideModal } from './HardwareWiringGuideModal';
-import { MikrotikScriptModal } from './MikrotikScriptModal';
 import jsQR from 'jsqr';
 import { LemaLogo } from '../common/LemaLogo';
 
@@ -886,8 +885,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Wizard & Omada Controller States (matching Video 1, 2, 3)
   const [showAddRouterForm, setShowAddRouterForm] = useState<boolean>(false);
-  const [selectedDeviceVendor, setSelectedDeviceVendor] = useState<'mikrotik' | 'omada' | 'ruijie'>('omada');
-  const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'openwrt' | 'mikrotik'>('omada');
+  const [selectedDeviceVendor, setSelectedDeviceVendor] = useState<'omada' | 'ruijie'>('omada');
+  const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'openwrt'>('omada');
   const [newRouterName, setNewRouterName] = useState<string>('Lema-Omada-1');
   const [newRouterSite, setNewRouterSite] = useState<string>('Nyansoo Site');
   const [newRouterControllerUrl, setNewRouterControllerUrl] = useState<string>(() => {
@@ -916,7 +915,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newSiteInput, setNewSiteInput] = useState<string>('Lema-Omada-1');
   const [verifiedOmadaStatus, setVerifiedOmadaStatus] = useState<string | null>(null);
   const [isVerifyingOmada, setIsVerifyingOmada] = useState<boolean>(false);
-  const [showMikrotikModal, setShowMikrotikModal] = useState<boolean>(false);
 
   // Hardware Wiring & Voltage Modal States
   const [showHardwareWiringModal, setShowHardwareWiringModal] = useState<boolean>(false);
@@ -4670,7 +4668,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span>Routers & Cloud Controllers</span>
                   </h3>
                   <p className="text-xs text-stone-400 mt-0.5">
-                    Chagua mfumo wako wa kugawa intaneti: MikroTik RouterOS au TP-Link Omada Cloud.
+                    Chagua mfumo wako wa kugawa intaneti: TP-Link Omada Cloud au Access Points.
                   </p>
                 </div>
 
@@ -4711,22 +4709,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span>TP-Link AP (Omada)</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDeviceVendor('mikrotik')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${
-                      selectedDeviceVendor === 'mikrotik'
-                        ? 'bg-amber-400 text-stone-950 border-amber-400 shadow-md shadow-amber-400/20'
-                        : 'bg-stone-950 text-stone-300 border-stone-800 hover:border-stone-700'
-                    }`}
-                  >
-                    <Terminal className="w-3.5 h-3.5" />
-                    <span>MikroTik Router</span>
-                  </button>
-
                   <div className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-stone-950 text-stone-500 border border-stone-800 flex items-center gap-2 cursor-not-allowed">
                     <Radio className="w-3.5 h-3.5 text-stone-600" />
-                    <span>Ruijie (Coming soon)</span>
+                    <span>Ruijie Reyee (Cloud)</span>
                   </div>
                 </div>
               </div>
@@ -5156,31 +5141,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* MIKROTIK ROUTER VIEW */}
-            {selectedDeviceVendor === 'mikrotik' && (
-              <div className="p-5 sm:p-6 bg-stone-950 border border-stone-800 rounded-2xl space-y-4 animate-fadeIn">
-                <div className="flex items-center justify-between pb-3 border-b border-stone-800">
-                  <div>
-                    <h4 className="text-base font-bold text-white">MikroTik RouterOS Integration</h4>
-                    <p className="text-xs text-stone-400 mt-0.5">
-                      Unganisha MikroTik Router yako (hEX, hAP ac2, Cloud Hosted Router) kwa script ya haraka.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowMikrotikModal(true)}
-                    className="px-3.5 py-1.5 font-bold text-xs bg-sky-500 hover:bg-sky-400 text-stone-950 rounded-xl cursor-pointer"
-                  >
-                    Fungua Script ya MikroTik
-                  </button>
-                </div>
-                <div className="p-4 rounded-xl bg-stone-900 border border-stone-800 text-xs text-stone-300 space-y-2">
-                  <p>1. Fungua programu ya <strong>Winbox</strong> na uingie kwenye MikroTik yako kama admin.</p>
-                  <p>2. Bonyeza menyu ya <strong>New Terminal</strong>.</p>
-                  <p>3. Bonyeza kitufe cha "Fungua Script ya MikroTik" hapo juu, nakili amri nzima, na uibandike kwenye Terminal ya Winbox kisha gonga Enter.</p>
-                </div>
               </div>
             )}
           </div>
@@ -8005,7 +7965,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         />
       )}
 
-      {/* Smart AP Cloud Setup Modal (Zero MikroTik) */}
+      {/* Smart AP Cloud Setup Modal */}
       {showScriptModal && (
         <SmartApScriptModal
           settings={settings}
@@ -8110,7 +8070,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
                 <div>
                   <h3 className="font-black text-sm uppercase tracking-wider text-white">Lema AI AP Adoption Wizard</h3>
-                  <p className="text-[10px] text-stone-400">Adopt and preconfigure any Access Point without MikroTik</p>
+                  <p className="text-[10px] text-stone-400">Adopt and preconfigure any Access Point directly</p>
                 </div>
               </div>
               <button
@@ -8591,7 +8551,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               className="w-full text-left p-2.5 hover:bg-stone-800 rounded-xl transition-colors text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <span>📡</span>
-              <span>Smart AP Cloud Setup (Bila MikroTik)</span>
+              <span>Smart AP Cloud Setup (Standalone AP)</span>
             </button>
 
             {/* Option 4: Print Vouchers */}
@@ -8702,14 +8662,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         defaultTab={hardwareGuideTab}
         lang={lang}
       />
-
-      {/* MikroTik Configuration Script Modal */}
-      {showMikrotikModal && (
-        <MikrotikScriptModal
-          settings={settings}
-          onClose={() => setShowMikrotikModal(false)}
-        />
-      )}
     </div>
   );
 };

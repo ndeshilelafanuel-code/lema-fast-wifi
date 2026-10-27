@@ -23,7 +23,7 @@ interface PaymentIntegrationGuideProps {
 }
 
 export const PaymentIntegrationGuide: React.FC<PaymentIntegrationGuideProps> = ({ lang }) => {
-  const [selectedGateway, setSelectedGateway] = useState<'zeno' | 'snippe' | 'selcom' | 'mikrotik'>('zeno');
+  const [selectedGateway, setSelectedGateway] = useState<'zeno' | 'snippe' | 'selcom' | 'gateway'>('zeno');
   const [selectedLanguage, setSelectedLanguage] = useState<'nodejs' | 'php' | 'python'>('nodejs');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -67,8 +67,8 @@ app.post('/api/zeno-callback', async (req, res) => {
     // A: Tengeneza Vocha ya Muda
     const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // B: Washa Mtandao Moja kwa Moja kwenye MikroTik RouterOS
-    await activateMikrotikUser(phone_number, voucherCode, amount);
+    // B: Washa Mtandao Moja kwa Moja kwenye Gateway Router
+    await activateGatewayUser(phone_number, voucherCode, amount);
 
     // C: Mtumie Mteja SMS ya Namba ya Vocha kama akiba
     await sendSmsBackup(phone_number, voucherCode);
@@ -112,7 +112,7 @@ if (isset($data['payment_status']) && $data['payment_status'] === 'COMPLETED') {
     $phone = $data['phone_number'];
     $amount = $data['amount'];
     
-    // Washa mtumiaji kwenye MikroTik kupitia RouterOS API
+    // Washa mtumiaji kwenye Gateway Router kupitia API
     // activate_hotspot_user($phone, $amount);
     
     http_response_code(200);
@@ -228,7 +228,7 @@ if (isset($event['type']) && $event['type'] === 'charge.completed') {
     $phone = $event['data']['customer']['phone'];
     $amount = $event['data']['amount'];
     
-    // Washa mtumiaji kwenye MikroTik Hotspot
+    // Washa mtumiaji kwenye Gateway Hotspot
     // activate_hotspot_user($phone, $amount);
     
     http_response_code(200);
@@ -309,8 +309,8 @@ app.post('/api/selcom-webhook', async (req, res) => {
   if (payment_status === 'SUCCESSFUL' || payment_status === 'COMPLETED') {
     console.log(\`✅ Malipo ya Selcom ya Tsh \${amount} kutoka \${phone_number} yamekamilika.\`);
     
-    // Washa mtandao kwa mteja sasa hivi kwenye MikroTik!
-    await activateMikrotikUserByPhone(phone_number, amount);
+    // Washa mtandao kwa mteja sasa hivi kwenye Gateway Router!
+    await activateGatewayUserByPhone(phone_number, amount);
   }
 
   return res.status(200).json({ result: "SUCCESS", message: "Webhook processed" });
@@ -379,8 +379,8 @@ if (isset($data['payment_status']) && $data['payment_status'] === 'SUCCESSFUL') 
     $phone = $data['phone_number'];
     $amount = $data['amount'];
     
-    // Washa mteja kwenye MikroTik RouterOS
-    // activate_mikrotik_hotspot_user($phone, $amount);
+    // Washa mteja kwenye Gateway Router
+    // activate_gateway_hotspot_user($phone, $amount);
     
     http_response_code(200);
     echo json_encode(['result' => 'SUCCESS']);
@@ -389,42 +389,22 @@ if (isset($data['payment_status']) && $data['payment_status'] === 'SUCCESSFUL') 
 }
 ?>`;
 
-  // MikroTik RouterOS Activation Script
-  const mikrotikActivationCode = `// JINSI YA KUWASHA MTEJA KWENYE MIKROTIK KUTOKA KWENYE WEBHOOK
-const RouterOSAPI = require('node-routeros').RouterOSAPI;
+  // Gateway Router Activation Script
+  const gatewayActivationCode = `// JINSI YA KUWASHA MTEJA KWENYE GATEWAY ROUTER KUTOKA KWENYE WEBHOOK
+const axios = require('axios');
 
-async function activateMikrotikUser(clientMac, clientIp, voucherCode, timeLimitHours) {
-  const conn = new RouterOSAPI({
-    host: '192.168.88.1',   // IP ya Router ya MikroTik
-    user: 'api_user',        // Mtumiaji mwenye ruhusa ya API
-    password: 'SafePassword123!',
-    port: 8728
-  });
-
+async function activateGatewayUser(clientMac, clientIp, voucherCode, timeLimitHours) {
   try {
-    await conn.connect();
+    const response = await axios.post('https://www.lemawifi.online/api/v1/gateway/authorize', {
+      mac_address: clientMac,
+      ip_address: clientIp,
+      voucher_code: voucherCode,
+      duration_hours: timeLimitHours
+    });
 
-    // 1. Ongeza mtumiaji kwenye Hotspot Users
-    await conn.write('/ip/hotspot/user/add', [
-      \`=name=\${voucherCode}\`,
-      \`=password=\${voucherCode}\`,
-      \`=profile=default\`,
-      \`=limit-uptime=\${timeLimitHours}h\`,
-      \`=comment=Automated Pay: \${clientMac}\`
-    ]);
-
-    // 2. (Hiari) Mwunganishe moja kwa moja kupitia IP Binding bila hata yeye ku-login!
-    await conn.write('/ip/hotspot/ip-binding/add', [
-      \`=mac-address=\${clientMac}\`,
-      \`=address=\${clientIp}\`,
-      \`=type=bypassed\`,
-      \`=comment=Paid-\${voucherCode}\`
-    ]);
-
-    console.log(\`✅ Mteja \${clientMac} amewashwa mtandaoni kwa saa \${timeLimitHours}!\`);
-    conn.close();
+    console.log(\`✅ Mteja \${clientMac} amewashwa mtandaoni kwa saa \${timeLimitHours}!\`, response.data);
   } catch (err) {
-    console.error("Hitilafu ya kuunganisha MikroTik:", err);
+    console.error("Hitilafu ya kuunganisha Gateway:", err);
   }
 }`;
 
@@ -435,8 +415,8 @@ async function activateMikrotikUser(clientMac, clientIp, voucherCode, timeLimitH
     if (selectedGateway === 'selcom') {
       return selectedLanguage === 'php' ? selcomPhpCode : selcomNodeCode;
     }
-    if (selectedGateway === 'mikrotik') {
-      return mikrotikActivationCode;
+    if (selectedGateway === 'gateway') {
+      return gatewayActivationCode;
     }
     return selectedLanguage === 'php' ? zenoPhpCode : zenoNodeCode;
   };
@@ -459,13 +439,13 @@ async function activateMikrotikUser(clientMac, clientIp, voucherCode, timeLimitH
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
           {lang === 'sw'
-            ? 'Jinsi ya Kuunganisha API za Malipo (ZenoPay, Snippe, Selcom) na MikroTik'
-            : 'How to Integrate Local Payment Gateway APIs with MikroTik Hotspot'}
+            ? 'Jinsi ya Kuunganisha API za Malipo (ZenoPay, Snippe, Selcom) na Router Gateway'
+            : 'How to Integrate Local Payment Gateway APIs with Hotspot Gateway'}
         </h2>
         <p className="mt-2 text-sm text-stone-300 max-w-3xl leading-relaxed">
           {lang === 'sw'
             ? 'Hatua kwa hatua jinsi mifumo ya malipo inavyowasiliana na simu za wateja (STK-Push), jinsi ya kupokea ujumbe wa uthibitisho (Webhooks), na jinsi kompyuta inavyomfungulia mteja mtandao mara moja bila wewe kuwepo.'
-            : 'End-to-end integration architecture: Initiating automated USSD STK-pushes, handling cryptographically verified webhooks, and auto-provisioning MikroTik Hotspot sessions.'}
+            : 'End-to-end integration architecture: Initiating automated USSD STK-pushes, handling cryptographically verified webhooks, and auto-provisioning Hotspot sessions.'}
         </p>
       </div>
 
@@ -540,7 +520,7 @@ async function activateMikrotikUser(clientMac, clientIp, voucherCode, timeLimitH
             </span>
             <div className="flex items-center gap-1.5 text-xs font-bold text-white">
               <Wifi className="w-3.5 h-3.5 text-amber-400" />
-              <span>MikroTik Hotspot</span>
+              <span>Hotspot Gateway</span>
             </div>
             <p className="text-[11px] text-stone-400 leading-relaxed">
               Server inawasiliana na router, inafungua MAC address ya mteja. Mtandao unawaka sekunde hiyo hiyo!
@@ -588,14 +568,14 @@ async function activateMikrotikUser(clientMac, clientIp, voucherCode, timeLimitH
             </button>
 
             <button
-              onClick={() => setSelectedGateway('mikrotik')}
+              onClick={() => setSelectedGateway('gateway')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedGateway === 'mikrotik'
+                selectedGateway === 'gateway'
                   ? 'bg-cyan-400 text-stone-950 shadow-sm'
                   : 'text-stone-300 hover:text-white bg-stone-850 hover:bg-stone-800'
               }`}
             >
-              4. MikroTik Auto-Activation
+              4. Gateway Auto-Activation
             </button>
           </div>
 

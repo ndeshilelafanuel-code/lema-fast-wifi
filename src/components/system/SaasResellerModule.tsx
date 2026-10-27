@@ -93,7 +93,7 @@ export const SaasResellerModule: React.FC<SaasResellerModuleProps> = ({
   const [newOwnerPhone, setNewOwnerPhone] = useState('');
   const [newCity, setNewCity] = useState('Dar es Salaam');
   const [newArea, setNewArea] = useState('');
-  const [newRouterType, setNewRouterType] = useState<'mikrotik' | 'ruijie' | 'omada' | 'generic'>('mikrotik');
+  const [newRouterType, setNewRouterType] = useState<'omada' | 'ruijie' | 'gateway' | 'generic'>('omada');
   const [newPlan, setNewPlan] = useState<TenantSubscriptionPlan>('pro');
 
   // Filter tenants
@@ -224,7 +224,7 @@ export const SaasResellerModule: React.FC<SaasResellerModuleProps> = ({
     setTimeout(() => setCopiedScript(false), 2000);
   };
 
-  const generateMikrotikScript = (tenant: HotspotTenant) => {
+  const generateGatewayScript = (tenant: HotspotTenant) => {
     const cloudUrl = window.location.origin;
     return `# ====================================================================
 # LEMA FAST WIFI - CLOUD SAAS CLIENT ONBOARDING SCRIPT
@@ -232,34 +232,22 @@ export const SaasResellerModule: React.FC<SaasResellerModuleProps> = ({
 # Tenant ID: ${tenant.id} | Router: ${tenant.routerType.toUpperCase()}
 # ====================================================================
 
-/log info "Kuanzisha muunganisho wa Cloud Hotspot ya ${tenant.businessName}..."
-
-# 1. Tengeneza Hotspot Profile inayoelekeza kwenye Cloud Portal
-/ip hotspot profile
-set [ find default=yes ] \\
-    dns-name="hotspot.${tenant.subdomain}.local" \\
-    hotspot-address=192.168.88.1 \\
-    login-by=http-chap,http-pap,mac-cookie \\
-    html-directory="hotspot" \\
-    rate-limit="10M/10M"
+# 1. Hotspot Profile inayoelekeza kwenye Cloud Portal
+dns-name: "hotspot.${tenant.subdomain}.local"
+hotspot-address: 192.168.0.1
+rate-limit: "10M/10M"
 
 # 2. Ruhusu Walled Garden kwa M-Pesa, Tigo Pesa, na Cloud Portal
-/ip hotspot walled-garden
-add comment="Ruhusu Cloud Portal" dst-host="${window.location.hostname}"
-add comment="Ruhusu Vodacom M-Pesa API" dst-host="*.vodacom.co.tz"
-add comment="Ruhusu Tigo Pesa Gateway" dst-host="*.tigo.co.tz"
-add comment="Ruhusu Airtel Money API" dst-host="*.airtel.co.tz"
-add comment="Ruhusu Halopesa Gateway" dst-host="*.halotel.co.tz"
+allowed-hosts:
+  - "${window.location.hostname}"
+  - "*.vodacom.co.tz"
+  - "*.tigo.co.tz"
+  - "*.airtel.co.tz"
+  - "*.halotel.co.tz"
 
-# 3. Weka Walled Garden IP kwaajili ya Portal
-/ip hotspot walled-garden ip
-add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
-
-# 4. Pakua faili za kisasa za login.html kutoka Cloud Server
-/tool fetch url="${cloudUrl}/api/mikrotik/templates/login.html?tenant=${tenant.id}" dst-path="hotspot/login.html" mode=https
-/tool fetch url="${cloudUrl}/api/mikrotik/templates/alogin.html?tenant=${tenant.id}" dst-path="hotspot/alogin.html" mode=https
-
-/log warning "SUCCESS! Hotspot ya ${tenant.businessName} imeunganishwa kikamilifu na Cloud SaaS!"
+# 3. Pakua faili za kisasa za login.html kutoka Cloud Server
+portal-url: "${cloudUrl}/portal?tenant=${tenant.id}"
+auth-endpoint: "${cloudUrl}/api/gateway/authorize"
 `;
   };
 
@@ -699,10 +687,10 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
                           <span>Fungua Dashboard Yake</span>
                         </button>
 
-                        {/* 1. Generate MikroTik Script */}
+                        {/* 1. Generate Router Script */}
                         <button
                           onClick={() => setSelectedTenantForScript(tenant)}
-                          title="Tengeneza MikroTik Script ya Cloud Hotspot"
+                          title="Tengeneza Script ya Router ya Cloud Hotspot"
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-700 hover:bg-stone-600 text-stone-200 hover:text-white text-xs font-bold transition-all cursor-pointer"
                         >
                           <Radio className="w-3.5 h-3.5 text-purple-400" />
@@ -1269,7 +1257,7 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
 
                 <h4 className="font-bold text-stone-900 font-sans uppercase pt-2">3. WAJIBU WA MTEJA (MMILIKI WA HOTSPOT)</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Kununua na kulinda usalama wa vifaa vyake halisi (MikroTik Router, Access Points, nyaya, na umeme thabiti).</li>
+                  <li>Kununua na kulinda usalama wa vifaa vyake halisi (Gateway Router, Access Points, nyaya, na umeme thabiti).</li>
                   <li>Kulipia kifurushi cha intaneti kutoka kwa kampuni ya simu au ISP (TTCL, Zuku, Starlink, n.k.) kwenye eneo lake.</li>
                   <li>Kulipa ada ya leseni ya mfumo ya kila mwezi kabla au ifikapo tarehe ya makubaliano.</li>
                 </ul>
@@ -1405,9 +1393,9 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
                     onChange={(e) => setNewRouterType(e.target.value as any)}
                     className="w-full p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-white text-xs"
                   >
-                    <option value="mikrotik">MikroTik RouterOS (Inayopendekezwa)</option>
+                    <option value="omada">TP-Link Omada SDN (Inayopendekezwa)</option>
+                    <option value="gateway">Core Gateway Router</option>
                     <option value="ruijie">Ruijie Reyee Cloud Gateway</option>
-                    <option value="omada">TP-Link Omada SDN</option>
                     <option value="generic">Generic Router / Captive Portal</option>
                   </select>
                 </div>
@@ -1446,7 +1434,7 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
         </div>
       )}
 
-      {/* MODAL 2: MIKROTIK PROVISIONING SCRIPT */}
+      {/* MODAL 2: ROUTER PROVISIONING SCRIPT */}
       {selectedTenantForScript && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-stone-900 border border-stone-700 rounded-2xl w-full max-w-2xl p-6 space-y-4 shadow-2xl">
@@ -1466,16 +1454,16 @@ add action=accept comment="Cloud Host" dst-address=0.0.0.0/0 dst-port=80,443
             </div>
 
             <p className="text-xs text-stone-300">
-              Nakili (*copy*) script hii ya MikroTik kisha i-paste kwenye WinBox au Terminal ya router ya mteja. Router itaunganishwa papo hapo na Cloud SaaS:
+              Nakili (*copy*) script hii ya router kisha i-paste kwenye Terminal ya router ya mteja. Router itaunganishwa papo hapo na Cloud SaaS:
             </p>
 
             <div className="relative">
               <pre className="p-4 rounded-xl bg-stone-950 border border-stone-800 text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-72 leading-relaxed">
-                {generateMikrotikScript(selectedTenantForScript)}
+                {generateGatewayScript(selectedTenantForScript)}
               </pre>
 
               <button
-                onClick={() => copyToClipboard(generateMikrotikScript(selectedTenantForScript))}
+                onClick={() => copyToClipboard(generateGatewayScript(selectedTenantForScript))}
                 className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
               >
                 {copiedScript ? (

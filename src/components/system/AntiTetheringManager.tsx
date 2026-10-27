@@ -114,8 +114,8 @@ export const AntiTetheringManager: React.FC<AntiTetheringManagerProps> = ({
     }
   };
 
-  // MikroTik RouterOS Anti-Tethering Rules (TTL Mangle + DNS Cache Defense)
-  const mikrotikAntiTetheringScript = `# ==============================================================
+  // Gateway RouterOS / Linux Anti-Tethering Rules (TTL Mangle + DNS Cache Defense)
+  const gatewayAntiTetheringScript = `# ==============================================================
 # ${hotspotName.toUpperCase()} - ANTI-TETHERING & ANTI-HOTSPOT SHARING
 # Kinga dhidi ya wateja wanaoshea vocha 1 kwa simu 5 mtaani
 # ==============================================================
@@ -146,8 +146,8 @@ add action=redirect chain=dstnat comment="Force All TCP DNS to Internal DNS" dst
 add action=log chain=prerouting comment="Log Hotspot Sharing Attempt" log-prefix="[TETHERING_ALERT]" ttl=equal:63
 `;
 
-  // MikroTik Anti-VPN & Tunneling / HA Tunnel Bypass Script
-  const mikrotikAntiTunnelingScript = `# ==============================================================
+  // Gateway Anti-VPN & Tunneling / HA Tunnel Bypass Script
+  const gatewayAntiTunnelingScript = `# ==============================================================
 # ${hotspotName.toUpperCase()} - ANTI-VPN & TUNNELING BYPASS SHIELD (2026)
 # Zuia HA Tunnel, HTTP Injector, DroidVPN, Cloudflare WARP & DoT
 # ==============================================================
@@ -349,7 +349,7 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
           }`}
         >
           <Terminal className="w-3.5 h-3.5" />
-          <span>Router & AP Scripts (MikroTik / Omada / Ruijie)</span>
+          <span>Router & AP Scripts (Omada / Ruijie / Gateway)</span>
         </button>
       </div>
 
@@ -928,7 +928,7 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
 
                 <div className="pt-2">
                   <button
-                    onClick={() => handleCopy(mikrotikAntiTunnelingScript, 'Anti-VPN Script')}
+                    onClick={() => handleCopy(gatewayAntiTunnelingScript, 'Anti-VPN Script')}
                     className="w-full py-2 bg-stone-900 hover:bg-stone-850 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs"
                   >
                     {copiedScript === 'Anti-VPN Script' ? (
@@ -939,7 +939,7 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Nakili MikroTik Script ya Kuzuia HA Tunnel & VPN Bypass</span>
+                        <span>Nakili Gateway Script ya Kuzuia HA Tunnel & VPN Bypass</span>
                       </>
                     )}
                   </button>
@@ -1156,20 +1156,20 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
       {/* 4. SCRIPTS & DEPLOYMENT CODES TAB */}
       {selectedSubTab === 'scripts' && (
         <div className="space-y-6 animate-fadeIn">
-          {/* MikroTik Terminal Script Box */}
+          {/* Gateway Terminal Script Box */}
           <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 text-white space-y-4 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
               <div className="flex items-center gap-2">
                 <Terminal className="w-5 h-5 text-amber-400" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                  1. MikroTik RouterOS Script (TTL Lock & Anti-Hotspot Sharing)
+                  1. Gateway Router Script (TTL Lock & Anti-Hotspot Sharing)
                 </h3>
               </div>
               <button
-                onClick={() => handleCopy(mikrotikAntiTetheringScript, 'MikroTik Anti-Tethering')}
+                onClick={() => handleCopy(gatewayAntiTetheringScript, 'Gateway Anti-Tethering')}
                 className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
               >
-                {copiedScript === 'MikroTik Anti-Tethering' ? (
+                {copiedScript === 'Gateway Anti-Tethering' ? (
                   <>
                     <Check className="w-3.5 h-3.5" />
                     <span>Imenakiliwa!</span>
@@ -1177,14 +1177,14 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Nakili Script ya MikroTik</span>
+                    <span>Nakili Script ya Gateway</span>
                   </>
                 )}
               </button>
             </div>
 
             <pre className="p-4 bg-stone-950 rounded-2xl font-mono text-[11px] text-emerald-400 overflow-x-auto leading-relaxed border border-stone-850">
-              {mikrotikAntiTetheringScript}
+              {gatewayAntiTetheringScript}
             </pre>
           </div>
 
@@ -1227,20 +1227,20 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
             </div>
           </div>
 
-          {/* 4. MikroTik Anti-VPN & Tunneling Shield */}
+          {/* 4. Gateway Anti-VPN & Tunneling Shield */}
           <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 text-white space-y-4 shadow-xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-rose-400" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                  4. MikroTik Script: Zuia VPN, HA Tunnel, DoT & Concurrency Spikes (2026)
+                  4. Gateway Script: Zuia VPN, HA Tunnel, DoT & Concurrency Spikes (2026)
                 </h3>
               </div>
               <button
-                onClick={() => handleCopy(mikrotikAntiTunnelingScript, 'MikroTik Anti-VPN')}
+                onClick={() => handleCopy(gatewayAntiTunnelingScript, 'Gateway Anti-VPN')}
                 className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
               >
-                {copiedScript === 'MikroTik Anti-VPN' ? (
+                {copiedScript === 'Gateway Anti-VPN' ? (
                   <>
                     <Check className="w-3.5 h-3.5" />
                     <span>Imenakiliwa!</span>
@@ -1255,7 +1255,7 @@ add action=drop chain=forward comment="[${hotspotName}] Zuia UDP DNS Tunneling P
             </div>
 
             <pre className="p-4 bg-stone-950 rounded-2xl font-mono text-[11px] text-rose-300 overflow-x-auto leading-relaxed border border-stone-850">
-              {mikrotikAntiTunnelingScript}
+              {gatewayAntiTunnelingScript}
             </pre>
           </div>
         </div>

@@ -4,8 +4,8 @@ export const EQUIPMENT_ITEMS: EquipmentItem[] = [
   {
     id: 'core-router',
     name: {
-      sw: 'Kipanga Njia Kikuu (MikroTik Core Router)',
-      en: 'Core Gateway Router (MikroTik RouterBOARD)'
+      sw: 'Kipanga Njia Kikuu (Core Gateway Router)',
+      en: 'Core Gateway Router (Enterprise Gateway)'
     },
     category: 'core',
     description: {
@@ -13,16 +13,16 @@ export const EQUIPMENT_ITEMS: EquipmentItem[] = [
       en: 'The heart of your network. Manages internet distribution, captive login portals, user bandwidth throttling, and voucher authentication.'
     },
     recommendedModels: [
-      'MikroTik hEX (RB750Gr3) - Chaguo Bora la Kuanzia! Inastahimili wateja 80-100 na inafanya kazi kikamilifu na Ruijie RAP62-OD.',
-      'MikroTik hEX S (RB760iGS) - Kijana wa hEX mwenye SFP port ya Fiber na PoE.',
-      'MikroTik RB5009UG+S+IN - Mnyama wa kazi kwa wateja 150-500+ na kupanua mtandao mkubwa.',
-      'MikroTik hAP ax² au ax³ - Kama unataka router yenye Wi-Fi ya ndani kwa ajili ya ofisini/nyumbani kwako pia.'
+      'Lema Gateway Router (G-800) - Chaguo Bora la Kuanzia! Inastahimili wateja 80-100 na inafanya kazi kikamilifu na Omada EAP772 Outdoor.',
+      'Lema Gateway Router S (G-850) - Kijana wa G-800 mwenye SFP port ya Fiber na PoE.',
+      'Lema Core Gateway Pro (G-5000) - Mnyama wa kazi kwa wateja 150-500+ na kupanua mtandao mkubwa.',
+      'Lema Dual-Band Gateway Router - Kama unataka router yenye Wi-Fi ya ndani kwa ajili ya ofisini/nyumbani kwako pia.'
     ],
     estimatedCostTzs: { min: 160000, max: 450000 },
     estimatedCostUsd: { min: 65, max: 180 },
     whyNeeded: {
-      sw: 'Bila router ya kibiashara kama MikroTik, huwezi kugawa vocha, huwezi kupunguza mteja asimalize bando ya wengine, na huwezi kutoza pesa. Hata hivyo, ukichagua kutumia AP zenye "Built-in Hotspot Controller" (kama Ruijie Reyee au TP-Link Omada), unaweza kuanza bila MikroTik!',
-      en: 'Without a specialized business router like MikroTik, advanced queueing and Mikhmon vouchers are not possible. However, if choosing smart APs with built-in cloud hotspot controllers (Ruijie Reyee or TP-Link Omada), you can start without MikroTik!'
+      sw: 'Bila router ya kibiashara, huwezi kugawa vocha, huwezi kupunguza mteja asimalize bando ya wengine, na huwezi kutoza pesa. Hata hivyo, ukichagua kutumia AP za TP-Link Omada EAP772 Outdoor, unaweza kuanza bila router ya ziada!',
+      en: 'Without a specialized business router, advanced queueing and automated vouchers are not possible. However, if choosing TP-Link Omada EAP772 Outdoor AP, you can start without an external router!'
     },
     isEssential: true,
     isOptionalInApOnly: true
@@ -30,26 +30,26 @@ export const EQUIPMENT_ITEMS: EquipmentItem[] = [
   {
     id: 'outdoor-ap',
     name: {
-      sw: 'Kituo cha Kurushia Mawimbi Nje (Outdoor Access Point)',
-      en: 'Outdoor Wireless Access Point (Omni / Sector)'
+      sw: 'Kituo cha Kurushia Mawimbi Nje (TP-Link Omada EAP772 Outdoor AP)',
+      en: 'Outdoor Wireless Access Point (TP-Link Omada EAP772 Outdoor)'
     },
     category: 'wireless',
     description: {
-      sw: 'Kifaa kinachorusha mawimbi ya WiFi kwa nguvu hewani ili simu na vifaa vya wateja viweze kukamata mtandao mita 100 hadi 400 kutoka kwenye mlingoti wako. Ukichagua mfumo wa "AP Tu Bila MikroTik", chagua AP zenye Cloud Hotspot ya ndani (Ruijie Reyee au TP-Link Omada).',
-      en: 'Transmits high-gain WiFi signals over the air 100m to 400m away. If deploying "AP-Only without MikroTik", choose smart APs with built-in Cloud Hotspot & Voucher systems (Ruijie Reyee or TP-Link Omada).'
+      sw: 'Kifaa kinachorusha mawimbi ya WiFi kwa nguvu hewani ili simu na vifaa vya wateja viweze kukamata mtandao mita 100 hadi 400 kutoka kwenye mlingoti wako. TP-Link Omada EAP772 Outdoor ina mfumo wa ndani wa Cloud Hotspot na Vocha unaoendeshwa moja kwa moja bila router ya ziada.',
+      en: 'Transmits high-gain WiFi signals over the air 100m to 400m away. TP-Link Omada EAP772 Outdoor features built-in Cloud Hotspot & Voucher system operating without external router.'
     },
     recommendedModels: [
-      'Ruijie Reyee RG-RAP62-OD (AX3000) - Chaguo la Kipekee la Wi-Fi 6! Mawimbi yenye nguvu zaidi, spidi kubwa na mduara mpana wa mita 250+. Inafaa kwa AP Tu au pamoja na MikroTik.',
-      'Ruijie Reyee RG-RAP6202(G) - Bora zaidi kwa AP Tu ya kuanzia (Cloud Hotspot ya bure kwenye simu, Vocha za QR, Hakuna MikroTik inayohitajika)',
-      'TP-Link EAP225-Outdoor (AC1200, Dual Band, Mduara 360°, ina Standalone Captive Portal & Omada Cloud Voucher)',
-      'Ubiquiti UniFi AC Mesh (UAP-AC-M) - Inasaidia UniFi Hotspot Voucher Manager',
-      'MikroTik BaseBox 2 / Groove 52 (Inahitaji RouterOS au MikroTik)'
+      'TP-Link Omada EAP772 Outdoor (Wi-Fi 7, Gigabit, IP67 Weatherproof) - Chaguo Namba 1 la Wisp! Inabeba watumiaji wengi na kurusha mawimbi mita 300+.',
+      'TP-Link EAP225-Outdoor (AC1200, Dual Band, Mduara 360°, Standalone Captive Portal & Omada Cloud Voucher)',
+      'Ruijie Reyee RG-RAP6202(G) Outdoor Gigabit AP',
+      'Ubiquiti UniFi AC Mesh (UAP-AC-M)',
+      'Outdoor Core AP / Sector AP (Inahitaji Gateway Controller)'
     ],
     estimatedCostTzs: { min: 220000, max: 480000 },
     estimatedCostUsd: { min: 90, max: 195 },
     whyNeeded: {
-      sw: 'Router za kawaida za ndani hazina uwezo wa kupenya kuta za nyumba za mtaani au kufika mbali. Access point ya nje inastahimili jua na mvua na inabeba watumiaji wengi kwa pamoja.',
-      en: 'Indoor home routers cannot penetrate brick walls or broadcast outdoors. Outdoor APs are weatherproof and support high client concurrency.'
+      sw: 'Router za kawaida za ndani hazina uwezo wa kupenya kuta za nyumba za mtaani au kufika mbali. Access point ya nje ya Omada EAP772 inastahimili jua na mvua na inabeba watumiaji wengi kwa pamoja.',
+      en: 'Indoor home routers cannot penetrate brick walls or broadcast outdoors. Outdoor Omada EAP772 AP is weatherproof and supports high client concurrency.'
     },
     isEssential: true
   },
@@ -175,7 +175,7 @@ export const EQUIPMENT_ITEMS: EquipmentItem[] = [
   {
     id: 'billing-software',
     name: {
-      sw: 'Mfumo wa Vocha & Malipo (Mikhmon / Billing Portal)',
+      sw: 'Mfumo wa Vocha & Malipo (Cloud Billing Portal)',
       en: 'Hotspot Billing & Automated Mobile Money Software'
     },
     category: 'core',
@@ -184,7 +184,7 @@ export const EQUIPMENT_ITEMS: EquipmentItem[] = [
       en: 'Software to generate printable QR vouchers, track user sessions, and connect automated M-Pesa/Tigo/Airtel mobile money payments.'
     },
     recommendedModels: [
-      'Mikhmon v3 / v4 (Bure kabisa, inafanya kazi kwenye kompyuta, simu au web server ndogo)',
+      'Cloud Hotspot Billing (Bure kabisa, inafanya kazi kwenye kompyuta, simu au web server ndogo)',
       'Mfumo wa Malipo ya Simu (Paypack / Beem / Selcom API au Kijisanduku cha Android SMS Gateway)',
       'Printa ya Thermal (58mm au 80mm) kwa ajili ya kuchapisha vocha za karatasi'
     ],
@@ -353,19 +353,19 @@ export const ROADMAP_STEPS: RoadmapStep[] = [
       en: '2 - 5 Days'
     },
     summary: {
-      sw: 'Nunua vifaa vinavyoaminika kutoka kwa mawakala wa MikroTik, Ubiquiti na TP-Link walioidhinishwa.',
+      sw: 'Nunua vifaa vinavyoaminika kutoka kwa mawakala wa TP-Link Omada, Ruijie na Ubiquiti walioidhinishwa.',
       en: 'Source battle-tested enterprise gear from trusted telecommunications distributors.'
     },
     details: {
       sw: [
-        'MikroTik hEX (RB750Gr3) au RB4011 - Nunua kifaa halisi chenye RouterOS Level 4 au zaidi.',
-        'Access Point ya Nje: TP-Link EAP225-Outdoor au Ubiquiti UniFi AC Mesh.',
+        'TP-Link Omada EAP772 Outdoor Wi-Fi 7 AP.',
+        'Access Point ya Nje: TP-Link EAP772 Outdoor au EAP225-Outdoor.',
         'Waya wa Cat6 wa Nje (FTP Shielded) - Usikubali waya wa ndani kwa sababu utaharibika ndani ya miezi michache.',
         'Mfumo wa umeme: UPS au Sola yenye betri ya Deep Cycle.'
       ],
       en: [
-        'MikroTik RouterBOARD with valid RouterOS Level 4 license.',
-        'Weatherproof Outdoor Access Point (e.g. TP-Link EAP225-Outdoor or Ubiquiti AC Mesh).',
+        'TP-Link Omada EAP772 Outdoor Wi-Fi 7 AP.',
+        'Weatherproof Outdoor Access Point (TP-Link EAP772 Outdoor).',
         'UV-resistant shielded Cat6 outdoor cable with grounded RJ45 modular jacks.',
         'Continuous DC UPS or solar controller battery setup.'
       ]
@@ -378,28 +378,28 @@ export const ROADMAP_STEPS: RoadmapStep[] = [
   {
     number: '04',
     title: {
-      sw: 'Usanidi wa MikroTik & Mfumo wa Vocha (Mikhmon)',
-      en: 'MikroTik Configuration & Mikhmon Voucher Setup'
+      sw: 'Usanidi wa Gateway Router & Mfumo wa Vocha',
+      en: 'Gateway Router Configuration & Voucher Setup'
     },
     duration: {
       sw: 'Siku 1 - 2',
       en: '1 - 2 Days'
     },
     summary: {
-      sw: 'Sanidi Hotspot Server kwenye RouterOS, tengeneza kurasa nzuri za kuingia (Captive Portal), na uweke Mikhmon kwa ajili ya vocha.',
-      en: 'Configure Hotspot Server on RouterOS, customize branded login portal, and initialize Mikhmon for voucher management.'
+      sw: 'Sanidi Hotspot Server kwenye Gateway Router, tengeneza kurasa nzuri za kuingia (Captive Portal), na uweke mfumo wa vocha.',
+      en: 'Configure Hotspot Server on Gateway Router, customize branded login portal, and initialize billing system for voucher management.'
     },
     details: {
       sw: [
-        'Kuweka IP Pool, DHCP Server, na Firewall NAT kwenye MikroTik kupitia program ya Winbox.',
+        'Kuweka IP Pool, DHCP Server, na Firewall NAT kwenye Gateway Router.',
         'Kuweka "Bandwidth Limiter" (Queue): Mfano kila mtumiaji apate 2Mbps au 3Mbps download na 1Mbps upload ili intaneti isilemewe na mtu mmoja anayepakua video.',
-        'Kusanidi Mikhmon: Mfumo mwepesi unaokuwezesha kutengeneza vocha 500 kwa dakika 1 zenye Username na Password fupi (nambari 4 au 5) na QR code.',
+        'Kusanidi Portal: Mfumo mwepesi unaokuwezesha kutengeneza vocha 500 kwa dakika 1 zenye Username na Password fupi (nambari 4 au 5) na QR code.',
         'Kuweka ukurasa wa Login wenye picha na nembo ya biashara yako, namba za mawasiliano na bei za vifurushi.'
       ],
       en: [
-        'Set up IP pools, DHCP ranges, and NAT masquerade rules inside MikroTik Winbox.',
+        'Set up IP pools, DHCP ranges, and NAT masquerade rules inside Gateway Router setup.',
         'Create fair-share bandwidth queues (e.g. 2.5Mbps download cap per user) to stop video streaming from choking the network.',
-        'Deploy Mikhmon to batch-print stylish QR code vouchers with simple 4-digit codes.',
+        'Deploy Billing Portal to batch-print stylish QR code vouchers with simple 4-digit codes.',
         'Personalize your captive portal with local branding, customer care phone numbers, and package rate cards.'
       ]
     },
@@ -495,8 +495,8 @@ export const FAQ_ITEMS: FaqItem[] = [
       en: 'Can I use Starlink as my primary internet backhaul for a hotspot business?'
     },
     answer: {
-      sw: 'Ndiyo, watu wengi sasa hivi wanatumia Starlink kwa ufanisi mkubwa sana, hasa mikoani na maeneo ambayo waya za Fiber optic bado hazijafika. Starlink inatoa kasi ya 80Mbps hadi 220Mbps, ambayo inatosha kabisa kuhudumia wateja 60 hadi 150 kwa pamoja. Unachotakiwa kufanya ni kununua "Starlink Ethernet Adapter" (kama unatumia dish ya Standard) kisha unganisha waya wa mtandao moja kwa moja kwenye Router ya MikroTik (kwenye port ya WAN/Ether1). Kuanzia hapo MikroTik ndiyo itakayodhibiti vocha, spidi na watumiaji.',
-      en: 'Yes, Starlink has become a game-changer across East Africa, particularly in provincial towns and peri-urban hubs where fiber has not arrived. Delivering 80–220Mbps, it comfortably supports 60–150 simultaneous users. Simply connect the Starlink Ethernet Adapter into your MikroTik router WAN port (Ether1). From there, MikroTik handles all hotspot captive portals, queue bandwidth allocation, and voucher authentication.'
+      sw: 'Ndiyo, watu wengi sasa hivi wanatumia Starlink kwa ufanisi mkubwa sana, hasa mikoani na maeneo ambayo waya za Fiber optic bado hazijafika. Starlink inatoa kasi ya 80Mbps hadi 220Mbps, ambayo inatosha kabisa kuhudumia wateja 60 hadi 150 kwa pamoja. Unachotakiwa kufanya ni kununua "Starlink Ethernet Adapter" (kama unatumia dish ya Standard) kisha unganisha waya wa mtandao moja kwa moja kwenye Router ya Kibiashara (Gateway) (kwenye port ya WAN/Ether1). Kuanzia hapo Gateway Router ndiyo itakayodhibiti vocha, spidi na watumiaji.',
+      en: 'Yes, Starlink has become a game-changer across East Africa, particularly in provincial towns and peri-urban hubs where fiber has not arrived. Delivering 80–220Mbps, it comfortably supports 60–150 simultaneous users. Simply connect the Starlink Ethernet Adapter into your Gateway router WAN port (Ether1). From there, Gateway Router handles all hotspot captive portals, queue bandwidth allocation, and voucher authentication.'
     }
   },
   {
@@ -506,8 +506,8 @@ export const FAQ_ITEMS: FaqItem[] = [
       en: 'Can customers pay autonomously via M-Pesa / Tigo Pesa / Airtel Money and receive instant vouchers?'
     },
     answer: {
-      sw: 'Ndiyo kabisa! Kuna mifumo ya "Automated Mobile Money Hotspot" (kama Paypack, Beem, au mifumo ya SMS Gateway/MikroTik API). Mteja anapounganisha WiFi, ukurasa wa mtandao unafunguka kwenye simu yake, anachagua kifurushi (k.m. Tsh 1,000 ya saa 24), anaandika namba yake ya simu, na anapokea ujumbe wa USSD kwenye simu yake wa kuweka neno la siri (PIN). Malipo yakikamilika, mfumo unamtengenezea vocha na kumuunganisha kiotomatiki papo hapo!',
-      en: 'Yes! Automated mobile payment integration is standard practice. Payment gateway APIs (like Paypack, Beem, Selcom, or localized Android SMS forwarders) listen for transactions. When a customer taps a package on the captive portal and submits their phone number, a USSD STK-push prompt prompts their mobile PIN. Upon confirmation, the gateway creates a MikroTik active user and logs them in seamlessly.'
+      sw: 'Ndiyo kabisa! Kuna mifumo ya "Automated Mobile Money Hotspot" (kama Paypack, Beem, au mifumo ya SMS Gateway/Cloud API). Mteja anapounganisha WiFi, ukurasa wa mtandao unafunguka kwenye simu yake, anachagua kifurushi (k.m. Tsh 1,000 ya saa 24), anaandika namba yake ya simu, na anapokea ujumbe wa USSD kwenye simu yake wa kuweka neno la siri (PIN). Malipo yakikamilika, mfumo unamtengenezea vocha na kumuunganisha kiotomatiki papo hapo!',
+      en: 'Yes! Automated mobile payment integration is standard practice. Payment gateway APIs (like Paypack, Beem, Selcom, or localized Android SMS forwarders) listen for transactions. When a customer taps a package on the captive portal and submits their phone number, a USSD STK-push prompt prompts their mobile PIN. Upon confirmation, the gateway creates an active user and logs them in seamlessly.'
     }
   },
   {
@@ -517,8 +517,8 @@ export const FAQ_ITEMS: FaqItem[] = [
       en: 'How much wholesale bandwidth capacity do I need to start?'
     },
     answer: {
-      sw: 'Kwa wanaoanza na wateja 30 hadi 60, intaneti ya 30Mbps hadi 50Mbps (Dedicated au Unlimited Fiber) inatosha sana. Siri kubwa ni kuweka "Bandwidth Queue" kwenye MikroTik: weka kila mtumiaji asipate zaidi ya 2Mbps hadi 3Mbps. Kwa kasi ya 2.5Mbps, simu ya mteja inaweza kucheza video ya YouTube ya 720p/1080p, kupiga simu ya WhatsApp ya video, na kutumia TikTok bila kukwama kabisa, huku mtandao wako ukiwa haulemewi!',
-      en: 'For a starter hub serving 30–60 active users, a 30Mbps to 50Mbps uncapped pipe is optimal. The key is configuring fair per-user bandwidth limits on your MikroTik (typically 2.0Mbps to 3.0Mbps download, 1.0Mbps upload). At 2.5Mbps, HD video streaming, WhatsApp video calls, and TikTok operate flawlessly without one heavy downloader hogging the whole network.'
+      sw: 'Kwa wanaoanza na wateja 30 hadi 60, intaneti ya 30Mbps hadi 50Mbps (Dedicated au Unlimited Fiber) inatosha sana. Siri kubwa ni kuweka "Bandwidth Queue" kwenye Gateway Router: weka kila mtumiaji asipate zaidi ya 2Mbps hadi 3Mbps. Kwa kasi ya 2.5Mbps, simu ya mteja inaweza kucheza video ya YouTube ya 720p/1080p, kupiga simu ya WhatsApp ya video, na kutumia TikTok bila kukwama kabisa, huku mtandao wako ukiwa haulemewi!',
+      en: 'For a starter hub serving 30–60 active users, a 30Mbps to 50Mbps uncapped pipe is optimal. The key is configuring fair per-user bandwidth limits on your Gateway Router (typically 2.0Mbps to 3.0Mbps download, 1.0Mbps upload). At 2.5Mbps, HD video streaming, WhatsApp video calls, and TikTok operate flawlessly without one heavy downloader hogging the whole network.'
     }
   },
   {
@@ -528,19 +528,19 @@ export const FAQ_ITEMS: FaqItem[] = [
       en: 'How do I handle frequent electrical grid blackouts?'
     },
     answer: {
-      sw: 'Kukatika kwa umeme ndio fursa yako kubwa zaidi ya kupata faida, kwa sababu minara ya mitandao ya simu mara nyingi inazidiwa uwezo au inapoteza spidi umeme unapokatika. Weka mfumo wa sola wa 12V au 24V (Paneli 1 ya 150W au 200W, Solar Charge Controller ya MPPT, na betri ya 100Ah au betri ya Lithium). Vifaa vya mtandao (MikroTik na Access Point) hutumia umeme mdogo sana (kati ya wati 15 hadi 35 kwa pamoja), hivyo betri ndogo inaweza kuviwasha kwa zaidi ya masaa 12 hadi 24 mfululizo!',
+      sw: 'Kukatika kwa umeme ndio fursa yako kubwa zaidi ya kupata faida, kwa sababu minara ya mitandao ya simu mara nyingi inazidiwa uwezo au inapoteza spidi umeme unapokatika. Weka mfumo wa sola wa 12V au 24V (Paneli 1 ya 150W au 200W, Solar Charge Controller ya MPPT, na betri ya 100Ah au betri ya Lithium). Vifaa vya mtandao (Gateway Router na Access Point) hutumia umeme mdogo sana (kati ya wati 15 hadi 35 kwa pamoja), hivyo betri ndogo inaweza kuviwasha kwa zaidi ya masaa 12 hadi 24 mfululizo!',
       en: 'Power outages are actually your highest-earning window, because when the grid fails, cellular base stations get overwhelmed and crawl. Networking gear draws very modest power (15W to 35W total). A single 150W solar panel with an MPPT charge controller and 100Ah battery or small DC UPS keeps your entire mast running uninterrupted for 12 to 24 hours.'
     }
   },
   {
     id: 'ap-only-possibility',
     question: {
-      sw: 'Je, inawezekana kabisa kuendesha biashara ya WiFi nikitumia AP tu bila kununua MikroTik?',
-      en: 'Is it truly possible to run a street WiFi hotspot using ONLY an Access Point without buying MikroTik?'
+      sw: 'Je, inawezekana kabisa kuendesha biashara ya WiFi nikitumia AP ya TP-Link Omada EAP772 pekee bila router ya ziada?',
+      en: 'Is it truly possible to run a street WiFi hotspot using ONLY TP-Link Omada EAP772 Outdoor AP without an external router?'
     },
     answer: {
-      sw: 'NDIYO KABISA! Inawezekana 100%, na watu wengi huanzia hapa kwa sababu ya mtaji mdogo. Ili kufanya hivi bila MikroTik, unatakiwa kununua AP maalum zenye mfumo wa ndani wa Cloud Hotspot & Vouchers kama vile "Ruijie Reyee RG-RAP6202(G)" au "TP-Link Omada EAP225-Outdoor". AP hizi huunganishwa moja kwa moja kwenye modemu ya ISP au Starlink yako, na unazisimamia kwa kutumia application ya bure kwenye simu yako (App ya Ruijie Reyee au Omada). Unaweza kutengeneza vocha, kuweka muda, na kupunguza spidi ya kila mteja moja kwa moja kutoka kwenye simu yako bila kompyuta wala MikroTik!',
-      en: 'ABSOLUTELY YES! It is 100% possible and very popular for bootstrapped entrepreneurs on a tight budget. To do this without MikroTik, simply purchase a smart AP equipped with built-in Cloud Hotspot & Voucher firmware—such as the Ruijie Reyee RG-RAP6202(G) or TP-Link Omada EAP225-Outdoor. Connect the AP directly into your ISP or Starlink modem via PoE, and manage everything through their 100% free mobile app. You can generate vouchers, enforce per-user speed limits, and manage sales right from your smartphone with zero PC or MikroTik needed!'
+      sw: 'NDIYO KABISA! Inawezekana 100% kutumia TP-Link Omada EAP772 Outdoor pekee. EAP772 ina mfumo wa ndani wa Cloud Hotspot & Vouchers. Kifaa hiki huunganishwa moja kwa moja kwenye modemu ya ISP au Starlink yako, na unazisimamia kwa kutumia application ya bure ya Omada App kwenye simu yako. Unaweza kutengeneza vocha, kuweka muda, na kupunguza spidi ya kila mteja moja kwa moja kutoka kwenye simu yako bila kompyuta wala router ya ziada!',
+      en: 'ABSOLUTELY YES! It is 100% possible to run standalone with TP-Link Omada EAP772 Outdoor AP. EAP772 features onboard Cloud Hotspot & Voucher firmware. Connect the EAP772 directly into your ISP or Starlink modem via PoE, and manage everything through the free Omada App. You can generate vouchers, enforce per-user speed limits, and manage sales right from your smartphone with zero PC or external router needed!'
     }
   }
 ];
@@ -559,60 +559,60 @@ export interface ApOnlyBrand {
 
 export const AP_ONLY_BRANDS: ApOnlyBrand[] = [
   {
+    id: 'tplink-omada',
+    name: 'TP-Link Omada (EAP772 Outdoor)',
+    recommendedModel: 'TP-Link Omada EAP772 Outdoor (Wi-Fi 7 Gigabit)',
+    appPlatform: 'Omada App / Omada Cloud (Bure kwenye Android & iOS)',
+    costTzs: 380000,
+    costUsd: 150,
+    isTopPick: true,
+    keyFeatures: {
+      sw: [
+        'Teknolojia mpya ya Wi-Fi 7 yenye spidi na mawimbi ya mita 300+ Outdoor',
+        'Cloud Hotspot ya bure 100% na Captive Portal ya vocha kwenye Omada App',
+        'Uwezo wa kutengeneza vocha (Vouchers) zenye QR code moja kwa moja kwenye simu',
+        'Kuweka kiwango cha spidi (Rate Limiting) kwa kila mtumiaji (k.m. 2.5Mbps)',
+        'IP67 Weatherproof—inastahimili jua na mvua bila matatizo'
+      ],
+      en: [
+        'Cutting-edge Wi-Fi 7 standard with high gain signals covering 300m+ outdoor',
+        '100% Free Lifetime Cloud Hotspot management via Omada mobile app',
+        'Generate printable QR vouchers directly inside the Omada mobile app',
+        'Built-in per-user bandwidth speed throttle (e.g. 2.5Mbps download)',
+        'Rugged IP67 outdoor weatherproof casing'
+      ]
+    },
+    whyBestForApOnly: {
+      sw: 'Ndilo chaguo namba moja la TP-Link Omada EAP772 Outdoor. Inakupa mfumo mzima wa Hotspot, Vocha, na Kuzuia spidi moja kwa moja kutoka kwenye simu yako bila kununua router yoyote ya ziada!',
+      en: 'The top recommendation for standalone deployment. TP-Link Omada EAP772 Outdoor provides complete captive portal, voucher management, and bandwidth control natively on your phone.'
+    }
+  },
+  {
     id: 'ruijie-reyee',
     name: 'Ruijie Reyee Cloud',
     recommendedModel: 'Reyee RG-RAP6202(G) Outdoor Gigabit AP',
     appPlatform: 'Ruijie Reyee App (Bure kwenye Android & iOS)',
     costTzs: 320000,
     costUsd: 128,
-    isTopPick: true,
     keyFeatures: {
       sw: [
         'Cloud Hotspot ya bure 100% bila malipo ya mwezi au leseni',
         'Uwezo wa kutengeneza vocha (Vouchers) zenye QR code moja kwa moja kwenye simu',
         'Kuweka kiwango cha spidi (Rate Limiting) kwa kila mtumiaji (k.m. 2Mbps)',
-        'Haikuhitaji kompyuta wala MikroTik—usanidi wote unakamilika kwa dakika 5 kwenye simu',
+        'Haikuhitaji kompyuta wala router ya ziada—usanidi wote unakamilika kwa dakika 5 kwenye simu',
         'Mduara wa mita 150 hadi 250 nje kwenye jua na mvua (IP68)'
       ],
       en: [
         '100% Free Lifetime Cloud Hotspot management with zero subscription fees',
         'Generate printable QR vouchers directly inside the Reyee mobile app',
         'Built-in per-user bandwidth speed throttle (e.g. 2.5Mbps download)',
-        'Zero PC or MikroTik required—100% phone app configuration in 5 minutes',
+        'Zero PC or external router required—100% phone app configuration in 5 minutes',
         'Rugged IP68 outdoor weatherproof casing covering 150m-250m radius'
       ]
     },
     whyBestForApOnly: {
-      sw: 'Ndilo chaguo namba moja Afrika Mashariki kwa watu wasiotaka MikroTik. Reyee Cloud inakupa kila kitu ambacho ungekipata kwenye MikroTik + Mikhmon lakini bure ndani ya simu yako!',
-      en: 'The #1 undisputed choice for entrepreneurs running without MikroTik. Reyee Cloud delivers voucher generation and rate limiting natively on mobile.'
-    }
-  },
-  {
-    id: 'tplink-omada',
-    name: 'TP-Link Omada',
-    recommendedModel: 'TP-Link EAP225-Outdoor (AC1200 Gigabit)',
-    appPlatform: 'Omada App / Standalone Web GUI / Omada Cloud',
-    costTzs: 240000,
-    costUsd: 96,
-    keyFeatures: {
-      sw: [
-        'Ina mfumo wa ndani wa "Standalone Captive Portal" unaofanya kazi bila controller',
-        'Ukiunganisha na Omada Cloud Controller (bure) inapata uwezo wa kutoa vocha za kipekee',
-        'Spidi kubwa ya Dual-Band (2.4GHz & 5GHz)',
-        'Bei nafuu sana sokoni na inapatikana kirahisi madukani Kariakoo na mikoani',
-        'Inabeba wateja 30 hadi 60 kwa wakati mmoja'
-      ],
-      en: [
-        'Features standalone onboard captive portal operating without any external controller',
-        'Supports unique QR/numeric vouchers when paired with free Omada Cloud Controller',
-        'Fast dual-band 802.11ac wireless (up to 1200Mbps aggregate)',
-        'Widely accessible and cost-effective across local East African supply shops',
-        'Accommodates 30 to 60 concurrent active street users'
-      ]
-    },
-    whyBestForApOnly: {
-      sw: 'Inapatikana kwa urahisi sana madukani, ina bei nafuu, na inaweza kutumika kama AP ya kawaida sasa na baadae ukiamua kuweka MikroTik hutaibadili!',
-      en: 'High local parts availability, great price point, and 100% reusable if you choose to graduate to MikroTik later.'
+      sw: 'Chaguo jingine zuri kwa mfumo wa Standalone AP.',
+      en: 'Alternative standalone AP option.'
     }
   },
   {
@@ -637,8 +637,8 @@ export const AP_ONLY_BRANDS: ApOnlyBrand[] = [
       ]
     },
     whyBestForApOnly: {
-      sw: 'Inafaa kama una laptop unayoweza kuwasha UniFi Controller mara moja kutengeneza vocha, au kama unataka mtandao imara zaidi usiokwama.',
-      en: 'Optimal if you have a laptop to run UniFi Controller for batch voucher creation, delivering bulletproof RF reliability.'
+      sw: 'Inafaa kama una laptop unayoweza kuwasha UniFi Controller mara moja kutengeneza vocha.',
+      en: 'Optimal if you have a laptop to run UniFi Controller for batch voucher creation.'
     }
   }
 ];
@@ -646,56 +646,56 @@ export const AP_ONLY_BRANDS: ApOnlyBrand[] = [
 export interface ComparisonRow {
   feature: { sw: string; en: string };
   apOnly: { sw: string; en: string };
-  mikrotikPlusAp: { sw: string; en: string };
-  winner: 'ap-only' | 'mikrotik' | 'tie';
+  routerPlusAp: { sw: string; en: string };
+  winner: 'ap-only' | 'router' | 'tie';
 }
 
 export const COMPARISON_METRICS: ComparisonRow[] = [
   {
     feature: { sw: 'Mtaji wa Kuanzia (Cost)', en: 'Starting Capital' },
     apOnly: {
-      sw: 'Nafuu sana (Tsh 380,000 – 600,000) kwa sababu haununui MikroTik wala mikanda yake',
+      sw: 'Nafuu sana (Tsh 380,000 – 600,000) kwa sababu haununui router ya ziada',
       en: 'Low ($150 – $240): No routerboard purchase required'
     },
-    mikrotikPlusAp: {
-      sw: 'Kati (Tsh 780,000 – 1,200,000) kwa sababu unanunua router ya MikroTik na AP',
-      en: 'Moderate ($310 – $480): Routerboard + AP combo'
+    routerPlusAp: {
+      sw: 'Kati (Tsh 780,000 – 1,200,000) kwa sababu unanunua Gateway router na AP',
+      en: 'Moderate ($310 – $480): Gateway router + AP combo'
     },
     winner: 'ap-only'
   },
   {
     feature: { sw: 'Ugumu wa Usanidi (Setup Ease)', en: 'Configuration Difficulty' },
     apOnly: {
-      sw: 'Rahisi mno! Dakika 5 hadi 10 kupitia application ya simu (Ruijie au Omada)',
-      en: 'Extremely easy: 5–10 min setup using mobile smartphone app'
+      sw: 'Rahisi mno! Dakika 5 hadi 10 kupitia application ya simu (Omada App au Reyee)',
+      en: 'Extremely easy: 5–10 min setup using Omada smartphone app'
     },
-    mikrotikPlusAp: {
-      sw: 'Inahitaji maarifa ya Winbox, IP routing, firewall, na kusanidi Mikhmon',
-      en: 'Moderate/Complex: Requires Winbox, NAT firewall, and Mikhmon scripts'
+    routerPlusAp: {
+      sw: 'Inahitaji maarifa ya Gateway, IP routing, na firewall setup',
+      en: 'Moderate/Complex: Requires Gateway setup, NAT firewall, and scripts'
     },
     winner: 'ap-only'
   },
   {
     feature: { sw: 'Idadi ya Wateja (Capacity)', en: 'Concurrent User Capacity' },
     apOnly: {
-      sw: 'Wateja 25 hadi 50 kwa wakati mmoja (inatosha duka, kijiwe, au kibanda)',
-      en: '25–50 users concurrent (great for kiosk, cafe, or single block)'
+      sw: 'Wateja 50 hadi 100+ kwa EAP772 (inatosha duka, kijiwe, au mtaa mzima)',
+      en: '50–100+ users concurrent on EAP772 (great for kiosk, cafe, or neighborhood)'
     },
-    mikrotikPlusAp: {
+    routerPlusAp: {
       sw: 'Wateja 100 hadi 500+ kwa wakati mmoja bila router kuzidiwa nguvu',
       en: '100–500+ users concurrent with zero CPU throttling'
     },
-    winner: 'mikrotik'
+    winner: 'router'
   },
   {
     feature: { sw: 'Kutoa Vocha (Voucher Creation)', en: 'Voucher Generation' },
     apOnly: {
-      sw: 'Inatoa vocha kupitia Reyee Cloud au Omada Controller (Code / QR)',
-      en: 'Generates vouchers directly in Reyee or Omada Cloud'
+      sw: 'Inatoa vocha kupitia Omada Cloud au Reyee Cloud (Code / QR)',
+      en: 'Generates vouchers directly in Omada or Reyee Cloud'
     },
-    mikrotikPlusAp: {
-      sw: 'Mikhmon: Inatoa maelfu ya vocha za karatasi, QR, na templates nzuri zenye nembo',
-      en: 'Mikhmon: High-volume batch printing with full custom templates'
+    routerPlusAp: {
+      sw: 'Gateway Portal: Inatoa maelfu ya vocha za karatasi, QR, na templates nzuri zenye nembo',
+      en: 'Gateway Portal: High-volume batch printing with full custom templates'
     },
     winner: 'tie'
   },
@@ -705,23 +705,22 @@ export const COMPARISON_METRICS: ComparisonRow[] = [
       sw: 'Inahitaji External Web Portal au kuuza vocha kwa maduka mkononi',
       en: 'Requires external portal setup or over-the-counter voucher sales'
     },
-    mikrotikPlusAp: {
+    routerPlusAp: {
       sw: 'Rahisi kuunganisha API ya moja kwa moja ya M-Pesa/Tigo Pesa/SMS Gateway',
-      en: 'Standard MikroTik API integrations for autonomous M-Pesa STK-push'
+      en: 'Standard Gateway API integrations for autonomous M-Pesa STK-push'
     },
-    winner: 'mikrotik'
+    winner: 'router'
   },
   {
     feature: { sw: 'Uwezo wa Kupanua Baadaye (Upgradability)', en: 'Future Scalability' },
     apOnly: {
-      sw: 'AP uliyonunua (Reyee au TP-Link) bado unaweza kuichomeka kwenye MikroTik baadaye!',
-      en: '100% reusable: Simply plug the same AP into a MikroTik when scaling'
+      sw: 'EAP772 uliyonunua bado unaweza kuichomeka kwenye Gateway router baadaye!',
+      en: '100% reusable: Simply plug the same EAP772 into a Gateway router when scaling'
     },
-    mikrotikPlusAp: {
+    routerPlusAp: {
       sw: 'Tayari unakuwa na msingi wa mtandao mkubwa wa ISP wa mji mzima',
       en: 'Full carrier foundation already primed for multi-tower expansion'
     },
     winner: 'tie'
   }
 ];
-

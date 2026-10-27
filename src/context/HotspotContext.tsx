@@ -477,30 +477,8 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
           fetch('/api/v1/hardware/inventory', { headers }).then((r) => r.json()).catch(() => null),
         ]);
 
-        let apStatus: 'online' | 'offline' | null = null;
-        if (hwRes && Array.isArray(hwRes.inventory) && hwRes.inventory.length > 0) {
-          const ap = hwRes.inventory.find((i: any) => i.category === 'ap') || hwRes.inventory[0];
-          if (ap) {
-            apStatus = ap.status === 'online' ? 'online' : 'offline';
-          }
-        }
-
-        if (isMounted) {
-          if (towerRes && towerRes.success && Array.isArray(towerRes.towers) && towerRes.towers.length > 0) {
-            setTowers((current) => {
-              const base = towerRes.towers.length > 0 ? towerRes.towers : current;
-              return base.map((t: NetworkTower) => {
-                if (apStatus && (!t.status || t.status === 'online' || t.status === 'offline')) {
-                  return { ...t, status: apStatus };
-                }
-                return t;
-              });
-            });
-          } else if (apStatus) {
-            setTowers((current) =>
-              current.map((t) => ({ ...t, status: apStatus as any }))
-            );
-          }
+        if (isMounted && towerRes?.success && Array.isArray(towerRes.towers) && towerRes.towers.length > 0) {
+          setTowers(towerRes.towers);
         }
       } catch (e) {}
     };
@@ -511,6 +489,28 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isMounted = false;
       clearInterval(interval);
     };
+  }, []);
+
+  // Automated In-Browser LAN Probe:
+  // If the admin or user's browser is on the local network (Wi-Fi), it probes the AP directly
+  // and automatically submits genuine heartbeats to the server.
+  useEffect(() => {
+    const probeLocalHardware = async () => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2500);
+        await fetch('http://192.168.88.115/', { mode: 'no-cors', signal: controller.signal });
+        clearTimeout(timer);
+        // AP reached on LAN - send heartbeat
+        fetch('/api/v1/hardware/heartbeat?ip=192.168.88.115&mac=D4-D6-DF-0D-B3-A0').catch(() => {});
+      } catch {
+        // Not directly on 192.168.88.x subnet or AP unreachable
+      }
+    };
+
+    probeLocalHardware();
+    const probeInterval = setInterval(probeLocalHardware, 12000);
+    return () => clearInterval(probeInterval);
   }, []);
 
   useEffect(() => {

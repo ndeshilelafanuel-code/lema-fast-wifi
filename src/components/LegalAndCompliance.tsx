@@ -118,8 +118,8 @@ export const LegalAndCompliance: React.FC<LegalAndComplianceProps> = ({ lang }) 
 
             <p className="text-xs text-stone-300 leading-relaxed">
               {lang === 'sw'
-                ? 'Sheria ya Makosa ya Mtandao (Cybercrimes Act) inamtaka mtoa huduma kurekodi anwani za IP na muda ambao watumiaji walikuwa mtandaoni. RouterOS ya MikroTik hufanya hili kiotomatiki kwa kuhifadhi kumbukumbu (Log files) za kila vocha iliyounganishwa na nambari ya simu au MAC address. Hii inakulinda kama mteja atafanya uhalifu akiwa kwenye WiFi yako!'
-                : 'Cybersecurity laws require network providers to record user connection logs. MikroTik RouterOS automates this by maintaining timestamped logs pairing each voucher session to its hardware MAC address and allocated IP, safeguarding you from legal liability if an end-user misbehaves.'}
+                ? 'Sheria ya Makosa ya Mtandao (Cybercrimes Act) inamtaka mtoa huduma kurekodi anwani za IP na muda ambao watumiaji walikuwa mtandaoni. Mfumo wetu wa Seva na Router hufanya hili kiotomatiki kwa kuhifadhi kumbukumbu (Log files) za kila vocha iliyounganishwa na nambari ya simu au MAC address. Hii inakulinda kama mteja atafanya uhalifu akiwa kwenye WiFi yako!'
+                : 'Cybersecurity laws require network providers to record user connection logs. Our Cloud Server & Gateway Router automate this by maintaining timestamped logs pairing each voucher session to its hardware MAC address and allocated IP, safeguarding you from legal liability if an end-user misbehaves.'}
             </p>
           </div>
         </div>

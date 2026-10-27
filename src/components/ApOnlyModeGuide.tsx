@@ -8,13 +8,8 @@ import {
   Smartphone,
   Zap,
   ArrowRight,
-  ShieldAlert,
   Sparkles,
-  Layers,
   Award,
-  Check,
-  X,
-  HelpCircle
 } from 'lucide-react';
 
 interface ApOnlyModeGuideProps {
@@ -23,15 +18,15 @@ interface ApOnlyModeGuideProps {
 }
 
 export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
-  const [activeBrandId, setActiveBrandId] = useState<string>('ruijie-reyee');
-  const [demoVouchers, setDemoVouchers] = useState<string[]>(['RY-8291', 'RY-4519', 'RY-7730']);
+  const [activeBrandId, setActiveBrandId] = useState<string>('tplink-omada');
+  const [demoVouchers, setDemoVouchers] = useState<string[]>(['OM-8291', 'OM-4519', 'OM-7730']);
   const [selectedDuration, setSelectedDuration] = useState<string>('24h');
   const [showWiringModal, setShowWiringModal] = useState<boolean>(false);
 
   const selectedBrand = AP_ONLY_BRANDS.find((b) => b.id === activeBrandId) || AP_ONLY_BRANDS[0];
 
   const generateNewVouchers = () => {
-    const prefix = activeBrandId === 'ruijie-reyee' ? 'RY' : 'OM';
+    const prefix = activeBrandId === 'tplink-omada' ? 'OM' : 'RY';
     const newCodes = [
       `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`,
       `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -53,18 +48,18 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white text-balance">
             {lang === 'sw' ? (
               <>
-                Kutumia <span className="text-amber-400">AP Tu Bila MikroTik</span>: Mwongozo Kamili
+                Kutumia <span className="text-amber-400">AP Tu za Standalone</span>: Mwongozo Kamili
               </>
             ) : (
               <>
-                Running with <span className="text-amber-400">Only an Access Point (No MikroTik)</span>
+                Running with <span className="text-amber-400">Only Standalone Access Points</span>
               </>
             )}
           </h2>
           <p className="mt-3 text-base text-stone-300 leading-relaxed">
             {lang === 'sw'
-              ? 'Ndiyo! Unaweza kuanzisha biashara yako ya WiFi bila kununua router ya MikroTik kwa kutumia "Smart Outdoor AP" zenye mfumo wa ndani wa Cloud Hotspot na Vocha unaoendeshwa moja kwa moja kutoka kwenye simu yako.'
-              : 'Yes! You can launch your street WiFi business without buying a MikroTik router by using Smart Outdoor APs that run built-in Cloud Hotspots and voucher generators directly from your mobile phone.'}
+              ? 'Ndiyo! Unaweza kuanzisha biashara yako ya WiFi bila kununua router ya ziada kwa kutumia "Smart Outdoor AP" zenye mfumo wa ndani wa Cloud Hotspot na Vocha unaoendeshwa moja kwa moja kutoka kwenye simu yako.'
+              : 'Yes! You can launch your street WiFi business without buying an external router by using Smart Outdoor APs that run built-in Cloud Hotspots and voucher generators directly from your mobile phone.'}
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -125,8 +120,8 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
             </h3>
             <p className="text-xs text-stone-300 leading-relaxed">
               {lang === 'sw'
-                ? 'Hakuna kompyuta wala Winbox! Unatumia app ya bure (Reyee App au Omada App) kutengeneza vocha, kuona idadi ya wateja, na kugawa vifurushi.'
-                : 'Zero laptop or Winbox scripts needed! Use the free vendor app to batch generate vouchers, track clients, and set validity hours.'}
+                ? 'Hakuna kompyuta wala router ya ziada! Unatumia app ya bure (Reyee App au Omada App) kutengeneza vocha, kuona idadi ya wateja, na kugawa vifurushi.'
+                : 'Zero laptop or CLI scripts needed! Use the free vendor app to batch generate vouchers, track clients, and set validity hours.'}
             </p>
           </div>
         </div>
@@ -136,7 +131,7 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
           <div className="flex items-center justify-between border-b border-stone-800 pb-4 mb-6">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                {lang === 'sw' ? 'Mchoro wa Mtandao wa AP Tu (Bila MikroTik)' : 'AP-Only Network Diagram'}
+                {lang === 'sw' ? 'Mchoro wa Mtandao wa AP Tu (Standalone AP)' : 'AP-Only Network Diagram'}
               </h3>
               <p className="text-xs text-stone-400 mt-0.5">
                 {lang === 'sw'
@@ -177,7 +172,7 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
             {/* Box 3 */}
             <div className="p-4 rounded-xl bg-stone-900 border border-emerald-500/40 text-center ring-1 ring-emerald-400/20">
               <p className="text-xs font-mono text-emerald-400 font-bold mb-1">03. SMART AP</p>
-              <h4 className="text-sm font-bold text-white">Ruijie Reyee / TP-Link EAP</h4>
+              <h4 className="text-sm font-bold text-white">TP-Link Omada EAP772 Outdoor (Wi-Fi 7)</h4>
               <p className="text-[11px] text-stone-400 mt-1">Cloud Hotspot + Vocha za QR + Spidi</p>
             </div>
           </div>
@@ -189,7 +184,7 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
           <div className="lg:col-span-7 space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Award className="w-5 h-5 text-amber-400" />
-              <span>{lang === 'sw' ? 'Chagua AP Inayofaa Zaidi Bila MikroTik' : 'Best APs for Non-MikroTik Hotspot'}</span>
+              <span>{lang === 'sw' ? 'Chagua AP Inayofaa Zaidi kwa Standalone Hotspot' : 'Best APs for Standalone Hotspot'}</span>
             </h3>
 
             <div className="space-y-3">
@@ -409,13 +404,13 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
           </div>
         </div>
 
-        {/* Detailed Comparison Table: AP Only vs MikroTik + AP */}
+        {/* Detailed Comparison Table: AP Only vs Gateway + AP */}
         <div className="bg-stone-950 rounded-2xl p-6 sm:p-8 border border-stone-800">
           <div className="max-w-2xl mb-6">
             <h3 className="text-lg font-bold text-white">
               {lang === 'sw'
-                ? 'Ulinganifu: "AP Tu" Dhidi ya "MikroTik + AP"'
-                : 'Decision Matrix: "AP Only" vs "MikroTik + AP"'}
+                ? 'Ulinganifu: "AP Tu" Dhidi ya "Gateway + AP"'
+                : 'Decision Matrix: "AP Only" vs "Gateway + AP"'}
             </h3>
             <p className="text-xs text-stone-400 mt-1">
               {lang === 'sw'
@@ -432,10 +427,10 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
                     {lang === 'sw' ? 'Kipengele' : 'Feature'}
                   </th>
                   <th className="py-3 px-4 font-semibold uppercase tracking-wider text-amber-400">
-                    {lang === 'sw' ? 'AP Tu (Bila MikroTik)' : 'AP Only (No MikroTik)'}
+                    {lang === 'sw' ? 'AP Tu (Standalone)' : 'AP Only (Standalone)'}
                   </th>
                   <th className="py-3 px-4 font-semibold uppercase tracking-wider text-stone-300">
-                    {lang === 'sw' ? 'Mfumo Kamili (MikroTik + AP)' : 'Full System (MikroTik + AP)'}
+                    {lang === 'sw' ? 'Mfumo Kamili (Gateway + AP)' : 'Full System (Gateway + AP)'}
                   </th>
                 </tr>
               </thead>
@@ -449,7 +444,7 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
                       {row.apOnly[lang]}
                     </td>
                     <td className="py-3.5 px-4 text-stone-400">
-                      {row.mikrotikPlusAp[lang]}
+                      {row.routerPlusAp[lang]}
                     </td>
                   </tr>
                 ))}
@@ -460,8 +455,8 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
           <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
             <strong>{lang === 'sw' ? 'Ushauri wa Mwisho: ' : 'Key Takeaway: '}</strong>
             {lang === 'sw'
-              ? 'Kama una mtaji mdogo sana (chini ya Tsh 500,000) au haupendi mambo magumu ya networking, ANZA NA AP TU (hasa Ruijie Reyee RG-RAP6202G). Ukishapata wateja zaidi ya 50 na kukuza mtaji, unaweza kuongeza MikroTik wakati wowote bila kutupa AP yako!'
-              : 'If you have low starting capital (under $200) or want zero networking configuration headache, START WITH AP ONLY (especially Ruijie Reyee RG-RAP6202G). Once you grow beyond 50 regular users, you can effortlessly introduce a MikroTik router later without replacing your AP!'}
+              ? 'Kama una mtaji mdogo sana (chini ya Tsh 500,000) au haupendi mambo magumu ya networking, ANZA NA AP TU (hasa Ruijie Reyee RG-RAP6202G). Ukishapata wateja zaidi ya 50 na kukuza mtaji, unaweza kuongeza Gateway Router wakati wowote bila kutupa AP yako!'
+              : 'If you have low starting capital (under $200) or want zero networking configuration headache, START WITH AP ONLY (especially Ruijie Reyee RG-RAP6202G). Once you grow beyond 50 regular users, you can effortlessly introduce a Gateway router later without replacing your AP!'}
           </div>
         </div>
       </div>

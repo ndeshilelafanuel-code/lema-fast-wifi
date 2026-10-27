@@ -46,9 +46,9 @@ export const Footer: React.FC<FooterProps> = ({ lang, onPrint, onScrollToTop }) 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
           <p>© {new Date().getFullYear()} Mwongozo wa Biashara ya WiFi. Haki zote zimehifadhiwa.</p>
           <div className="flex items-center gap-4 text-stone-400">
-            <span>MikroTik RouterOS</span>
+            <span>TP-Link Omada SDN</span>
             <span aria-hidden="true">·</span>
-            <span>Mikhmon Billing</span>
+            <span>Lema Cloud Engine</span>
             <span aria-hidden="true">·</span>
             <span>Fiber & Starlink Ready</span>
           </div>

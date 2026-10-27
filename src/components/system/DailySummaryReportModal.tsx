@@ -483,7 +483,7 @@ export const DailySummaryReportModal: React.FC<DailySummaryReportModalProps> = (
             </p>
             <p>Namba ya Msaada: {settings.supportPhone}</p>
             <p className="text-[10px] text-stone-500 print:text-stone-400">
-              Ripoti hii imezalishwa kiotomatiki na Mfumo wa Usimamizi wa Hotspot (MikroTik Hotspot Billing Engine).
+              Ripoti hii imezalishwa kiotomatiki na Mfumo wa Usimamizi wa Hotspot (Hotspot Automated Billing Engine).
             </p>
           </div>
 

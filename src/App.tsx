@@ -230,7 +230,7 @@ export default function App() {
               {/* Automated Self-Service Payment & STK-Push Guide */}
               <AutomatedPaymentGuide lang={lang} />
 
-              {/* Developer Payment API Integration Guide (ZenoPay, Snippe, InstantPay, MikroTik) */}
+              {/* Developer Payment API Integration Guide (ZenoPay, Snippe, InstantPay, Gateway) */}
               <PaymentIntegrationGuide lang={lang} />
 
               {/* 1. Equipment & Hardware Checklist with Real Prices and Live Budget */}

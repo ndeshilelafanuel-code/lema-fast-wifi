@@ -58,7 +58,7 @@ export const SmartBandwidthEngine: React.FC<SmartBandwidthEngineProps> = ({
   const [simAppType, setSimAppType] = useState<'tiktok' | 'youtube' | 'webpage'>('tiktok');
 
   // 4. CODE EXPORT SCRIPT TAB
-  const [scriptPlatform, setScriptPlatform] = useState<'mikrotik' | 'openwrt' | 'radius_nexor'>('mikrotik');
+  const [scriptPlatform, setScriptPlatform] = useState<'omada' | 'openwrt' | 'radius_nexor'>('omada');
   const [copiedScript, setCopiedScript] = useState<boolean>(false);
 
   // Live Clock & Peak Hours check
@@ -129,34 +129,31 @@ export const SmartBandwidthEngine: React.FC<SmartBandwidthEngineProps> = ({
     }, 1000);
   };
 
-  // Generate RouterOS / Queue script
+  // Generate Router / Queue script
   const generateScript = () => {
-    if (scriptPlatform === 'mikrotik') {
+    if (scriptPlatform === 'omada') {
       return `# ================================================================
-# LEMA FAST WIFI - SMART SPEED BURST & FAIR USAGE QUEUES (ROUTEROS)
-# Mfumo: Speed Burst (${burstSpeedMbps}M kwa ${burstDurationSeconds}s) + Peak Hour Fair Share (PCQ)
+# LEMA FAST WIFI - SMART SPEED BURST & FAIR USAGE (TP-LINK OMADA / LINUX TC)
+# Mfumo: Speed Burst (${burstSpeedMbps}M kwa ${burstDurationSeconds}s) + Peak Hour Fair Share (QoS)
 # ================================================================
 
-/ip hotspot user profile
-set [find default=yes] rate-limit="${baselineSpeedMbps}M/${burstSpeedMbps}M ${burstThresholdMbps}M/${burstSpeedMbps}M ${burstDurationSeconds}s/${burstDurationSeconds}s 8 2M/2M"
+# 1. Omada Controller Rate Limit Profile (JSON CLI / API Payload)
+{
+  "profile_name": "Lema_Smart_Burst_${burstSpeedMbps}M",
+  "download_limit_kbps": ${baselineSpeedMbps * 1024},
+  "upload_limit_kbps": 2048,
+  "burst_download_limit_kbps": ${burstSpeedMbps * 1024},
+  "burst_time_seconds": ${burstDurationSeconds},
+  "threshold_kbps": ${burstThresholdMbps * 1024}
+}
 
-# 1. PCQ Dynamic Bandwidth Queues (Huzuia mtu mmoja kunyonya mtandao wote)
-/queue type
-add kind=pcq name="Lema_PCQ_Download" pcq-classifier=dst-address pcq-rate=${baselineSpeedMbps}M pcq-burst-rate=${burstSpeedMbps}M pcq-burst-threshold=${burstThresholdMbps}M pcq-burst-time=${burstDurationSeconds}s
-add kind=pcq name="Lema_PCQ_Upload" pcq-classifier=src-address pcq-rate=1M pcq-burst-rate=4M pcq-burst-threshold=1M pcq-burst-time=10s
+# 2. Linux Traffic Control (TC CAKE / FQ_CODEL) for Gateway Router
+tc qdisc replace dev eth0 root cake bandwidth ${burstSpeedMbps}mbit diffserv4 wash ack-filter
+tc class add dev eth0 parent 1: classid 1:1 cake bandwidth ${baselineSpeedMbps}mbit
 
-# 2. Peak Hours Traffic Shaper (${peakStartHour} - ${peakEndHour})
-# Saa za jioni watu wakiwa wengi, kipaumbele kinapewa M-Pesa na WhatsApp calls
-/ip firewall mangle
-add chain=prerouting protocol=tcp dst-port=443 content="mpesa" action=mark-packet new-packet-mark="financial_vip" passthrough=no comment="Priority 1: M-Pesa & Mobile Money"
-add chain=prerouting protocol=udp dst-port=3478,53,443 action=mark-packet new-packet-mark="voice_vip" passthrough=no comment="Priority 2: WhatsApp Voice/Video Calls"
-add chain=prerouting action=mark-packet new-packet-mark="general_traffic" passthrough=no comment="Priority 3: General Browsing & TikTok"
-
-# 3. Queue Tree with Strict Priorities
-/queue tree
-add name="Lema_Priority_Finance" packet-mark="financial_vip" priority=1 queue=default max-limit=50M
-add name="Lema_Priority_Calls" packet-mark="voice_vip" priority=2 queue=default max-limit=50M
-add name="Lema_Normal_Traffic" packet-mark="general_traffic" priority=6 queue=Lema_PCQ_Download max-limit=100M`;
+# 3. Priority Rules for Mobile Money (M-Pesa) & Voice Calls
+iptables -t mangle -A PREROUTING -p tcp --dport 443 -m string --string "mpesa" --algo bm -j MARK --set-mark 1
+iptables -t mangle -A PREROUTING -p udp -m multiport --dports 3478,53,443 -j MARK --set-mark 2`;
     }
 
     if (scriptPlatform === 'openwrt') {
@@ -179,17 +176,18 @@ tc qdisc replace dev br-lan root cake bandwidth ${burstSpeedMbps}mbit diffserv4 
 
     // RADIUS / Nexor Cloud Rate-Limit
     return `# ================================================================
-# NEXOR / CLOUD RADIUS ATTRIBUTES (WISPr & MIKROTIK-RATE-LIMIT)
+# NEXOR / CLOUD RADIUS ATTRIBUTES (WISPr STANDARD RATE-LIMIT)
 # Ibandike kwenye RADIUS User Profile ya Kila Kifurushi:
 # ================================================================
 
-# Rate-Limit syntax: [Rx/Tx] [Burst-Rx/Tx] [Threshold-Rx/Tx] [Burst-Time] [Priority] [Min-Rate]
-Mikrotik-Rate-Limit = "${baselineSpeedMbps}M/${burstSpeedMbps}M ${burstThresholdMbps}M/${burstSpeedMbps}M ${burstDurationSeconds}s/${burstDurationSeconds}s 8 1M/1M"
+# Standard WISPr Attributes:
 WISPr-Bandwidth-Max-Down = ${burstSpeedMbps * 1048576}
+WISPr-Bandwidth-Max-Up = 5242880
 WISPr-Bandwidth-Min-Down = ${baselineSpeedMbps * 1048576}
+Filter-Id = "Rate-Limit-${baselineSpeedMbps}M-${burstSpeedMbps}M"
 
 # Peak Hour Overrides (${peakStartHour} to ${peakEndHour}):
-# Mikrotik-Rate-Limit = "2M/8M 3M/8M 8s/8s 8 512k/512k"`;
+# WISPr-Bandwidth-Max-Down = 8388608`;
   };
 
   const handleCopyScript = () => {
@@ -612,12 +610,12 @@ WISPr-Bandwidth-Min-Down = ${baselineSpeedMbps * 1048576}
 
               <div className="flex gap-1 bg-stone-100 p-0.5 rounded-xl text-[10px] font-bold">
                 <button
-                  onClick={() => setScriptPlatform('mikrotik')}
+                  onClick={() => setScriptPlatform('omada')}
                   className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
-                    scriptPlatform === 'mikrotik' ? 'bg-white shadow-2xs text-stone-900 font-black' : 'text-stone-500'
+                    scriptPlatform === 'omada' ? 'bg-white shadow-2xs text-stone-900 font-black' : 'text-stone-500'
                   }`}
                 >
-                  MikroTik
+                  TP-Link Omada
                 </button>
                 <button
                   onClick={() => setScriptPlatform('radius_nexor')}

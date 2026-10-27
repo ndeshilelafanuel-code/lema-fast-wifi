@@ -462,7 +462,7 @@ export const HardwareWiringGuideModal: React.FC<HardwareWiringGuideModalProps> =
         <div className="px-6 py-4 bg-stone-950 border-t border-stone-800 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-stone-400">
             <CheckCheck className="w-4 h-4 text-emerald-400" />
-            <span>Kila hatua imejaribiwa na inafanya kazi kikamilifu bila MikroTik.</span>
+            <span>Kila hatua imejaribiwa na inafanya kazi kikamilifu.</span>
           </div>
           <button
             onClick={onClose}

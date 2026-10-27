@@ -82,7 +82,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
 
               {/* Subheading */}
               <p className="text-base sm:text-lg text-stone-300 max-w-xl leading-relaxed font-normal">
-                Badilisha mtandao wako wa TP-Link Omada na MikroTik kuwa mashine ya mapato ya kila siku. Portal ya kisasa ya wateja, malipo ya haraka ya M-Pesa na Tigo Pesa, na ramani ya GIS ya kusimamia minara yako popote ulipo.
+                Badilisha mtandao wako wa TP-Link Omada na Access Points kuwa mashine ya mapato ya kila siku. Portal ya kisasa ya wateja, malipo ya haraka ya M-Pesa na Tigo Pesa, na ramani ya GIS ya kusimamia minara yako popote ulipo.
               </p>
 
               {/* Action Buttons */}
@@ -133,7 +133,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Inafanya kazi na EAP225, EAP610 & MikroTik</span>
+                  <span>Inafanya kazi na EAP225, EAP610 & EAP772</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -225,7 +225,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
                     <Radio className="w-4 h-4 text-emerald-400" />
                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Outdoor Hardware Ready</span>
                   </div>
-                  <h4 className="text-lg font-bold">TP-Link Omada EAP & MikroTik Metal</h4>
+                  <h4 className="text-lg font-bold">TP-Link Omada EAP & Outdoor APs</h4>
                   <p className="text-xs text-stone-300">Antena za mzingo wa mita 200 zenye nguvu ya kupenya kuta na kutoa huduma kwa wateja wengi kwa wakati mmoja.</p>
                 </div>
               </div>
@@ -465,7 +465,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
         </div>
       </section>
 
-      {/* 6. HARDWARE COMPATIBILITY: TP-LINK OMADA & MIKROTIK */}
+      {/* 6. HARDWARE COMPATIBILITY: TP-LINK OMADA & STANDALONE AP */}
       <section className="py-16 sm:py-24 bg-white border-b border-stone-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           
@@ -473,7 +473,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
             <span className="text-xs font-bold text-amber-600 uppercase tracking-wider block">Vifaa Vinavyoungwa Mkono</span>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-stone-950">Inafanya Kazi na Vifaa Vyako Vyote vya Hotspot</h2>
             <p className="text-sm text-stone-500">
-              Hakuna haja ya kubadilisha vifaa vyako ulivyonavyo. Mfumo wetu unaunganishwa moja kwa moja na mifumo ya TP-Link Omada na MikroTik RouterOS.
+              Hakuna haja ya kubadilisha vifaa vyako ulivyonavyo. Mfumo wetu unaunganishwa moja kwa moja na mifumo ya TP-Link Omada na Access Points.
             </p>
           </div>
 
@@ -482,8 +482,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ lang, onNavigate }) =>
               { id: '1', name: 'TP-Link EAP225', desc: 'Outdoor AC1200 AP', type: 'Access Point', badge: 'Omada' },
               { id: '2', name: 'TP-Link EAP610', desc: 'Outdoor Wi-Fi 6 AP', type: 'Access Point', badge: 'Wi-Fi 6' },
               { id: '3', name: 'TP-Link EAP110', desc: 'Outdoor 300Mbps AP', type: 'Access Point', badge: 'Budget' },
-              { id: '4', name: 'MikroTik hEX', desc: 'Gigabit Core Router', type: 'Router', badge: 'RouterOS' },
-              { id: '5', name: 'MikroTik RB4011', desc: 'High Bandwidth Router', type: 'Core Gateway', badge: 'Heavy Load' },
+              { id: '4', name: 'TP-Link EAP772', desc: 'Outdoor Wi-Fi 7 AP', type: 'Access Point', badge: 'Wi-Fi 7' },
+              { id: '5', name: 'Ruijie RG-RAP6202G', desc: 'High Bandwidth Outdoor AP', type: 'Access Point', badge: 'Cloud AP' },
               { id: '6', name: 'TP-Link ER605', desc: 'Omada Multi-WAN VPN', type: 'Gateway', badge: 'Dual WAN' },
             ].map((hw) => (
               <div

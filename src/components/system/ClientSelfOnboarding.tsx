@@ -41,7 +41,7 @@ export const ClientSelfOnboarding: React.FC<ClientSelfOnboardingProps> = ({
   const [locationCity, setLocationCity] = useState('Dar es Salaam');
   const [locationArea, setLocationArea] = useState('');
   const [wifiSsid, setWifiSsid] = useState('');
-  const [routerType, setRouterType] = useState<'mikrotik' | 'omada' | 'ruijie' | 'generic'>('mikrotik');
+  const [routerType, setRouterType] = useState<'omada' | 'ruijie' | 'gateway' | 'generic'>('omada');
   const [selectedPlan, setSelectedPlan] = useState<TenantSubscriptionPlan>('pro');
   const [payoutMethod, setPayoutMethod] = useState<'lipa_namba' | 'bank' | 'mobile_phone'>('lipa_namba');
   const [payoutAccount, setPayoutAccount] = useState('');
@@ -143,15 +143,12 @@ export const ClientSelfOnboarding: React.FC<ClientSelfOnboardingProps> = ({
     setIsSubmitted(true);
   };
 
-  const generateMikrotikQuickScript = (slug: string, biz: string) => {
-    return `/ip hotspot profile
-set [ find default=yes ] html-directory=flash/hotspot login-by=http-chap,mac-cookie
-add dns-name="${slug}.lemawifi.co.tz" hotspot-address=192.168.88.1 html-directory=flash/hotspot \\
-    http-cookie-lifetime=1d name="${slug}_Profile" radius-accounting=yes use-radius=yes
-/radius
-add address=cloud.lemawifi.co.tz authentication-port=1812 accounting-port=1813 \\
-    comment="Lema SaaS Cloud Server - ${biz}" secret="LemaSaaS2026_${slug}" service=hotspot timeout=3000ms
-/system identity set name="${biz.replace(/[^a-zA-Z0-9]/g, '_')}_WiFi"`;
+  const generateGatewayQuickScript = (slug: string, biz: string) => {
+    return `# Gateway Quick Onboarding Script
+hotspot_profile_name="${slug}_Profile"
+dns_name="${slug}.lemawifi.co.tz"
+cloud_auth_url="https://cloud.lemawifi.co.tz/api/v1/gateway/authorize"
+hotspot_identity="${biz.replace(/[^a-zA-Z0-9]/g, '_')}_WiFi"`;
   };
 
   const handleCopyScript = (text: string) => {
@@ -314,9 +311,9 @@ add address=cloud.lemawifi.co.tz authentication-port=1812 accounting-port=1813 \
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     {
-                      id: 'mikrotik',
-                      title: 'MikroTik RouterOS',
-                      sub: 'Inapendekezwa zaidi (hEX, hAP, RB750, Cloud Core)',
+                      id: 'omada',
+                      title: 'TP-Link Omada SDN',
+                      sub: 'Inapendekezwa zaidi (EAP225-Outdoor, EAP650, EAP772)',
                       badge: 'Inayotumika Zaidi'
                     },
                     {
@@ -546,7 +543,7 @@ add address=cloud.lemawifi.co.tz authentication-port=1812 accounting-port=1813 \
               </div>
             </div>
 
-            {/* MikroTik Auto Script Card */}
+            {/* Router Auto Script Card */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -555,12 +552,12 @@ add address=cloud.lemawifi.co.tz authentication-port=1812 accounting-port=1813 \
                     <span>Script ya Kuunganisha Router Yako (Copy & Paste)</span>
                   </h3>
                   <p className="text-[11px] text-stone-400 mt-0.5">
-                    Fungua WinBox kwenye MikroTik yako, bonyeza **New Terminal**, kisha paste script hii:
+                    Fungua App au Controller ya router yako, kisha ingiza script au maelezo haya:
                   </p>
                 </div>
 
                 <button
-                  onClick={() => handleCopyScript(generateMikrotikQuickScript(createdTenantData?.slug, createdTenantData?.businessName))}
+                  onClick={() => handleCopyScript(generateGatewayQuickScript(createdTenantData?.slug, createdTenantData?.businessName))}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                 >
                   {copiedScript ? (
@@ -578,7 +575,7 @@ add address=cloud.lemawifi.co.tz authentication-port=1812 accounting-port=1813 \
               </div>
 
               <pre className="p-4 rounded-xl bg-stone-950 border border-stone-800 text-[11px] font-mono text-emerald-400 overflow-x-auto max-h-56 leading-relaxed">
-                {generateMikrotikQuickScript(createdTenantData?.slug, createdTenantData?.businessName)}
+                {generateGatewayQuickScript(createdTenantData?.slug, createdTenantData?.businessName)}
               </pre>
             </div>
 

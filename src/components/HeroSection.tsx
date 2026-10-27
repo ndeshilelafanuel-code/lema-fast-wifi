@@ -48,7 +48,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       : 'text-stone-300 hover:text-white'
                   }`}
                 >
-                  {lang === 'sw' ? '⚡ AP Tu (Bila MikroTik)' : '⚡ AP Only (No MikroTik)'}
+                  {lang === 'sw' ? '⚡ AP Tu (Standalone)' : '⚡ AP Only (Standalone)'}
                 </button>
                 <button
                   onClick={() => onModeToggle('standard')}
@@ -58,7 +58,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       : 'text-stone-300 hover:text-white'
                   }`}
                 >
-                  {lang === 'sw' ? 'MikroTik + AP' : 'MikroTik + AP'}
+                  {lang === 'sw' ? 'Gateway + AP' : 'Gateway + AP'}
                 </button>
               </div>
             </div>
@@ -68,11 +68,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {isApOnly ? (
                 lang === 'sw' ? (
                   <>
-                    Ndio! Unaweza Kuanza na <span className="text-amber-400">AP Tu Bila MikroTik</span>
+                    Ndio! Unaweza Kuanza na <span className="text-amber-400">AP Tu pekee</span>
                   </>
                 ) : (
                   <>
-                    Yes! You Can Run on <span className="text-amber-400">Only an AP (Zero MikroTik)</span>
+                    Yes! You Can Run on <span className="text-amber-400">Only an AP</span>
                   </>
                 )
               ) : (
@@ -92,12 +92,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <p className="text-sm sm:text-base text-stone-300 leading-relaxed max-w-2xl">
               {isApOnly ? (
                 lang === 'sw'
-                  ? 'Ikiwa unataka mfumo mwepesi usio na MikroTik, unachohitaji ni "Smart Outdoor Access Point" yenye mfumo wa ndani wa Cloud Hotspot (k.m. Ruijie Reyee RG-RAP6202G au TP-Link Omada EAP225). Inachomekwa moja kwa moja kwenye modemu ya ISP au Starlink, na inatoa vocha za QR na kudhibiti spidi kupitia app ya bure kwenye simu yako bila kuhitaji PC wala MikroTik!'
-                  : 'If you want a lean setup without a MikroTik router, all you need is a Smart Outdoor AP featuring onboard Cloud Hotspot firmware (Ruijie Reyee or TP-Link Omada). It plugs directly into your ISP or Starlink modem, generating QR vouchers and rate-limiting users from your smartphone.'
+                  ? 'Ikiwa unataka mfumo mwepesi, unachohitaji ni "Smart Outdoor Access Point" yenye mfumo wa ndani wa Cloud Hotspot (k.m. Ruijie Reyee RG-RAP6202G au TP-Link Omada EAP225). Inachomekwa moja kwa moja kwenye modemu ya ISP au Starlink, na inatoa vocha za QR na kudhibiti spidi kupitia app ya bure kwenye simu yako bila kuhitaji PC!'
+                  : 'If you want a lean setup, all you need is a Smart Outdoor AP featuring onboard Cloud Hotspot firmware (Ruijie Reyee or TP-Link Omada). It plugs directly into your ISP or Starlink modem, generating QR vouchers and rate-limiting users from your smartphone.'
               ) : (
                 lang === 'sw'
-                  ? 'Kuanzisha biashara ya kuuza WiFi ya vocha mtaani hakuhitaji mamilioni ya kutisha. Unahitaji mambo makuu matano: chanzo cha intaneti ya jumla, router ya kibiashara ya MikroTik, kifaa cha kurushia mawimbi nje (Access Point), mfumo wa vocha (Mikhmon), na umeme thabiti wa sola au UPS.'
-                  : 'Starting a street voucher WiFi hotspot does not require millions in venture funding. You only need five concrete components: uncapped wholesale bandwidth, a MikroTik gateway router, a high-gain outdoor access point, automated voucher software, and dependable power backup.'
+                  ? 'Kuanzisha biashara ya kuuza WiFi ya vocha mtaani hakuhitaji mamilioni ya kutisha. Unahitaji mambo makuu matano: chanzo cha intaneti ya jumla, router ya kibiashara / gateway, kifaa cha kurushia mawimbi nje (Access Point), mfumo wa vocha, na umeme thabiti wa sola au UPS.'
+                  : 'Starting a street voucher WiFi hotspot does not require millions in venture funding. You only need five concrete components: uncapped wholesale bandwidth, a gateway router, a high-gain outdoor access point, automated voucher software, and dependable power backup.'
               )}
             </p>
 
@@ -154,7 +154,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-stone-100 uppercase tracking-wide">
-                      {lang === 'sw' ? '1. Router ya MikroTik' : '1. MikroTik Router'}
+                      {lang === 'sw' ? '1. Router ya Kibiashara' : '1. Commercial Gateway Router'}
                     </h4>
                     <p className="text-xs text-stone-400">
                       {lang === 'sw' ? 'Kugawanya spidi, IP & ukurasa wa vocha' : 'Bandwidth throttling & captive gateway'}
@@ -240,7 +240,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <span>
                   {isApOnly
                     ? (lang === 'sw' ? 'Usanidi wa dakika 5 kwenye simu' : '5-min mobile app setup')
-                    : (lang === 'sw' ? 'Hakuna vocha feki / usalama wa mtandao' : 'Secure MikroTik firewall standards')}
+                    : (lang === 'sw' ? 'Hakuna vocha feki / usalama wa mtandao' : 'Secure firewall standards')}
                 </span>
               </div>
             </div>

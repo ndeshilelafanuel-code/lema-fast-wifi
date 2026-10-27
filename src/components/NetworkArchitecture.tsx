@@ -33,20 +33,20 @@ export const NetworkArchitecture: React.FC<NetworkArchitectureProps> = ({ lang, 
       icon: 'globe',
       hardware: 'Fiber ONU Modem / Starlink Dish & Ethernet Adapter',
       tips: {
-        sw: 'Omba IP ya uhakika (Static IP au Public IP kama inawezekana) au uunganishe moja kwa moja kwenye Port 1 ya MikroTik.',
-        en: 'Configure modem in Bridge Mode or connect directly to MikroTik WAN port 1 to avoid double NAT.'
+        sw: 'Omba IP ya uhakika (Static IP au Public IP kama inawezekana) au uunganishe moja kwa moja kwenye Port 1 ya Gateway Router.',
+        en: 'Configure modem in Bridge Mode or connect directly to Gateway WAN port 1 to avoid double NAT.'
       },
-      ports: 'WAN (Ether1 in MikroTik)'
+      ports: 'WAN (Ether1 in Gateway Router)'
     },
     {
       id: 'router',
-      name: { sw: 'Router Kuu (MikroTik)', en: 'MikroTik Core Gateway' },
+      name: { sw: 'Router Kuu (Gateway Router)', en: 'Core Gateway Router' },
       role: {
         sw: 'Kiongozi wa mfumo mzima. Hutoa anwani za IP (DHCP), kusimamia ukurasa wa kuingia (Hotspot Server), kupunguza spidi kwa kila mtu (Queues), na kulinda mtandao (Firewall).',
         en: 'The brain of the network. Manages DHCP pools, captive login server, per-user bandwidth speed queues, and security firewall.'
       },
       icon: 'server',
-      hardware: 'MikroTik hEX (RB750Gr3) / RB4011',
+      hardware: 'TP-Link ER605 / Gateway Router',
       tips: {
         sw: 'Weka spidi ya mteja kuwa 2.5Mbps Download / 1Mbps Upload. Hii inatosha kabisa video za YouTube/TikTok bila kulemea mtandao wote.',
         en: 'Set user default profile to 2.5M/1M max-limit. This allows bufferless 1080p streaming without exhausting your total pipe.'
@@ -55,18 +55,18 @@ export const NetworkArchitecture: React.FC<NetworkArchitectureProps> = ({ lang, 
     },
     {
       id: 'billing',
-      name: { sw: 'Mfumo wa Vocha (Mikhmon)', en: 'Mikhmon Voucher Engine' },
+      name: { sw: 'Mfumo wa Vocha (Lema Cloud)', en: 'Lema Cloud Voucher Engine' },
       role: {
         sw: 'Hutoa vocha zenye nambari fupi na QR code. Hufuatilia mapato ya kila siku, saa, na kuzuia wizi wa intaneti.',
         en: 'Generates user credentials and QR codes, tracks daily sales ledger, and interfaces with mobile money gateways.'
       },
       icon: 'code',
-      hardware: 'Mikhmon Server (kwenye PC, Raspberry Pi, au Android Web Host)',
+      hardware: 'Lema Cloud Server (SaaS Web Engine)',
       tips: {
         sw: 'Tengeneza vifurushi vya muda: Saa 2 (Tsh 500), Saa 24 (Tsh 1,000), Wiki 1 (Tsh 5,000). Weka muda uhesabiwe kuanzia kuingia mara ya kwanza.',
         en: 'Set validity to trigger on first login. Batch-generate 200 vouchers in advance so you never run out of inventory.'
       },
-      ports: 'API Port 8728 (MikroTik RouterOS)'
+      ports: 'API Port 443 / REST Gateway'
     },
     {
       id: 'power',

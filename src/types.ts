@@ -137,7 +137,7 @@ export interface HotspotSettings {
   enablePurchaseReceiptSms?: boolean;
   purchaseReceiptSmsTemplate?: string;
 
-  // Modern Captive Portal Best Practices (Omada / Ruijie / Mikrotik)
+  // Modern Captive Portal Best Practices (Omada / Ruijie / Standalone AP)
   enableAutoMacLogin?: boolean;
   enableQrCameraScanner?: boolean;
   enableAntiAbuseTrial?: boolean;
@@ -217,7 +217,7 @@ export interface HotspotTenant {
   locationArea: string; // e.g. "Sinza Mori", "Kijenge"
   brandColor?: string; // e.g. "#cca43b"
   tagline?: string;
-  routerType: 'mikrotik' | 'omada' | 'ruijie' | 'generic';
+  routerType: 'omada' | 'ruijie' | 'gateway' | 'generic';
   routerIpOrHost?: string;
   payoutAccount: string; // e.g. "5849201"
   payoutMethod: 'lipa_namba' | 'bank' | 'mobile_phone';

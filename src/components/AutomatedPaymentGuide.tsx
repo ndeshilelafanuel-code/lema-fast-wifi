@@ -368,7 +368,7 @@ export const AutomatedPaymentGuide: React.FC<AutomatedPaymentGuideProps> = ({ la
                   </span>
                   <div>
                     <strong className="text-emerald-400 block mb-0.5">Seva Inamruhusu Kuingia Mara Moja:</strong>
-                    Malipo yakishapokelewa, seva inawasiliana na router ya MikroTik au AP yako kupitia API, inamtengenezea mteja nambari ya vocha na kumuunganisha papo hapo bila wewe kufanya kitu chochote!
+                    Malipo yakishapokelewa, seva inawasiliana na AP yako au Router kupitia API, inamtengenezea mteja nambari ya vocha na kumuunganisha papo hapo bila wewe kufanya kitu chochote!
                   </div>
                 </div>
               </div>
@@ -413,8 +413,8 @@ export const AutomatedPaymentGuide: React.FC<AutomatedPaymentGuideProps> = ({ la
               <h4 className="text-sm font-bold text-white">Paypack / Swahilies</h4>
               <p className="text-xs text-stone-400">
                 {lang === 'sw'
-                  ? 'Inafaa sana kwa biashara za WiFi Hotspot. Wanatoa template ya ukurasa wa login tayari, unaipakua na kuiweka kwenye MikroTik au AP yako ndani ya dakika 20.'
-                  : 'Turnkey hotspot billing engine with pre-styled login templates and automated MikroTik/AP user generation.'}
+                  ? 'Inafaa sana kwa biashara za WiFi Hotspot. Wanatoa template ya ukurasa wa login tayari, unaipakua na kuiweka kwenye AP yako au Router ndani ya dakika 20.'
+                  : 'Turnkey hotspot billing engine with pre-styled login templates and automated AP session generation.'}
               </p>
               <div className="pt-2 text-[11px] text-emerald-400 font-mono">
                 Ada ya Muamala: ~1.5% - 2% kwa mauzo
@@ -439,7 +439,7 @@ export const AutomatedPaymentGuide: React.FC<AutomatedPaymentGuideProps> = ({ la
               <h4 className="text-sm font-bold text-white">Android SMS Gateway</h4>
               <p className="text-xs text-stone-400">
                 {lang === 'sw'
-                  ? 'Unatumia simu ndogo ya Android yenye app ya kusoma SMS za kawaida za M-Pesa. Mteja akilipa kwenye namba yako ya kawaida, simu inatuma uthibitisho kwenye MikroTik na kumpa vocha bure bila ada ya kampuni ya malipo!'
+                  ? 'Unatumia simu ndogo ya Android yenye app ya kusoma SMS za kawaida za M-Pesa. Mteja akilipa kwenye namba yako ya kawaida, simu inatuma uthibitisho kwenye mfumo na kumpa vocha bure bila ada ya kampuni ya malipo!'
                   : 'Use a spare Android device with SMS gateway listener to verify P2P mobile money alerts with zero aggregator fee.'}
               </p>
               <div className="pt-2 text-[11px] text-amber-400 font-mono">

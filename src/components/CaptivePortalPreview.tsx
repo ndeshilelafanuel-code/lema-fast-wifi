@@ -202,8 +202,8 @@ export const CaptivePortalPreview: React.FC<CaptivePortalPreviewProps> = ({ lang
 
             <p className="text-sm sm:text-base text-stone-600 leading-relaxed">
               {lang === 'sw'
-                ? 'Tumechukua teknolojia za kisasa zaidi za TP-Link Omada EAP 772, Ruijie Reyee na MikroTik Cloud Portals ili kumwondolea mteja kero zote na kukupa mfumo unaoingiza faida kwa njia mbili (Vocha + Matangazo):'
-                : 'We incorporated modern best practices from TP-Link Omada, Ruijie Reyee, and MikroTik Cloud portals to guarantee a frictionless self-service customer experience and dual monetization:'}
+                ? 'Tumechukua teknolojia za kisasa zaidi za TP-Link Omada EAP 772, Ruijie Reyee na Standalone Cloud Portals ili kumwondolea mteja kero zote na kukupa mfumo unaoingiza faida kwa njia mbili (Vocha + Matangazo):'
+                : 'We incorporated modern best practices from TP-Link Omada, Ruijie Reyee, and Standalone Cloud portals to guarantee a frictionless self-service customer experience and dual monetization:'}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">

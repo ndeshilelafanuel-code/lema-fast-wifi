@@ -672,7 +672,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                     className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                   >
                     <option value="ap">📡 Access Point (AP / Antena)</option>
-                    <option value="router">⚡ Router / Gateway (MikroTik)</option>
+                    <option value="router">⚡ Router / Gateway (Hardware)</option>
                     <option value="switch">🔌 PoE Switch</option>
                     <option value="starlink">🛰️ Starlink Kit</option>
                     <option value="power">🔋 Solar / UPS Backup</option>
@@ -699,7 +699,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
                     type="text"
                     value={manualForm.manufacturer}
                     onChange={(e) => setManualForm({ ...manualForm, manufacturer: e.target.value })}
-                    placeholder="TP-Link, MikroTik, Ubiquiti"
+                    placeholder="TP-Link, Ruijie, Ubiquiti"
                     className="w-full px-3.5 py-2.5 bg-stone-950 border border-stone-800 rounded-xl text-white text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>

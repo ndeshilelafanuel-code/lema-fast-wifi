@@ -77,7 +77,7 @@ export const GisMapModule: React.FC = () => {
       return;
     }
     setIsApiConnected(true);
-    triggerToast(`Umeunganishwa kwa mafanikio na Omada / MikroTik Controller (${controllerIp})!`);
+    triggerToast(`Umeunganishwa kwa mafanikio na Omada Controller (${controllerIp})!`);
     setShowApiConfigModal(false);
   };
 
@@ -101,7 +101,7 @@ export const GisMapModule: React.FC = () => {
             </span>
             {isApiConnected && (
               <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold">
-                🔗 Omada/MikroTik API Connected
+                🔗 Omada Controller API Connected
               </span>
             )}
           </div>
@@ -120,7 +120,7 @@ export const GisMapModule: React.FC = () => {
             className="flex items-center gap-1.5 px-3.5 py-2 bg-stone-800 hover:bg-stone-700 border border-stone-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
           >
             <Server className="w-4 h-4 text-sky-400" />
-            <span>Unganisha Omada / MikroTik API</span>
+            <span>Unganisha Omada Controller API</span>
           </button>
 
           <button
@@ -154,7 +154,7 @@ export const GisMapModule: React.FC = () => {
                 </div>
                 <h3 className="text-white font-bold text-sm">Hakuna Mnara Uliosajiliwa Bado</h3>
                 <p className="text-stone-400 text-xs leading-relaxed">
-                  Ili uanze kuona minara yako ya **Omada WiFi 7 (EAP772)** au **MikroTik** kiuhalisia, bonyeza kitufe cha **"Ongeza Mnara Halisi"** hapo juu.
+                  Ili uanze kuona minara yako ya **Omada WiFi 7 (EAP772)** au **Access Points** kiuhalisia, bonyeza kitufe cha **"Ongeza Mnara Halisi"** hapo juu.
                 </p>
                 <div className="flex items-center justify-center gap-2 pt-2">
                   <button
@@ -306,7 +306,7 @@ export const GisMapModule: React.FC = () => {
           )}
 
           <div className="border-t border-stone-800 pt-4 text-[11px] text-stone-400 text-center">
-            Omada & MikroTik Real-Time API Link • HotspotContext
+            Omada SDN Real-Time API Link • HotspotContext
           </div>
         </div>
 
@@ -362,8 +362,8 @@ export const GisMapModule: React.FC = () => {
                 >
                   <option value="Omada EAP772 Outdoor WiFi 7">Omada EAP772 Outdoor WiFi 7</option>
                   <option value="Omada EAP650-Outdoor">Omada EAP650-Outdoor</option>
-                  <option value="MikroTik cAP ac Outdoor">MikroTik cAP ac Outdoor</option>
-                  <option value="MikroTik BaseBox 5">MikroTik BaseBox 5</option>
+                  <option value="Omada EAP225-Outdoor">Omada EAP225-Outdoor</option>
+                  <option value="Ruijie Reyee RG-RAP6202G Outdoor">Ruijie Reyee RG-RAP6202G Outdoor</option>
                 </select>
               </div>
 
@@ -405,7 +405,7 @@ export const GisMapModule: React.FC = () => {
             <div className="flex items-center justify-between border-b border-stone-800 pb-4">
               <h3 className="text-base font-black text-white flex items-center gap-2">
                 <Server className="w-5 h-5 text-sky-400" />
-                <span>Unganisha TP-Link Omada / MikroTik API</span>
+                <span>Unganisha TP-Link Omada API</span>
               </h3>
               <button
                 onClick={() => setShowApiConfigModal(false)}

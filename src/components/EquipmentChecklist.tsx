@@ -120,7 +120,7 @@ export const EquipmentChecklist: React.FC<EquipmentChecklistProps> = ({ lang, sy
               onError={(e) => {
                 e.currentTarget.src = '/images/hardware_network_gear_1791031774960.jpg';
               }}
-              alt="MikroTik RouterBOARD and outdoor access point hardware equipment"
+              alt="TP-Link Omada and outdoor access point hardware equipment"
               referrerPolicy="no-referrer"
               className="w-full h-64 lg:h-full object-cover"
             />
@@ -130,7 +130,7 @@ export const EquipmentChecklist: React.FC<EquipmentChecklistProps> = ({ lang, sy
                   {lang === 'sw' ? 'Vifaa Halisi vya Kazi' : 'Field-Ready Gear'}
                 </span>
                 <p className="text-sm text-stone-200 mt-1">
-                  MikroTik hEX RB750Gr3 + TP-Link EAP225-Outdoor + Outdoor Cat6 FTP
+                  TP-Link Omada EAP772 / EAP225-Outdoor + Outdoor Cat6 FTP
                 </p>
               </div>
             </div>
@@ -200,8 +200,8 @@ export const EquipmentChecklist: React.FC<EquipmentChecklistProps> = ({ lang, sy
               <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <span>
                 {lang === 'sw'
-                  ? 'Ushauri wa Kitaalamu: Kamwe usikate gharama kwa kutumia waya wa ndani (Indoor Cat5) nje, au router ya kawaida ya Tenda/TP-Link ya nyumbani. Router ya MikroTik na Access Point ya nje ndio msingi wa kudumu miaka mingi bila milango ya matatizo.'
-                  : 'Pro Tip: Never cheap out on indoor patch cables or consumer home access points. A rugged MikroTik routerboard and weatherproof outdoor AP are the difference between seamless profit and daily technical headaches.'}
+                  ? 'Ushauri wa Kitaalamu: Kamwe usikate gharama kwa kutumia waya wa ndani (Indoor Cat5) nje, au router ya kawaida ya nyumbani. Router ya kibiashara na Access Point ya nje ndio msingi wa kudumu miaka mingi bila matatizo.'
+                  : 'Pro Tip: Never cheap out on indoor patch cables or consumer home access points. A rugged gateway router and weatherproof outdoor AP are the difference between seamless profit and daily technical headaches.'}
               </span>
             </div>
           </div>

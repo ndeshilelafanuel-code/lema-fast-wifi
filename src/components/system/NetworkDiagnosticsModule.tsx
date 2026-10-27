@@ -41,21 +41,21 @@ export const NetworkDiagnosticsModule: React.FC<NetworkDiagnosticsModuleProps> =
   const [selectedTarget, setSelectedTarget] = useState<string>('router');
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     '[SYSTEM] LEMA Diagnostic Engine v2.4 initialized.',
-    '[SYSTEM] Monitoring MikroTik RouterOS (v7.14) & Omada AP mesh.',
+    '[SYSTEM] Monitoring Omada Gateway & AP mesh.',
     '[READY] Click "Anza Ukaguzi wa Haraka" to execute ICMP ping & DNS latency check.'
   ]);
 
   const [targets, setTargets] = useState<PingTarget[]>([
     {
       id: 'router',
-      name: 'MikroTik Core Router',
-      ip: '192.168.88.1',
+      name: 'Omada Core Gateway Router',
+      ip: '192.168.0.1',
       type: 'router',
       latencyMs: 1.2,
       packetLoss: 0,
       jitter: 0.3,
       status: 'online',
-      notes: 'CPU 12%, Uptime 18d, RB750Gr3 hEX'
+      notes: 'CPU 12%, Uptime 18d, ER605 Gigabit'
     },
     {
       id: 'gateway',
@@ -185,7 +185,7 @@ export const NetworkDiagnosticsModule: React.FC<NetworkDiagnosticsModuleProps> =
         ]);
 
         if (onShowToast) {
-          onShowToast('Ukaguzi Umekamilika!', 'Mifumo yote ya MikroTik, DNS na APs inafanya kazi kwa kiwango cha juu bila hitilafu yoyote.', 'success');
+          onShowToast('Ukaguzi Umekamilika!', 'Mifumo yote ya Gateway, DNS na APs inafanya kazi kwa kiwango cha juu bila hitilafu yoyote.', 'success');
         }
       }
     }, 600);
@@ -352,7 +352,7 @@ export const NetworkDiagnosticsModule: React.FC<NetworkDiagnosticsModuleProps> =
 
               <div className="p-3 bg-stone-100 rounded-xl border border-stone-200 space-y-1">
                 <span className="text-[10px] text-stone-500 uppercase font-bold block">Hop 2</span>
-                <span className="font-bold text-stone-900 block text-[11px]">MikroTik Gateway</span>
+                <span className="font-bold text-stone-900 block text-[11px]">Omada Gateway</span>
                 <span className="text-[10px] text-emerald-600 font-mono font-bold">1.2 ms</span>
               </div>
 
@@ -397,7 +397,7 @@ export const NetworkDiagnosticsModule: React.FC<NetworkDiagnosticsModuleProps> =
               <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <strong className="text-white block font-bold">MikroTik Router Haina Msongamano:</strong>
+                  <strong className="text-white block font-bold">Gateway Router Haina Msongamano:</strong>
                   <span>Matumizi ya processor ni 12% na hakuna upotevu wowote wa pakiti za data (0% Packet loss).</span>
                 </div>
               </div>

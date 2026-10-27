@@ -2524,33 +2524,33 @@ Niko hapa kuhakikisha unapata huduma bora saa 24/7 bila kukatika! 🙌`,
               </div>
             )}
 
-            {/* Microtik Fetch Alert Script for WhatsApp */}
+            {/* Server / Webhook Fetch Alert Script for WhatsApp */}
             <div className="bg-[#1f2937] border border-stone-700 rounded-2xl p-5 space-y-3 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Terminal className="w-4 h-4 text-emerald-400" />
-                  <strong className="text-xs font-mono uppercase tracking-wider">MikroTik WhatsApp Instant Alert Script</strong>
+                  <strong className="text-xs font-mono uppercase tracking-wider">Server / Linux WhatsApp Instant Alert Script</strong>
                 </div>
                 <button
                   onClick={() =>
                     handleCopy(
-                      `/tool fetch http-method=post http-header-field="Content-Type: application/json" http-data="{\\"phone\\":\\"${adminNotificationPhone}\\",\\"message\\":\\"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!\\"}" url="${window.location.origin}/api/v1/whatsapp/test-send" keep-result=no`,
-                      'MikroTik WhatsApp Script'
+                      `curl -X POST -H "Content-Type: application/json" -d '{"phone":"${adminNotificationPhone}","message":"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!"}' "${window.location.origin}/api/v1/whatsapp/test-send"`,
+                      'WhatsApp Alert Script'
                     )
                   }
                   className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Copy className="w-3 h-3" />
-                  <span>Nakili Script ya MikroTik</span>
+                  <span>Nakili Script ya Arifa</span>
                 </button>
               </div>
 
               <p className="text-[11px] text-stone-300">
-                Weka amri hii kwenye <em>System &gt; Scripts</em> au kwenye <em>Netwatch</em> kwenye MikroTik yako ili ikitokea internet imekatika au mtu anajaribu kutoa hotspot, ikutumie WhatsApp papo hapo:
+                Weka amri hii kwenye seva au crontab yako ili ikitokea internet imekatika au mtu anajaribu kutoa hotspot, ikutumie WhatsApp papo hapo:
               </p>
 
               <pre className="p-3 bg-stone-950 rounded-xl font-mono text-[10px] text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-{`/tool fetch http-method=post http-header-field="Content-Type: application/json" http-data="{\\"phone\\":\\"${adminNotificationPhone}\\",\\"message\\":\\"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!\\"}" url="${window.location.origin}/api/v1/whatsapp/test-send" keep-result=no`}
+{`curl -X POST -H "Content-Type: application/json" -d '{"phone":"${adminNotificationPhone}","message":"🚨 Hotspot Alert: Mteja anashea mtandao au mfumo una hitilafu!"}' "${window.location.origin}/api/v1/whatsapp/test-send"`}
               </pre>
             </div>
           </div>

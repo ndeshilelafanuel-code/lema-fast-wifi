@@ -78,7 +78,7 @@ export const BandwidthVisualizationWidget: React.FC<Props> = ({
           </div>
           <div>
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              Kipima Spidi & MikroTik Burst Mode
+              Kipima Spidi & Smart QoS Burst Mode
               {isBurstActive && (
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-500 text-slate-950 rounded-full animate-pulse">
                   ⚡ BURST ACTIVE
@@ -207,7 +207,7 @@ export const BandwidthVisualizationWidget: React.FC<Props> = ({
       <div className="flex items-start gap-2 text-[11px] text-slate-400 bg-slate-800/50 p-2.5 rounded-xl border border-slate-700/50">
         <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
         <div>
-          <span className="text-slate-200 font-semibold">MikroTik QoS Technology: </span>
+          <span className="text-slate-200 font-semibold">Smart QoS Technology: </span>
           Router yetu inatumia mfumo maalum wa <span className="text-cyan-300 font-medium">Queue Bursting</span>. Hukupa kipaumbele cha spidi kubwa unapoanza kuperuzi ili kurasa na video zifunguke mara moja bila kusubiri.
         </div>
       </div>
