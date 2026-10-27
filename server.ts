@@ -3633,8 +3633,8 @@ function saveTowersToFile(towers: any[]) {
 app.get('/api/v1/towers', async (_req, res) => {
   // Check hardware inventory status for 100% real-time consistency
   loadSavedHardware();
-  const apItem = savedHardware.find((h) => h.category === 'ap') || savedHardware[0];
-  const isApOffline = apItem && apItem.status === 'offline';
+  const apItems = savedHardware.filter((h) => h.category === 'ap');
+  const isApOffline = apItems.length > 0 && apItems.every((h) => h.status === 'offline');
 
   try {
     const rows = await db.select().from(towersTable);
@@ -3750,13 +3750,13 @@ async function startServer() {
       }
     } catch (e) {}
 
-    // Step 2: Check heartbeats and mark stagnant devices offline
+    // Step 2: Check heartbeats and mark stagnant devices offline ONLY if a heartbeat was actively sending and then stopped (> 2 mins)
     savedHardware.forEach((h) => {
       const last = (h as any).lastHeartbeat || 0;
-      if (h.status === 'online' && (last === 0 || now - last > 40000)) {
+      if (h.status === 'online' && last > 0 && now - last > 120000) {
         h.status = 'offline';
         hwUpdated = true;
-        console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) is OFFLINE (no recent heartbeat/Omada signal)!`);
+        console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) heartbeat stopped!`);
         processApOutageAlert({
           status: 'down',
           apIp: h.ipAddress,
@@ -3783,7 +3783,7 @@ async function startServer() {
     let towersUpdated = false;
     towers.forEach((t: any) => {
       const last = t.lastHeartbeat || 0;
-      if (t.status === 'online' && last > 0 && now - last > 35000) {
+      if (t.status === 'online' && last > 0 && now - last > 120000) {
         t.status = 'offline';
         towersUpdated = true;
       }
