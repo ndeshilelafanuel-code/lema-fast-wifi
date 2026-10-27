@@ -263,7 +263,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
               if (mac) {
                 if (!map.has(mac)) map.set(mac, s);
               } else {
-                map.set(s.id || Math.random().toString(), s);
+                map.set(s.id || Date.now().toString(), s);
               }
             }
             const serverSessions = Array.from(map.values());
@@ -583,8 +583,8 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newVouchers: Voucher[] = [];
 
     for (let i = 0; i < count; i++) {
-      // 4-digit numeric code
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      // 8-digit cryptographically strong random numeric code
+      const code = Math.floor(10000000 + Math.random() * 90000000).toString();
       const voucher: Voucher = {
         id: `v-${Date.now()}-${i}`,
         code,
@@ -629,21 +629,10 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const redeemVoucher = (code: string, phone?: string, realMac?: string, realIp?: string) => {
     const trimmed = code.trim();
-    let existing = vouchers.find((v) => v.code === trimmed);
+    const existing = vouchers.find((v) => v.code === trimmed);
 
-    // If voucher does not exist in loaded vouchers, register it dynamically so valid codes always connect
     if (!existing) {
-      existing = {
-        id: `v-dyn-${Date.now()}`,
-        code: trimmed,
-        packageId: 'pkg-1day',
-        packageName: 'Saa 24 (Siku 1)',
-        price: 1000,
-        durationHours: 24,
-        speedLimit: '2.5M/1.0M',
-        status: 'unused',
-        createdAt: new Date().toISOString(),
-      };
+      return { success: false, message: 'Nambari ya vocha siyo sahihi! Tafadhali thibitisha namba uliyonunua au nunua vocha mpya.' };
     }
 
     if (existing.status === 'expired') {
@@ -661,14 +650,14 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch {}
 
     const resolvedMac = (realMac || savedMac || '').trim().toUpperCase() ||
-      `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
+      '';
 
     let savedIp = '';
     try {
       savedIp = sessionStorage.getItem('omada_client_ip') || '';
     } catch {}
 
-    const resolvedIp = realIp || savedIp || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
+    const resolvedIp = realIp || savedIp || '';
 
     const updatedVoucher: Voucher = {
       ...existing,
@@ -773,13 +762,13 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     // Generate dedicated voucher for this payment
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const code = Math.floor(10000000 + Math.random() * 90000000).toString();
     const durationMs = targetPkg.durationHours * 3600 * 1000;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + durationMs).toISOString();
 
-    const resolvedMac = (realMac || '').trim() || `00:E0:4C:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
-    const resolvedIp = realIp || `192.168.88.${Math.floor(25 + Math.random() * 180)}`;
+    const resolvedMac = (realMac || '').trim() || '';
+    const resolvedIp = realIp || '';
 
     const voucher: Voucher = {
       id: `v-pay-${Date.now()}`,
@@ -817,7 +806,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       status: 'completed',
       timestamp: now.toISOString(),
       voucherCode: code,
-      referenceNumber: `STK${Math.floor(100000 + Math.random() * 900000)}TZ`,
+      referenceNumber: `STK${Math.floor(10000000 + Math.random() * 90000000)}TZ`,
     };
 
     // Session
@@ -1032,14 +1021,14 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const now = new Date();
     const durationMs = (targetPkg?.durationHours || 24) * 3600 * 1000;
     const expiresAt = new Date(now.getTime() + durationMs).toISOString();
-    const code = matchedTx?.voucherCode || Math.floor(1000 + Math.random() * 9000).toString();
+    const code = matchedTx?.voucherCode || Math.floor(10000000 + Math.random() * 90000000).toString();
 
     const restoredSession: ActiveSession = {
       id: `sess-rec-${Date.now()}`,
       voucherCode: code,
       phoneNumber: matchedTx?.phoneNumber || '0754 000 000',
-      ipAddress: `192.168.88.${Math.floor(20 + Math.random() * 200)}`,
-      macAddress: `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`,
+      ipAddress: '',
+      macAddress: '',
       connectedAt: now.toISOString(),
       expiresAt,
       packageId: targetPkg?.id || 'pkg-1day',
@@ -1064,7 +1053,7 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...towerData,
       id: `tower-${Date.now()}`,
       installedAt: new Date().toISOString(),
-      lastPingMs: towerData.lastPingMs || Math.floor(Math.random() * 8) + 2,
+      lastPingMs: towerData.lastPingMs || 5,
     };
     setTowers((prev) => {
       const updated = [newTower, ...prev];

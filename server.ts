@@ -15,7 +15,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { db } from './src/db/index.ts';
-import { hardware, towers as towersTable } from './src/db/schema.ts';
+import { hardware, towers as towersTable, vouchers as vouchersTable, activeSessions as activeSessionsTable, paymentOrders as paymentOrdersTable } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
 import { initDbTables } from './src/db/init.ts';
 import { omadaAuthorize, omadaUnauthorize, omadaBlockClient, omadaUnblockClient, getOmadaConfig, updateOmadaConfig, testOmadaConnection, resolveControllerId, getOmadaDevices, getOmadaClients } from './omada.ts';
@@ -92,8 +92,21 @@ const requireAdmin = (req: express.Request, res: express.Response, next: express
   });
 };
 
+// Track admin login attempts to prevent brute-force attacks
+const adminLoginAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
 // 1. Uthibitisho halisi wa Msimamizi Seva (Admin Login via POST)
 app.post('/api/v1/admin/login', (req, res) => {
+  const clientIp = String(req.ip || req.headers['x-forwarded-for'] || 'client');
+  const record = adminLoginAttempts.get(clientIp);
+  const now = Date.now();
+  if (record && record.lockedUntil > now) {
+    const minsLeft = Math.ceil((record.lockedUntil - now) / 60000);
+    return res.status(429).json({
+      success: false,
+      message: `Umejaribu kuingia bila mafanikio mara nyingi. Tafadhali subiri dakika ${minsLeft} kabla ya kujaribu tena.`
+    });
+  }
   const adminKey = getAdminKey();
   if (!adminKey) {
     return res.status(503).json({
@@ -110,6 +123,7 @@ app.post('/api/v1/admin/login', (req, res) => {
   const inputPass = String(pass || '').trim();
 
   if (inputUser === expectedUser && inputPass === expectedPass) {
+    adminLoginAttempts.delete(clientIp);
     console.log(`[Admin Login] Success for user "${inputUser}"`);
     return res.json({
       success: true,
@@ -120,10 +134,15 @@ app.post('/api/v1/admin/login', (req, res) => {
     });
   }
 
-  console.warn(`[Admin Login 401] Failed login attempt for user "${inputUser}"`);
+  console.warn(`[Admin Login 401] Failed login attempt for user "${inputUser}" from ${clientIp}`);
+  const currentCount = (record?.count || 0) + 1;
+  const lockedUntil = currentCount >= 5 ? Date.now() + 15 * 60 * 1000 : 0;
+  adminLoginAttempts.set(clientIp, { count: currentCount, lockedUntil });
   return res.status(401).json({
     success: false,
-    message: 'Jina la mtumiaji (Username) au nenosiri (Password) si sahihi.'
+    message: currentCount >= 5
+      ? 'Umejaribu mara 5 bila mafanikio. Akaunti imezuiwa kwa dakika 15 kwa usalama.'
+      : 'Jina la mtumiaji (Username) au nenosiri (Password) si sahihi.'
   });
 });
 
@@ -813,6 +832,7 @@ async function processApOutageAlert(params: {
 
     if (sessionsChanged) {
       saveSessionsToDisk();
+
       console.log(`[AP Watchdog] Client sessions correlated with AP status ${status.toUpperCase()}`);
     }
   } catch (err: any) {
@@ -1177,19 +1197,14 @@ app.get('/api/v1/sessions/active', async (_req, res) => {
       };
     }
 
-    // Accumulate realistic background data consumption based on elapsed session duration
-    const elapsedSecs = Math.max(0, Math.floor((nowMs - new Date(s.connectedAt || nowMs).getTime()) / 1000));
-    // Realistic consumption: ~55 KB per second of active web browsing
-    const realisticBytes = Math.max(s.bytesDown || 1048576, Math.floor(elapsedSecs * 55 * 1024));
-
     return {
       ...s,
       status: s.status || 'online',
       apStatus: 'online',
-      bytesDown: realisticBytes,
-      bytesUp: Math.floor(realisticBytes * 0.18),
-      downSpeedMbps: s.downSpeedMbps !== undefined ? s.downSpeedMbps : 1.5,
-      upSpeedMbps: s.upSpeedMbps !== undefined ? s.upSpeedMbps : 0.3,
+      bytesDown: s.bytesDown || 0,
+      bytesUp: s.bytesUp || 0,
+      downSpeedMbps: s.downSpeedMbps !== undefined ? s.downSpeedMbps : 0,
+      upSpeedMbps: s.upSpeedMbps !== undefined ? s.upSpeedMbps : 0,
     };
   });
 
@@ -1231,7 +1246,7 @@ app.post('/api/v1/sessions/sync', (req, res) => {
       if (mac) {
         map.set(mac, s);
       } else {
-        map.set(s.id || Math.random(), s);
+        map.set(s.id || String(Date.now()), s);
       }
     }
     savedActiveSessions = Array.from(map.values());
@@ -1425,6 +1440,32 @@ app.post('/api/v1/vouchers', (req, res) => {
       }
     }
     saveVouchersToDisk();
+
+    // Persist vouchers to PostgreSQL database if configured
+    if (process.env.DATABASE_URL) {
+      for (const v of vouchers) {
+        db.insert(vouchersTable).values({
+          id: v.id || `v-${v.code}`,
+          code: v.code,
+          packageId: v.packageId || 'pkg-default',
+          packageName: v.packageName || 'Intaneti',
+          price: v.price || 1000,
+          durationMinutes: (v.durationHours || 24) * 60,
+          status: v.status || 'unused',
+          customerPhone: v.usedByPhone || '',
+          paymentReference: v.paymentReference || '',
+        }).onConflictDoUpdate({
+          target: vouchersTable.code,
+          set: {
+            status: v.status || 'unused',
+            customerPhone: v.usedByPhone || '',
+          }
+        }).catch((dbErr: any) => {
+          console.warn('[PostgreSQL Voucher Sync Warning]:', dbErr?.message || dbErr);
+        });
+      }
+    }
+
     return res.json({ success: true, count: savedVouchers.length, vouchers: savedVouchers });
   }
   return res.status(400).json({ success: false, error: 'Invalid vouchers array' });
@@ -1532,8 +1573,21 @@ function parseKbps(s?: string) {
   return { down: k(m[1], m[2]), up: k(m[3], m[4]) };
 }
 
+// In-memory rate limiting map for voucher redemption (anti brute-force)
+const voucherRedeemAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
 // POST Redeem Voucher (called from Customer Portal on Mobile Phone with Omada v6.3)
 app.post('/api/v1/vouchers/redeem', async (req, res) => {
+  const clientKey = String(req.body?.clientMac || req.ip || 'unknown').toUpperCase();
+  const attempt = voucherRedeemAttempts.get(clientKey);
+  const nowMs = Date.now();
+  if (attempt && attempt.lockedUntil > nowMs) {
+    const minsRemaining = Math.ceil((attempt.lockedUntil - nowMs) / 60000);
+    return res.status(429).json({
+      success: false,
+      message: `Umejaribu vocha zisizo sahihi mara nyingi mno. Tafadhali subiri dakika ${minsRemaining} kabla ya kujaribu tena.`
+    });
+  }
   const { code, phone, clientMac, apMac, ssidName, radioId, clientIp, macAddress, ipAddress, voucher: incomingVoucher } = req.body || {};
   const trimmed = String(code || '').trim();
   if (!trimmed) {
@@ -1564,11 +1618,17 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   const found: any = savedVouchers.find((v) => v.code === trimmed);
 
   if (!found) {
+    const curAttempts = (attempt?.count || 0) + 1;
+    const lockTime = curAttempts >= 5 ? Date.now() + 15 * 60 * 1000 : 0;
+    voucherRedeemAttempts.set(clientKey, { count: curAttempts, lockedUntil: lockTime });
     return res.status(404).json({
       success: false,
-      message: 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako au nunua vocha mpya.'
+      message: curAttempts >= 5
+        ? 'Umejaribu vocha zisizo sahihi mara 5. Kifaa chako kimezuiwa kwa dakika 15 kwa usalama.'
+        : 'Nambari ya vocha siyo sahihi! Tafadhali kagua tena namba yako au nunua vocha mpya.'
     });
   }
+  voucherRedeemAttempts.delete(clientKey);
 
   const now = Date.now();
   if (found.status === 'expired' || (found.expiresAt && new Date(found.expiresAt).getTime() <= now)) {
@@ -1672,6 +1732,32 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
   ];
   saveSessionsToDisk();
 
+  // Persist activated voucher and session to PostgreSQL
+  if (process.env.DATABASE_URL) {
+    db.update(vouchersTable)
+      .set({
+        status: 'active',
+        customerPhone: String(phone || found.usedByPhone || ''),
+        activatedAt: new Date(found.activatedAt || now),
+        expiresAt: new Date(expiresAt),
+      })
+      .where(eq(vouchersTable.code, found.code))
+      .catch(() => {});
+
+    db.insert(activeSessionsTable).values({
+      id: String(session.id),
+      voucherCode: String(session.voucherCode),
+      macAddress: String(session.macAddress),
+      ipAddress: String(session.ipAddress),
+      customerPhone: String(session.phoneNumber || ''),
+      deviceInfo: String(session.ssidName || ''),
+      bytesDownloaded: '1 MB',
+      bytesUploaded: '256 KB',
+      status: 'active',
+      expiresAt: new Date(expiresAt),
+    }).catch(() => {});
+  }
+
   // Also update associated wifi client list
   loadSavedWifiClients();
   const cIdx = wifiClients.findIndex((c) => c.mac.toUpperCase() === effectiveClientMac);
@@ -1703,8 +1789,8 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
 // POST Free Trial (15 minutes free internet)
 app.post('/api/v1/vouchers/trial', (req, res) => {
   const { phone, macAddress, ipAddress } = req.body || {};
-  const clientMac = (macAddress || `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`).toUpperCase();
-  const clientIp = ipAddress || `192.168.88.${Math.floor(20 + Math.random() * 200)}`;
+  const clientMac = (macAddress || '').toUpperCase();
+  const clientIp = ipAddress || '';
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
 
@@ -1828,12 +1914,14 @@ app.get('/api/v1/omada/config', requireAdmin, (_req, res) => {
     config: {
       omadaUrl: cfg.omadaUrl,
       controllerId: cfg.controllerId,
+      siteId: cfg.siteId || 'Default',
       operatorUser: cfg.operatorUser,
-      operatorPass: cfg.operatorPass,
+      operatorPass: cfg.operatorPass ? '••••••••' : '',
       hasPassword: Boolean(cfg.operatorPass),
       adminUser: cfg.adminUser || '',
-      adminPass: cfg.adminPass,
+      adminPass: cfg.adminPass ? '••••••••' : '',
       hasAdminPassword: Boolean(cfg.adminPass),
+      customUnauthEndpoint: cfg.customUnauthEndpoint || '',
       strictTls: cfg.strictTls,
       slidingLeaseEnabled: cfg.slidingLeaseEnabled,
       slidingLeaseMinutes: cfg.slidingLeaseMinutes,
@@ -1842,16 +1930,18 @@ app.get('/api/v1/omada/config', requireAdmin, (_req, res) => {
 });
 
 app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
-  const { omadaUrl, controllerId, operatorUser, operatorPass, adminUser, adminPass, strictTls, slidingLeaseEnabled, slidingLeaseMinutes } = req.body || {};
+  const { omadaUrl, controllerId, siteId, operatorUser, operatorPass, adminUser, adminPass, strictTls, slidingLeaseEnabled, slidingLeaseMinutes, customUnauthEndpoint } = req.body || {};
   const patch: any = {};
   if (omadaUrl !== undefined) patch.omadaUrl = String(omadaUrl).trim();
   if (controllerId !== undefined) patch.controllerId = String(controllerId).trim();
+  if (siteId !== undefined) patch.siteId = String(siteId).trim();
+  if (customUnauthEndpoint !== undefined) patch.customUnauthEndpoint = String(customUnauthEndpoint).trim();
   if (operatorUser !== undefined) patch.operatorUser = String(operatorUser).trim();
-  if (operatorPass !== undefined && String(operatorPass).trim() !== '') {
+  if (operatorPass !== undefined && String(operatorPass).trim() !== '' && String(operatorPass).trim() !== '••••••••') {
     patch.operatorPass = String(operatorPass).trim();
   }
   if (adminUser !== undefined) patch.adminUser = String(adminUser).trim();
-  if (adminPass !== undefined && String(adminPass).trim() !== '') {
+  if (adminPass !== undefined && String(adminPass).trim() !== '' && String(adminPass).trim() !== '••••••••') {
     patch.adminPass = String(adminPass).trim();
   }
   if (strictTls !== undefined) patch.strictTls = Boolean(strictTls);
@@ -1865,10 +1955,12 @@ app.post('/api/v1/omada/config', requireAdmin, (req, res) => {
     config: {
       omadaUrl: updated.omadaUrl,
       controllerId: updated.controllerId,
+      siteId: updated.siteId || 'Default',
       operatorUser: updated.operatorUser,
       hasPassword: Boolean(updated.operatorPass),
       adminUser: updated.adminUser || '',
       hasAdminPassword: Boolean(updated.adminPass),
+      customUnauthEndpoint: updated.customUnauthEndpoint || '',
       strictTls: updated.strictTls,
       slidingLeaseEnabled: updated.slidingLeaseEnabled,
       slidingLeaseMinutes: updated.slidingLeaseMinutes,
@@ -1927,7 +2019,7 @@ app.post('/api/v1/omada/client/authorize', requireAdmin, async (req, res) => {
   loadSavedWifiClients();
   let target = wifiClients.find((c) => c.mac.toUpperCase() === cleanMac);
   const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+  const voucherCode = crypto.randomInt(10000000, 99999999).toString();
 
   if (!target) {
     target = {
@@ -2131,12 +2223,15 @@ setInterval(async () => {
       if (expiresMs > now && session.macAddress) {
         try {
           const leaseMinutes = conf.slidingLeaseMinutes || 10;
+          const { down, up } = parseKbps(session.speedLimit);
           await omadaAuthorize({
             clientMac: session.macAddress,
             apMac: session.apMac || '',
             ssidName: session.ssidName || 'Lema Fast WiFi',
             radioId: session.radioId || 0,
-            durationMs: leaseMinutes * 60 * 1000
+            durationMs: leaseMinutes * 60 * 1000,
+            downKbps: down,
+            upKbps: up,
           });
         } catch (e: any) {
           console.warn(`[Sliding Lease Auto-Renew] ${session.macAddress} notice:`, e.message);
@@ -2959,7 +3054,7 @@ _Msaada wa haraka piga: 0653 578 184 (Jimmy Lema)_`;
     text.includes('kumbukumbu') ||
     text.includes('muamala')
   ) {
-    const randomVoucher = Math.floor(1000 + Math.random() * 9000);
+    const randomVoucher = crypto.randomInt(10000000, 99999999);
     return `🎉 *HONGERA SANA! MALIPO YAMEPOKELEWA NA KUTHIBITISHWA!*
 
 🎟️ *VOCHA YAKO NI:* \`${randomVoucher}\`
@@ -2976,7 +3071,7 @@ _Karibu sana tena! Kwa msaada wowote piga: 0653 578 184 (Jimmy Lema)._`;
 
   // 2c. Admin / Test voucher generator
   if (text === 'test' || text === 'demo' || text === 'jaribio') {
-    const randomVoucher = Math.floor(1000 + Math.random() * 9000);
+    const randomVoucher = crypto.randomInt(10000000, 99999999);
     return `🧪 *VOCHA YA MAJARIBIO (TEST MODE):* \`${randomVoucher}\`
 Hii ni kwa ajili ya majaribio ya mtandao tu.`;
   }
@@ -3099,7 +3194,20 @@ app.get('/api/v1/whatsapp/webhook', (req, res) => {
 
 app.post('/api/v1/whatsapp/webhook', async (req, res) => {
   const body = req.body;
-  console.log('[WhatsApp Webhook Received]:', JSON.stringify(body, null, 2));
+  const hubSig = req.get('x-hub-signature-256');
+  const secret = (whatsAppConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '').trim();
+  if (secret && hubSig) {
+    try {
+      const hmac = crypto.createHmac('sha256', secret);
+      const expected = 'sha256=' + hmac.update(JSON.stringify(body)).digest('hex');
+      if (hubSig !== expected) {
+        console.warn('[WhatsApp Webhook] Invalid X-Hub-Signature-256 rejected.');
+        return res.status(401).send('Invalid signature');
+      }
+    } catch (sigErr) {
+      console.warn('[WhatsApp Webhook] Signature verification notice:', sigErr);
+    }
+  }
 
   try {
     // Meta WhatsApp Cloud API Incoming Message
@@ -3351,7 +3459,7 @@ app.post('/api/v1/payments/stk-push', async (req, res) => {
   }
 
   const { local: localPhone } = normalizeTzPhone(phone);
-  const orderId = `ORD-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+  const orderId = `ORD-${Date.now()}-${crypto.randomInt(100000, 999999)}`;
 
   const order: PaymentOrder = {
     orderId,
@@ -3503,7 +3611,7 @@ app.post('/api/v1/payments/webhook', async (req, res) => {
   const order = orderId ? paymentOrders.get(orderId) : null;
 
   if (status === 'completed' || status === 'success' || status === 'paid' || body.resultcode === '0' || body.success === true) {
-    const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const voucherCode = crypto.randomInt(10000000, 99999999).toString();
     const phoneToNotify = order?.phone || incomingPhone || '255622443249';
 
     if (order) {
@@ -3578,10 +3686,10 @@ app.post('/api/v1/payments/simulate-confirm', requireAdmin, async (req, res) => 
     return res.status(404).json({ error: 'Order not found' });
   }
 
-  const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+  const voucherCode = crypto.randomInt(10000000, 99999999).toString();
   order.status = 'completed';
   order.voucherCode = voucherCode;
-  order.reference = `STK-${Math.floor(100000 + Math.random() * 900000)}TZ`;
+  order.reference = `STK-${crypto.randomInt(10000000, 99999999)}TZ`;
   order.completedAt = new Date().toISOString();
 
   // Persist to savedVouchers
@@ -3743,91 +3851,137 @@ async function startServer() {
   });
 
   // Background Watchdog: Query Omada Controller live status and mark APs offline if disconnected
+  // Background Worker: Automatically expire vouchers and active sessions
   setInterval(async () => {
-    loadSavedHardware();
-    const now = Date.now();
-    let hwUpdated = false;
-
-    // Step 1: Query live AP devices directly from Omada Controller
     try {
-      const liveDevices = await getOmadaDevices();
-      if (liveDevices && liveDevices.length > 0) {
-        liveDevices.forEach((d) => {
-          const dMac = d.mac.replace(/[:-]/g, '').toUpperCase();
-          const found = savedHardware.find(
-            (h) => h.macAddress.replace(/[:-]/g, '').toUpperCase() === dMac || (d.ip && h.ipAddress === d.ip)
-          );
-          if (found) {
-            if (found.status !== d.status) {
-              const previousStatus = found.status;
-              found.status = d.status;
-              hwUpdated = true;
-              console.log(`[Omada Watchdog] ⚡ AP ${found.name} (${found.ipAddress}) updated to ${d.status.toUpperCase()} (was ${previousStatus})`);
-              if (d.status === 'offline' && previousStatus === 'online') {
-                processApOutageAlert({
-                  status: 'down',
-                  apIp: found.ipAddress,
-                  apMac: found.macAddress,
-                  apName: found.name,
-                  site: found.site
-                }).catch(() => {});
+      loadSavedVouchers();
+      loadSavedSessions();
+      const now = Date.now();
+      let vChanged = false;
+      let sChanged = false;
+
+      savedVouchers.forEach((v) => {
+        if (v.status === 'active' && v.expiresAt && new Date(v.expiresAt).getTime() <= now) {
+          v.status = 'expired';
+          vChanged = true;
+          if (process.env.DATABASE_URL) {
+            db.update(vouchersTable).set({ status: 'expired' }).where(eq(vouchersTable.code, v.code)).catch(() => {});
+          }
+        }
+      });
+      if (vChanged) saveVouchersToDisk();
+
+      savedActiveSessions.forEach((s) => {
+        if (s.status === 'online' && s.expiresAt && new Date(s.expiresAt).getTime() <= now) {
+          s.status = 'offline';
+          s.downSpeedMbps = 0;
+          s.upSpeedMbps = 0;
+          sChanged = true;
+          if (process.env.DATABASE_URL) {
+            db.update(activeSessionsTable).set({ status: 'expired' }).where(eq(activeSessionsTable.voucherCode, s.voucherCode)).catch(() => {});
+          }
+        }
+      });
+      if (sChanged) saveSessionsToDisk();
+    } catch (e: any) {
+      console.warn('[Voucher/Session Expiry Worker Error]:', e?.message || e);
+    }
+  }, 60000).unref();
+
+  const watchdogTimer = setInterval(async () => {
+    try {
+      loadSavedHardware();
+      const now = Date.now();
+      let hwUpdated = false;
+
+      // Step 1: Query live AP devices directly from Omada Controller
+      try {
+        const liveDevices = await getOmadaDevices();
+        if (liveDevices && liveDevices.length > 0) {
+          liveDevices.forEach((d) => {
+            const dMac = d.mac.replace(/[:-]/g, '').toUpperCase();
+            const found = savedHardware.find(
+              (h) => h.macAddress.replace(/[:-]/g, '').toUpperCase() === dMac || (d.ip && h.ipAddress === d.ip)
+            );
+            if (found) {
+              if (found.status !== d.status) {
+                const previousStatus = found.status;
+                found.status = d.status;
+                hwUpdated = true;
+                console.log(`[Omada Watchdog] ⚡ AP ${found.name} (${found.ipAddress}) updated to ${d.status.toUpperCase()} (was ${previousStatus})`);
+                if (d.status === 'offline' && previousStatus === 'online') {
+                  processApOutageAlert({
+                    status: 'down',
+                    apIp: found.ipAddress,
+                    apMac: found.macAddress,
+                    apName: found.name,
+                    site: found.site
+                  }).catch(() => {});
+                }
               }
             }
+          });
+        }
+      } catch (e) {}
+
+      // Step 2: Check heartbeats and mark stagnant devices offline ONLY if a heartbeat was actively sending and then stopped (> 2 mins)
+      savedHardware.forEach((h) => {
+        const last = (h as any).lastHeartbeat || 0;
+        if (h.status === 'online' && last > 0 && now - last > 120000) {
+          h.status = 'offline';
+          hwUpdated = true;
+          console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) heartbeat stopped!`);
+          processApOutageAlert({
+            status: 'down',
+            apIp: h.ipAddress,
+            apMac: h.macAddress,
+            apName: h.name,
+            site: h.site
+          }).catch(() => {});
+        }
+      });
+
+      if (hwUpdated) {
+        saveHardwareToDisk();
+        for (const h of savedHardware) {
+          if (h.macAddress) {
+            db.update(hardware)
+              .set({ status: h.status, lastSeen: h.lastSeen || '' })
+              .where(eq(hardware.macAddress, h.macAddress.toUpperCase()))
+              .catch(() => {});
           }
-        });
-      }
-    } catch (e) {}
-
-    // Step 2: Check heartbeats and mark stagnant devices offline ONLY if a heartbeat was actively sending and then stopped (> 2 mins)
-    savedHardware.forEach((h) => {
-      const last = (h as any).lastHeartbeat || 0;
-      if (h.status === 'online' && last > 0 && now - last > 120000) {
-        h.status = 'offline';
-        hwUpdated = true;
-        console.log(`[Watchdog] ⚠️ AP ${h.name} (${h.ipAddress}) heartbeat stopped!`);
-        processApOutageAlert({
-          status: 'down',
-          apIp: h.ipAddress,
-          apMac: h.macAddress,
-          apName: h.name,
-          site: h.site
-        }).catch(() => {});
-      }
-    });
-
-    if (hwUpdated) {
-      saveHardwareToDisk();
-      for (const h of savedHardware) {
-        if (h.macAddress) {
-          db.update(hardware)
-            .set({ status: h.status, lastSeen: h.lastSeen || '' })
-            .where(eq(hardware.macAddress, h.macAddress.toUpperCase()))
-            .catch(() => {});
         }
       }
-    }
 
-    const towers = loadSavedTowers();
-    let towersUpdated = false;
-    towers.forEach((t: any) => {
-      const last = t.lastHeartbeat || 0;
-      if (t.status === 'online' && last > 0 && now - last > 120000) {
-        t.status = 'offline';
-        towersUpdated = true;
+      const towers = loadSavedTowers();
+      let towersUpdated = false;
+      towers.forEach((t: any) => {
+        const last = t.lastHeartbeat || 0;
+        if (t.status === 'online' && last > 0 && now - last > 120000) {
+          t.status = 'offline';
+          towersUpdated = true;
+        }
+      });
+
+      if (towersUpdated) {
+        saveTowersToFile(towers);
       }
-    });
-
-    if (towersUpdated) {
-      saveTowersToFile(towers);
+    } catch (watchdogErr: any) {
+      console.warn('[Watchdog Interval Error Handled]:', watchdogErr?.message || watchdogErr);
     }
   }, 10000);
+  watchdogTimer.unref();
+
+  // Always serve static assets from /public directory
+  app.use(express.static(path.resolve(__dirname, 'public')));
 
   if (!isProd) {
     const vite = await createViteServer({
       root: __dirname,
       server: {
         middlewareMode: true,
-        hmr: false // Disable HMR WebSocket in middlewareMode to prevent connection errors
+        hmr: false, // Disable HMR WebSocket in middlewareMode to prevent connection errors
+        ws: false,  // Explicitly disable Vite ws server so port 24678 is never bound
       },
       appType: 'spa',
     });
@@ -3858,10 +4012,20 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  // Global Express error handler to prevent unhandled express crashes
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('[Express Global Error]:', err?.message || err);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Server internal error' });
+    }
+  });
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Lema Fast WiFi Server running on port ${PORT}`);
-  }).on('error', (err) => {
-    console.error('[Server Listen Error]:', err);
+  });
+
+  server.on('error', (err: any) => {
+    console.error('[Server Listen Error]:', err?.message || err);
   });
 }
 

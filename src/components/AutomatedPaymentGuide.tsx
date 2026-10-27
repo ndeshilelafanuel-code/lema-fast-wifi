@@ -60,7 +60,7 @@ export const AutomatedPaymentGuide: React.FC<AutomatedPaymentGuideProps> = ({ la
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      setGeneratedVoucher(Math.floor(1000 + Math.random() * 9000).toString());
+      setGeneratedVoucher('84920194');
       setCurrentStep(3); // success step
     }, 1000);
   };

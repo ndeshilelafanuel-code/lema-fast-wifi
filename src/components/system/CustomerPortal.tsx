@@ -267,12 +267,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     try {
       const saved = localStorage.getItem('wifi_client_device_mac') || sessionStorage.getItem('omada_client_mac');
       if (saved && saved.trim()) return saved.trim().toUpperCase();
-      const generated = `48:D7:05:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}:${Math.floor(10 + Math.random() * 89)}`;
-      localStorage.setItem('wifi_client_device_mac', generated);
-      sessionStorage.setItem('omada_client_mac', generated);
-      return generated;
+      return '';
     } catch {
-      return '48:D7:05:A1:B2:C3';
+      return '';
     }
   };
 
@@ -393,7 +390,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     const res = await redeemOnServer(rememberedDevice.voucherCode);
     setIsProcessing(false);
 
-    if (res.success || contextRes.success) {
+    if (res.success) {
+      redeemVoucher(rememberedDevice.voucherCode, rememberedDevice.phone, targetMac, targetIp);
       setStatusMessage({
         type: 'success',
         text: `⚡ Umeunganishwa kiotomatiki kwa MAC Binding (${targetMac})!`
@@ -402,7 +400,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
       handleForgetDevice();
       setStatusMessage({
         type: 'error',
-        text: 'Vocha iliyohifadhiwa imekwisha muda wake au imekataliwa. Tafadhali weka vocha mpya.'
+        text: res.message || 'Vocha iliyohifadhiwa imekwisha muda wake au imekataliwa. Tafadhali weka vocha mpya.'
       });
     }
   };
@@ -419,18 +417,18 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
     const targetMac = (omadaParams.clientMac || clientMac || getDeviceMac()).trim().toUpperCase();
     const targetIp = omadaParams.clientIp || clientIp || '192.168.88.150';
 
-    const contextRes = redeemVoucher(scannedCode, phoneNumber, targetMac, targetIp);
     const res = await redeemOnServer(scannedCode);
     setIsProcessing(false);
 
-    if (res.success || contextRes.success) {
+    if (res.success) {
+      const contextRes = redeemVoucher(scannedCode, phoneNumber, targetMac, targetIp);
       // Save device for Auto-Login if checked
       if (rememberDeviceChecked) {
         const savedData = {
           mac: targetMac,
           voucherCode: scannedCode,
-          packageName: contextRes.session?.packageName || 'Vocha ya QR',
-          expiresAt: contextRes.session?.expiresAt || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+          packageName: res.session?.packageName || contextRes.session?.packageName || 'Vocha ya QR',
+          expiresAt: res.session?.expiresAt || contextRes.session?.expiresAt || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
           phone: phoneNumber || undefined
         };
         try {
@@ -443,7 +441,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         text: `📷 Vocha ya QR "${scannedCode}" imethibitishwa na mtandao umewashwa!`
       });
     } else {
-      setStatusMessage({ type: 'error', text: res.message || contextRes.message });
+      setStatusMessage({ type: 'error', text: res.message });
     }
   };
 
@@ -642,24 +640,16 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
 
   // Confirm PIN on USSD Prompt
   const handleConfirmUssd = async () => {
-    const currentOrderId = inlineUssdState?.orderId;
     setShowUssdPrompt(false);
     setInlineUssdState(null);
     setIsProcessing(true);
     try {
-      if (currentOrderId) {
-        fetch('/api/v1/payments/simulate-confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: currentOrderId }),
-        }).catch(() => {});
-      }
       const result = await processMobilePayment(phoneNumber, selectedPackageId, clientMac, clientIp);
       setIsProcessing(false);
       if (result.success) {
         authorizeOmadaHardware(clientMac);
         setStatusMessage({ type: 'success', text: result.message });
-        const vCode = result.voucher?.code || '9482';
+        const vCode = result.voucher?.code || '';
 
         // Auto-save MAC Binding if checked
         if (rememberDeviceChecked) {

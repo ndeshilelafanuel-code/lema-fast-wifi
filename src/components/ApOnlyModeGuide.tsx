@@ -28,9 +28,9 @@ export const ApOnlyModeGuide: React.FC<ApOnlyModeGuideProps> = ({ lang }) => {
   const generateNewVouchers = () => {
     const prefix = activeBrandId === 'tplink-omada' ? 'OM' : 'RY';
     const newCodes = [
-      `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`,
-      `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`,
-      `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`,
+      `${prefix}-${84920194}`,
+      `${prefix}-${84920194}`,
+      `${prefix}-${84920194}`,
     ];
     setDemoVouchers(newCodes);
   };

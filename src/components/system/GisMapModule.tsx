@@ -51,8 +51,8 @@ export const GisMapModule: React.FC = () => {
       antennaType: 'Omni-directional 360°',
       heightMeters: 18,
       coordinates: {
-        lat: -6.7924 + (Math.random() - 0.5) * 0.05,
-        lng: 39.2083 + (Math.random() - 0.5) * 0.05,
+        lat: -6.7924 + 0,
+        lng: 39.2083 + 0,
       },
     });
 

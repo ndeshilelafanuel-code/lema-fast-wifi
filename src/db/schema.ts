@@ -70,3 +70,17 @@ export const activeSessions = pgTable('active_sessions', {
   createdAt: timestamp('created_at').defaultNow(),
   expiresAt: timestamp('expires_at'),
 });
+
+// 6. Payment Transactions & Orders
+export const paymentOrders = pgTable('payment_orders', {
+  id: text('id').primaryKey(),
+  orderId: text('order_id').notNull().unique(),
+  phone: text('phone').notNull(),
+  packageId: text('package_id').notNull(),
+  amount: integer('amount').notNull(),
+  status: text('status').default('pending').notNull(), // pending | completed | failed
+  voucherCode: text('voucher_code').default(''),
+  reference: text('reference').default(''),
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+});

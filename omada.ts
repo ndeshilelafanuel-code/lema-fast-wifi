@@ -520,6 +520,7 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
         totalTrafficLimitBytes: 0,
         downloadRateLimitKbps: p.downKbps || 0,
         uploadRateLimitKbps: p.upKbps || 0,
+        site: currentConfig.siteId || 'Default',
       },
       { 'Csrf-Token': sess.csrf },
       sess
@@ -1057,17 +1058,24 @@ export async function testOmadaConnection(
  * Real-Time Device Monitoring: Fetch live AP status directly from Omada Controller
  */
 export async function getOmadaDevices(): Promise<Array<{ mac: string; name: string; model: string; ip: string; status: 'online' | 'offline'; rawStatus: any }>> {
-  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+  if (!currentConfig.omadaUrl) {
     return [];
   }
 
   try {
     const id = await resolveControllerId();
     let sess: OmadaSession | null = null;
-    try {
-      sess = await getOperatorSession();
-    } catch {
-      return [];
+    if (currentConfig.adminUser && currentConfig.adminPass) {
+      try {
+        sess = await getAdminSession();
+      } catch {}
+    }
+    if (!sess) {
+      try {
+        sess = await getOperatorSession();
+      } catch {
+        return [];
+      }
     }
 
     let siteIds = ['Default', 'default'];
@@ -1156,23 +1164,42 @@ export interface OmadaClientInfo {
  * Real-Time Client Monitoring: Fetch live connected wireless clients from Omada Controller
  */
 export async function getOmadaClients(): Promise<OmadaClientInfo[]> {
-  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+  if (!currentConfig.omadaUrl) {
     return [];
   }
 
   try {
     const id = await resolveControllerId();
     let sess: OmadaSession | null = null;
-    try {
-      sess = await getOperatorSession();
-    } catch {
-      return [];
+    if (currentConfig.adminUser && currentConfig.adminPass) {
+      try {
+        sess = await getAdminSession();
+      } catch {}
+    }
+    if (!sess) {
+      try {
+        sess = await getOperatorSession();
+      } catch {
+        return [];
+      }
     }
 
     let siteIds = ['Default', 'default'];
     if (currentConfig.siteId) {
       siteIds.unshift(currentConfig.siteId);
     }
+
+    try {
+      const sitesRes = await call('GET', `/${id}/api/v2/sites`, undefined, { 'Csrf-Token': sess.csrf }, sess);
+      const list = sitesRes.json?.result?.data || (Array.isArray(sitesRes.json?.result) ? sitesRes.json.result : []);
+      if (Array.isArray(list)) {
+        for (const s of list) {
+          if (s.id && !siteIds.includes(s.id)) siteIds.push(s.id);
+          if (s.siteId && !siteIds.includes(s.siteId)) siteIds.push(s.siteId);
+          if (s.name && !siteIds.includes(s.name)) siteIds.push(s.name);
+        }
+      }
+    } catch (e) {}
 
     const clientsList: OmadaClientInfo[] = [];
 

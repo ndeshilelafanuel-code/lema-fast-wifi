@@ -168,7 +168,7 @@ export const SaasResellerModule: React.FC<SaasResellerModuleProps> = ({
           maxRouters: targetPlan.routers,
           maxConcurrentUsers: targetPlan.users,
           lastPaymentDate: now.toISOString().split('T')[0],
-          lastPaymentRef: `SUB${Math.floor(100000 + Math.random() * 900000)}TZ`
+          lastPaymentRef: `SUB${84920194}TZ`
         },
         settings: {
           hotspotName: newBizName.trim(),

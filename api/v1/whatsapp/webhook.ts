@@ -62,7 +62,7 @@ export default async function handler(req: any, res: any) {
             } else if (cleanText === '4' || cleanText.includes('mwezi 1') || cleanText.includes('25000')) {
               replyText = `🎯 *Umechagua: Mwezi 1 (Siku 30) - Bei: TZS 25,000*\n\n💳 *LIPA KWA M-PESA / TIGO PESA:*\n👉 Lipa Namba: *5849201* au Tuma: *0653 578 184*\n👉 Jina: *Jimmy Lema*\n\n✅ Ukimaliza andika *NIMELIPA* upate vocha yako papo hapo!`;
             } else if (cleanText.includes('nimelipa') || cleanText.includes('tayari') || cleanText.includes('muamala')) {
-              const randomVoucher = Math.floor(1000 + Math.random() * 9000);
+              const randomVoucher = Math.floor(10000000 + Math.random() * 90000000);
               replyText = `🎉 *HONGERA! MALIPO YAMEPOKELEWA!*\n\n🎟️ *VOCHA YAKO:* \`${randomVoucher}\`\n⚡ *Mtandao:* Lema Fast WiFi\n\n👉 Unganisha simu yako kisha ingiza vocha hii au fungua http://192.168.88.1\n\n_Msaada: 0653 578 184 (Jimmy Lema)_`;
             } else {
               replyText = `Habari ${senderName}! 👋\nKaribu *Lema Fast WiFi* Smart Assistant.\n\n📶 *VIFURUSHI VYA INTANETI:*\n1️⃣ Saa 2 (TZS 500) ➔ Jibu: *1*\n2️⃣ Siku 1 (TZS 1,000) ➔ Jibu: *2*\n3️⃣ Wiki 1 (TZS 5,000) ➔ Jibu: *3*\n4️⃣ Mwezi 1 (TZS 25,000) ➔ Jibu: *4*\n\nAndika namba kupata vocha mara moja au andika *ADMIN* kuwasiliana na Jimmy Lema (0653 578 184).`;

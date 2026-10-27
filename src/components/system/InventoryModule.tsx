@@ -67,7 +67,7 @@ export const InventoryModule: React.FC<InventoryModuleProps> = ({
       category: 'ap',
       manufacturer: 'TP-Link',
       model: 'Omada Outdoor EAP',
-      serialNumber: 'SN-OMADA-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      serialNumber: 'SN-OMADA-' + Date.now().toString(36).toUpperCase(),
       macAddress: 'D4-D6-DF-0D-B3-A0',
       ipAddress: '192.168.1.153',
       site: 'Kariakoo',

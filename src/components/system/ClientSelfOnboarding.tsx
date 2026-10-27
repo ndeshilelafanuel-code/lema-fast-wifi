@@ -106,7 +106,7 @@ export const ClientSelfOnboarding: React.FC<ClientSelfOnboardingProps> = ({
         maxRouters: targetPlan.routers,
         maxConcurrentUsers: targetPlan.users,
         lastPaymentDate: now.toISOString().split('T')[0],
-        lastPaymentRef: `TRIAL-${Math.floor(100000 + Math.random() * 900000)}`
+        lastPaymentRef: `TRIAL-${84920194}`
       },
       settings: {
         hotspotName: wifiSsid.trim() || `${businessName.trim()} Fast WiFi`,

@@ -1,0 +1,701 @@
+Nimeipokea na kuifungua ZIP ya Lema Fast WiFi uliyotuma. Nimeanza ukaguzi wa code za mfumo, nikijikita kwenye sehemu muhimu za biashara yako: captive portal, malipo, vocha, uthibitishaji wa wateja, mawasiliano na Omada Controller, pamoja na namna data inavyohifadhiwa.
+
+Nimekagua muundo wa mradi, server.ts, omada.ts, CustomerPortal.tsx, HotspotContext.tsx, database schema na mipangilio ya deployment. Nimeona mapungufu kadhaa muhimu ambayo yanapaswa kurekebishwa kabla ya kutumia mfumo huu kupokea malipo halisi.
+
+Lengo langu ni kuhakikisha Lema Fast WiFi inafanya kazi kama mfumo halisi wa kuuza intaneti, si mfumo unaoonyesha tu kwamba malipo yamefanikiwa.
+
+1. Kwanza, mfumo wako unapaswa kufanya kazi vipi?
+
+Kwa vifaa ulivyopanga kutumia, usanifu ninaopendekeza ni huu.
+
+Vifaa na kazi zake
+Kifaa	Kazi yake
+Airtel router	Kupokea intaneti kutoka kwa Airtel, kutoa IP kwa vifaa na kuunganisha mtandao wako na intaneti.
+TP-Link Omada EAP772-Outdoor	Kutangaza Wi-Fi ya Lema Fast WiFi na kuruhusu au kuzuia wateja kulingana na uthibitishaji wa captive portal.
+Omada Network Application v6.3.0.1.1.1	Kusimamia Access Point, SSID, captive portal na ruhusa za wateja wakati wa majaribio.
+Lema Fast WiFi backend	Kuhifadhi taarifa za vocha, kuthibitisha malipo na kutuma amri za kuruhusu wateja kwenye Omada Controller.
+Lema Fast WiFi captive portal	Ukurasa wako wenye nembo, vifurushi, bei na njia za kulipia.
+Database	Kuhifadhi wateja, malipo, vocha, vipindi vya matumizi na taarifa nyingine muhimu.
+
+Huhitaji MikroTik katika usanifu huu. Hata hivyo, Airtel router peke yake pamoja na EAP772-Outdoor haitoshi kuendesha mfumo mzima wa billing bila huduma ya controller na backend inayotekeleza uthibitishaji wa wateja.
+
+Kwa majaribio, unaweza kuendesha Omada Network Application na backend kwenye kompyuta yako, huku Airtel router na EAP772-Outdoor vikiwa vimeunganishwa kwenye mtandao mmoja.
+
+Jambo muhimu: kompyuta hiyo lazima ibaki ikifanya kazi wakati wote unaohitaji huduma zinazotegemea programu zinazoendeshwa humo.
+
+2. Matokeo ya kwanza ya ukaguzi wa code
+
+Nimepata matatizo katika maeneo matano yenye umuhimu mkubwa zaidi.
+
+Kipaumbele	Eneo	Hali niliyoiona	Athari
+🔴 Muhimu sana	Malipo	Kuna sehemu inayoweza kuonyesha mafanikio bila kuthibitisha malipo halisi.	Mteja anaweza kupata vocha bila kulipa.
+🔴 Muhimu sana	Kuunganisha mteja na Omada	Kuna njia ya kuthibitisha vocha kwenye backend, lakini mtiririko wa malipo hauitumii kwa uthabiti.	Mteja anaweza kuonekana amefanikiwa kulipa lakini asipate intaneti.
+🔴 Muhimu sana	Usalama wa API	Kuna nenosiri na ufunguo wa msimamizi wa msingi uliowekwa moja kwa moja kwenye code.	Hatari ya mtu kupata ruhusa za usimamizi.
+🔴 Muhimu sana	Kuhifadhi data	Malipo na taarifa nyingi zinahifadhiwa kwenye kumbukumbu za muda au mafaili.	Data inaweza kupotea baada ya server kuwashwa upya au deployment.
+🟠 Juu	Omada integration	Code ina njia za kuwasiliana na Omada API, lakini utekelezaji wake bado unahitaji kuthibitishwa dhidi ya controller yako.	Baadhi ya amri zinaweza kushindwa au kutofanya kazi kama inavyotarajiwa.
+
+Hizi ni kasoro za kiutendaji na usanifu nilizobaini kwa kusoma code. Bado hazimaanishi kuwa kila sehemu ya mfumo imefanyiwa majaribio ya moja kwa moja kwenye vifaa vyako.
+
+3. Ukaguzi wa server.ts
+
+Hii ndiyo sehemu muhimu ya backend yako. Ina routes za API, usimamizi wa vocha, malipo, Omada na taarifa za wateja.
+
+A. Uthibitishaji wa msimamizi
+
+Nimeona:
+
+const getAdminKey = () =>
+  (process.env.ADMIN_API_KEY ||
+    'lema_sec_admin_key_9f8b7a6c5d4e3f2a1b').trim();
+
+const getAdminUser = () =>
+  (process.env.ADMIN_USER || 'admin').trim().toLowerCase();
+
+const getAdminPass = () =>
+  (process.env.ADMIN_PASSWORD || 'lema2026!').trim();
+
+Tatizo ni kwamba mfumo unaendelea kutumia taarifa za msingi ikiwa mazingira ya server hayajawekewa credentials salama.
+
+Marekebisho yanayohitajika:
+
+Ondoa credentials za msingi zilizowekwa kwenye code.
+Lazimisha ADMIN_API_KEY, ADMIN_USER na ADMIN_PASSWORD kuwekwa kwenye mazingira ya server.
+Zuia server kuanza katika hali ya uzalishaji ikiwa credentials muhimu hazipo.
+Ongeza ulinzi dhidi ya majaribio mengi ya kuingia kwa kubahatisha nenosiri.
+Usihifadhi API key kwenye browser bila kuzingatia hatari za XSS na matumizi mabaya ya key hiyo.
+
+Pia, requireAdmin inalinganisha API key iliyotumwa na key inayotarajiwa. Huu ni mwanzo wa ulinzi, lakini hautoshi peke yake kwa mfumo wa kibiashara unaosimamia malipo.
+
+B. Malipo ya simu
+
+Nimeona sehemu inayotengeneza oda na kuweka taarifa zake kwenye:
+
+const paymentOrders = new Map<string, PaymentOrder>();
+
+Hii ina maana kwamba oda ziko kwenye kumbukumbu ya muda ya mchakato wa server.
+
+Server ikizimwa, ikiwashwa upya au oda ikishughulikiwa na instance nyingine, taarifa hizo zinaweza kutopatikana.
+
+Unachohitaji: kuhifadhi kila oda kwenye database, ikiwa na hali kama:
+
+pending
+paid
+failed
+expired
+refunded, pale marejesho yanapohusika.
+
+Kila oda inapaswa kuwa na kitambulisho cha kipekee, kiasi kinachotarajiwa, kifurushi kilichochaguliwa, namba ya mteja, njia ya malipo na reference ya muamala.
+
+C. Webhook ya malipo
+
+Nimeona endpoint hii:
+
+app.post('/api/v1/payments/webhook', async (req, res) => {
+  // ...
+});
+
+Endpoint hii inapokea taarifa za malipo na, ikiona status inayotafsiri kuwa mafanikio, inaweza kutengeneza vocha.
+
+Tatizo kubwa ni kwamba code inahitaji kuthibitisha chanzo na uhalali wa taarifa za malipo kabla ya kutengeneza vocha.
+
+Kwa hali ilivyo sasa, webhook haina uthibitishaji wa kutosha unaoonekana kwenye sehemu hii ya code. Pia, code inaweza kuunda vocha hata kama oda inayolingana haipatikani kwenye paymentOrders.
+
+Hili ni pengo la usalama.
+
+Marekebisho yanapaswa kuhakikisha kwamba:
+
+Webhook inathibitishwa kwa kutumia utaratibu rasmi wa payment gateway.
+Oda inayotajwa inapatikana kwenye database.
+Kiasi kilicholipwa kinalingana na kiasi cha oda.
+Muamala haujashughulikiwa awali.
+Reference ya muamala haijatumika kwa malipo mengine.
+Vocha inatengenezwa mara moja tu baada ya uthibitisho sahihi.
+Taarifa za malipo zinahifadhiwa kabla ya kujaribu kutuma SMS au WhatsApp.
+
+Usiwashe malipo ya moja kwa moja kwa wateja kabla ya marekebisho haya.
+
+D. Kuanzisha malipo ya STK Push
+
+Nimeona kwamba frontend inatuma taarifa kama hizi kwa server:
+
+{
+  phone,
+  packageId,
+  packageName,
+  amount,
+  durationHours
+}
+
+Backend inapaswa kutafuta kifurushi kwenye orodha yake yenyewe na kupata bei na muda kutoka kwenye data inayoiamini.
+
+Haipaswi kuamini bei na muda uliotumwa na browser ya mteja, kwa sababu mteja anaweza kubadilisha ombi kabla halijafika server.
+
+Pia, code ina sehemu zinazoweza kurudisha ujumbe wa majaribio baada ya hitilafu ya gateway.
+
+Hiyo si sawa na malipo yaliyofanikiwa.
+
+Marekebisho yanahitajika ili hitilafu ya gateway irudishe hali ya kushindwa au kusubiri, badala ya kuwasilisha ujumbe unaoweza kumfanya mteja aamini kuwa amelipa.
+
+4. Tatizo kubwa zaidi: mtiririko wa malipo kwenye CustomerPortal.tsx
+
+Hapa nimeona kasoro muhimu sana.
+
+Katika handleConfirmUssd(), code inaita:
+
+fetch('/api/v1/payments/simulate-confirm', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ orderId: currentOrderId }),
+}).catch(() => {});
+
+const result = await processMobilePayment(
+  phoneNumber,
+  selectedPackageId,
+  clientMac,
+  clientIp
+);
+
+Baadaye, processMobilePayment() inatengeneza vocha na transaction ndani ya frontend.
+
+Sehemu ya HotspotContext.tsx inaonyesha hali kama hii:
+
+const transaction: PaymentTransaction = {
+  // ...
+  status: 'completed',
+  // ...
+};
+
+Hapa kuna tatizo la msingi.
+
+Mfumo unaweza kuandika transaction kama completed bila kuwa na uthibitisho kwamba M-Pesa, Mixx by Yas au Airtel Money imepokea malipo.
+
+Aidha, matokeo ya ombi la stk-push hayakaguliwi ipasavyo na processMobilePayment() kabla ya kuendelea kutengeneza vocha.
+
+Kwa hiyo, kwa hali ya sasa, sehemu hii bado ina tabia ya mfumo wa majaribio.
+
+Mfumo sahihi unapaswa kufanya hivi
+Mteja anachagua kifurushi.
+Browser inatuma packageId na namba ya simu kwa backend.
+Backend inathibitisha kifurushi na bei yake.
+Backend inatengeneza oda kwenye database.
+Backend inatuma ombi kwa payment gateway.
+Mteja anathibitisha malipo kwenye simu yake.
+Gateway inatuma uthibitisho rasmi kwa backend.
+Backend inathibitisha oda, kiasi na reference.
+Backend inabadilisha hali ya oda kuwa paid.
+Backend inatengeneza vocha ya kipekee.
+Mfumo unatumia vocha hiyo kuruhusu kifaa husika kwenye Omada.
+Backend inahifadhi session na muda wa kuisha.
+Mteja anapata ujumbe wa mafanikio baada ya ruhusa ya mtandao kuthibitishwa.
+
+Ikiwa hatua ya 7 au 8 haijakamilika, mteja hapaswi kupewa intaneti ya kulipia.
+
+Pia, kama malipo yamefanikiwa lakini Omada haijaruhusu kifaa, mfumo unapaswa kuhifadhi oda kama imelipwa na kujaribu tena kuunganisha mteja. Hupaswi kupoteza malipo kwa sababu tu controller haikupatikana kwa muda.
+
+5. Ukaguzi wa vouchers/redeem
+
+Nimeona endpoint hii:
+
+app.post('/api/v1/vouchers/redeem', async (req, res) => {
+  // ...
+});
+
+Hii ni mojawapo ya sehemu muhimu zaidi kwa mfumo wako.
+
+Kuna mambo mazuri ambayo tayari yamejengwa:
+
+Inakagua kama vocha ipo.
+Inakagua muda wa kuisha.
+Inajaribu kuzuia vocha inayotumika kwenye kifaa kingine.
+Inatumia MAC address ya mteja na AP.
+Inaita omadaAuthorize().
+Inaweka session baada ya jaribio la kuidhinisha kifaa.
+
+Hata hivyo, kuna mapungufu yanayohitaji kurekebishwa.
+
+A. Vocha haitoshi kuthibitisha utambulisho wa kifaa
+
+Backend inapokea clientMac na apMac kutoka kwa browser.
+
+Taarifa hizo zinaweza kubadilishwa na mteja. Kwa hiyo, zinapaswa kuchukuliwa kama taarifa za kuanzia, si uthibitisho wa kujitegemea kwamba kifaa hicho ndicho kilichounganishwa kwenye AP.
+
+Kwa majaribio, unaweza kutumia taarifa za captive portal za Omada. Lakini lazima uthibitishe kuwa Omada imetuma taarifa sahihi na kwamba mteja anayeidhinishwa ni yule anayehusika na ombi hilo.
+
+B. Matumizi ya vocha hayajalindwa kikamilifu dhidi ya maombi yanayofanana
+
+Vocha inaweza kukaguliwa, kisha kuidhinishwa, halafu status yake kubadilishwa.
+
+Kama maombi mawili yatafika kwa wakati mmoja, yote yanaweza kusoma vocha ikiwa bado haijabadilishwa.
+
+Marekebisho ni kutumia transaction ya database na operesheni inayohakikisha kwamba vocha inaweza kuanzishwa mara moja tu kwa kifaa kinachoruhusiwa.
+
+C. Muda wa kifurushi
+
+Code ina hesabu ya muda wa vocha na inatuma muda kwa Omada kwa milisekunde.
+
+Hii ni njia inayofaa kwa captive portal, lakini lazima ujaribu kwamba:
+
+Muda unaotumwa kwa Omada ni muda uliobaki, si muda wa awali kila mara.
+Vocha iliyoisha muda haiwezi kuanzishwa tena.
+Mteja akikatika na kuunganisha tena, muda hauanzi upya bila sababu.
+Kifaa kinazuiwa tena muda unapokwisha.
+Muda wa server na controller unalingana vya kutosha.
+
+Kwa sasa, database haionyeshi mfumo kamili wa kudhibiti mabadiliko haya kwa miamala ya pamoja.
+
+6. Ukaguzi wa omada.ts
+
+Hii ndiyo sehemu inayounganisha backend na Omada Controller.
+
+Nimeona kwamba tayari ina:
+
+normalizeOmadaUrl()
+resolveControllerId()
+getOperatorSession()
+getAdminSession()
+omadaAuthorize()
+omadaUnauthorize()
+omadaBlockClient()
+omadaUnblockClient()
+testOmadaConnection()
+getOmadaDevices()
+getOmadaClients()
+
+Kwa hiyo, hauhitaji kuanza upya kuandika integration ya Omada. Una msingi ambao unaweza kurekebishwa na kujaribiwa.
+
+Lakini kuwa na functions hizi hakumaanishi kwamba kila moja inafanya kazi kikamilifu kwenye controller yako.
+
+A. Controller login
+
+Code ina njia hii:
+
+`/${id}/api/v2/hotspot/login`
+
+Hii inalingana na endpoint ya Hotspot Operator inayotajwa katika mwongozo rasmi wa Omada External Portal API wa matoleo ya v6.2.10 na kuendelea.
+
+Mwongozo huo unaeleza kwamba akaunti ya kuingia kwa ajili ya external portal inapaswa kuwa Hotspot Operator, si akaunti ya kawaida ya Controller Administrator.
+
+Hili ni muhimu wakati wa kuweka akaunti kwenye Omada Network Application v6.3.
+
+Hatua zinazohitajika
+Tengeneza Hotspot Operator kwenye controller.
+Weka taarifa zake kwenye sehemu ya Omada ya Lema Fast WiFi.
+Hakikisha OMADA_URL inaelekeza kwenye controller inayofikiwa na backend.
+Weka OMADA_ID sahihi.
+Jaribu login.
+Hakikisha session cookie na CSRF token vinapatikana.
+Jaribu kuidhinisha kifaa halisi kilichounganishwa kwenye EAP772-Outdoor.
+B. Kuunganisha kifaa kwenye intaneti
+
+Code ina:
+
+await omadaAuthorize({
+  clientMac: effectiveClientMac,
+  apMac: effectiveApMac,
+  ssidName: String(ssidName || 'Lema Fast WiFi'),
+  radioId: radioId || 0,
+  clientIp: effectiveClientIp,
+  durationMs: remainingDurationMs,
+  downKbps: down,
+  upKbps: up,
+});
+
+Hii ndiyo aina ya amri inayohitajika ili backend iombe Omada imruhusu mteja.
+
+Hata hivyo, lazima uthibitishe mambo matatu:
+
+clientMac ni MAC address halisi ya mteja kwenye Omada.
+apMac ni MAC address sahihi ya EAP772-Outdoor.
+Muda na speed limit zinakubaliwa na controller.
+
+Usitumie MAC address ya mfano iliyowekwa kwenye code kama uthibitisho wa kifaa halisi.
+
+C. Kukata intaneti baada ya muda
+
+Nimeona kuwa omadaUnauthorize() inajaribu njia kadhaa za kukata mteja, ikiwemo njia ya kutoa muda mfupi sana wa authorization.
+
+Njia hizo zinahitaji majaribio ya moja kwa moja. Hatuwezi kuhitimisha kutoka kwenye code pekee kwamba zote zinafanya kazi kwa uhakika kwenye v6.3.
+
+Ninapendekeza tuanze na vipengele viwili muhimu:
+
+Kuruhusu mteja baada ya malipo kuthibitishwa.
+Kukata au kuzuia tena mteja baada ya muda wa kifurushi kuisha.
+
+Baada ya hapo, tujaribu block, unblock na disconnect.
+
+D. TLS na mawasiliano na controller
+
+Code inaruhusu kuendelea hata kama uthibitishaji wa certificate haujawashwa.
+
+Hilo linaweza kusaidia kwenye majaribio ya controller yenye certificate ya ndani, lakini katika mazingira ya uzalishaji lazima utumie uthibitishaji salama wa TLS.
+
+Pia, ombi la HTTP linapaswa kuwa na timeout ili backend isisubiri controller milele.
+
+7. Ukaguzi wa CustomerPortal.tsx
+
+Ukurasa wa mteja tayari una sehemu za:
+
+Kupokea taarifa za Omada kutoka kwenye URL.
+Kuchagua kifurushi.
+Kuingiza namba ya simu.
+Kuanza malipo.
+Kuingiza vocha.
+Kuonyesha hali ya malipo.
+Kuhifadhi taarifa za kifaa kwenye browser.
+Kujaribu kuelekeza mteja kwenye ukurasa aliokuwa akitaka kufungua.
+
+Hii ni msingi mzuri wa UI.
+
+Lakini kuna mambo muhimu yanayohitaji kurekebishwa.
+
+A. Mfumo unatengeneza MAC address za kubuni
+
+Nimeona sehemu inayoweza kutumia MAC address iliyotengenezwa kwa kutumia namba za kubahatisha:
+
+const generated = `48:D7:05:${...}`;
+
+Hii inaweza kusaidia kuonyesha mfano kwenye UI, lakini haiwezi kutumika kuthibitisha kifaa halisi cha Wi-Fi.
+
+Kwa mfumo halisi, ikiwa Omada haijatoa MAC address ya mteja, mfumo unapaswa kuonyesha hitilafu na kuomba taarifa sahihi badala ya kubuni MAC.
+
+B. authorizeOmadaHardware() haifanyi chochote
+
+Kuna function hii:
+
+const authorizeOmadaHardware = (_targetMac?: string) => {};
+
+Function hii ni tupu.
+
+Hilo lina maana kwamba kuitwa kwake kwenye frontend hakuanzishi ruhusa yoyote ya mtandao.
+
+Si lazima function hiyo ibaki kwenye frontend kwa sababu backend tayari ina omadaAuthorize() kupitia redemption endpoint. Lakini mtiririko wa mteja lazima uelekezwe kwenye endpoint halisi ya backend na usubiri majibu yake.
+
+C. Portal haipaswi kutegemea localStorage kama chanzo cha ukweli
+
+Kwa sasa, HotspotContext.tsx inahifadhi taarifa nyingi kwenye browser.
+
+Hii ni sawa kwa baadhi ya mipangilio ya UI, lakini si kwa:
+
+Uthibitisho wa malipo.
+Umiliki wa vocha.
+Muda wa kifurushi.
+Idadi ya vifaa vinavyoruhusiwa.
+Session inayotumika.
+Hali ya mteja kwenye mtandao.
+
+Data hizo lazima zidhibitiwe na backend.
+
+D. Kurejesha mteja kwenye ukurasa wa awali
+
+Code inajaribu kumrudisha mteja kwenye URL aliyokuwa akitaka kufungua.
+
+Hili ni wazo zuri, lakini URL hiyo inapaswa kuchunguzwa ili kuepuka open redirects na kuhakikisha haimpeleki mteja kwenye tovuti isiyoaminika.
+
+8. Ukaguzi wa HotspotContext.tsx
+
+Hii ni sehemu inayounganisha state ya frontend na backend.
+
+Nimeona kwamba inasimamia:
+
+Vifurushi.
+Vocha.
+Transactions.
+Active sessions.
+Taarifa za vifaa.
+Settings.
+Tenants.
+Taarifa za mtumiaji.
+Baadhi ya API calls.
+
+Tatizo ni kwamba baadhi ya data zinatokana na backend, nyingine zinatokana na localStorage, na nyingine zinatengenezwa ndani ya browser.
+
+Hii inafanya hali halisi ya mfumo isiwe na chanzo kimoja kinachoaminika.
+
+Marekebisho yanayohitajika
+Data	Chanzo kinachopaswa kuaminika
+Bei na muda wa kifurushi	Backend/database
+Hali ya malipo	Backend/database baada ya uthibitisho wa gateway
+Vocha	Backend/database
+Muda wa kuisha kwa vocha	Backend/database
+Active session	Backend/database pamoja na hali ya Omada inapohitajika
+MAC address	Taarifa halisi za mteja zilizopatikana kupitia captive portal
+Settings za mwonekano	Browser inaweza kuzihifadhi kwa urahisi
+Mipangilio ya biashara	Database, hasa kwa mfumo wa wateja wengi
+
+Pia, kuanzisha session kwenye React state hakumaanishi kwamba Omada imemruhusu mteja.
+
+Haya ni matukio mawili tofauti yanayopaswa kushughulikiwa kwa uwazi.
+
+9. Database: kuna kazi muhimu iliyobaki
+
+Nimeona faili hizi:
+
+src/db/schema.ts
+src/db/init.ts
+src/db/index.ts
+
+Database schema ina tables za:
+
+users
+hardware
+towers
+vouchers
+active_sessions
+
+Huu ni mwanzo mzuri.
+
+Lakini kwa mfumo wa hotspot billing unaotaka kuutumia kibiashara, tables hizi hazitoshi.
+
+Tables ninazopendekeza kuongeza
+Table	Kazi
+packages	Bei, muda, kasi na masharti ya vifurushi.
+payment_orders	Oda zote za malipo na hali zake.
+payment_transactions	Muamala uliothibitishwa na payment gateway.
+customers	Taarifa za wateja kulingana na mahitaji ya mfumo.
+hotspot_sessions	Historia ya kuingia na kutoka kwenye mtandao.
+voucher_redemptions	Historia ya matumizi ya kila vocha.
+tenants	Wamiliki wa mifumo mbalimbali ya hotspot.
+tenant_settings	Mipangilio ya kila biashara.
+tenant_subscriptions	Ada ya mwezi na hali ya usajili wa kila mteja wa Lema Fast WiFi.
+webhook_events	Kuzuia webhook kushughulikiwa zaidi ya mara moja na kusaidia uchunguzi wa matatizo.
+audit_logs	Historia ya vitendo muhimu vya wasimamizi.
+
+Majina yanaweza kubadilishwa wakati wa kutengeneza schema ya mwisho.
+
+Tatizo la kuhifadhi data kwenye mafaili
+
+Nimeona matumizi ya mafaili kama:
+
+vouchers-data.json
+active-sessions.json
+omada-config.json
+whatsapp-config.json
+hardware-inventory.json
+
+Hii ni hatari kwa deployment ya uzalishaji ikiwa unategemea mafaili hayo kuhifadhi data kwa kudumu.
+
+Mradi wako una render.yaml inayotumia PostgreSQL, lakini sehemu nyingi muhimu bado zinategemea mafaili au kumbukumbu za muda badala ya database.
+
+Kipaumbele ni kuhamisha oda, vocha, malipo na sessions kwenye PostgreSQL.
+
+Pia, src/db/index.ts ina njia ya mock pool ikiwa DATABASE_URL haipo. Hii inaweza kusaidia majaribio, lakini si mbadala wa database halisi.
+
+10. Je, mfumo wako unakamilisha malipo ya M-Pesa, Mixx by Yas na Airtel Money?
+
+Kwa hali niliyoiona kwenye code, bado haujakamilika kwa kiwango kinachohitajika kwa malipo halisi.
+
+Backend ina sehemu iliyojengwa kwa AzamPay.
+
+Lakini bado kuna kazi za kufanya:
+
+Kuhakikisha API credentials za gateway zimewekwa kwa usahihi.
+Kuhakikisha malipo ya sandbox yanafanya kazi.
+Kuthibitisha muundo halisi wa majibu ya gateway.
+Kuthibitisha webhook rasmi.
+Kuhakikisha malipo yaliyoshindwa hayatoi vocha.
+Kuhakikisha muamala mmoja hautoi vocha zaidi ya moja.
+Kuhakikisha oda zinahifadhiwa kwenye database.
+Kuhakikisha kila njia ya malipo unayotaka kutumia inakubaliwa na gateway na imeunganishwa ipasavyo.
+
+Code iliyopo inajaribu kuchagua provider kwa kutumia mwanzo wa namba ya simu. Hii si njia ya kutegemewa kwa kila mazingira. Pia, code haionyeshi adapters tofauti zilizokamilika kwa kila njia ya malipo.
+
+Tutahitaji kuthibitisha njia halisi zinazoungwa mkono na gateway utakayotumia kabla ya kuamua muundo wa mwisho wa integration.
+
+Usichukulie ujumbe wa “malipo yamefanikiwa” kwenye UI kama uthibitisho kwamba muamala halisi umepokelewa.
+
+11. Je, Omada Network Application v6.3.0.1.1.1 inafaa kwa majaribio?
+
+Ndiyo, hiyo ndiyo njia ninayopendekeza tuanze nayo.
+
+Mwongozo rasmi wa Omada External Portal API unaeleza integration ya external portal kwa Omada Controller v6.2.10 na kuendelea. Hivyo, v6.3 ni toleo linalofaa kuanza nalo, lakini bado tunapaswa kuthibitisha API kwenye installation yako halisi.
+
+Mwongozo huo pia unaeleza kwamba mteja anapojiunga na SSID yenye portal authentication, Omada inaweza kuelekeza ombi kwenye external portal yako ikiwa na taarifa za mteja na AP. Backend kisha huwasiliana na controller ili kuidhinisha kifaa.
+
+Kwa hiyo, tunahitaji kuthibitisha kwamba Lema Fast WiFi inatumia utaratibu huo kikamilifu.
+
+Mpangilio wa majaribio
+Hatua ya 1: Airtel router
+Hakikisha router inapata intaneti.
+Unganisha EAP772-Outdoor kwenye LAN ya router.
+Hakikisha EAP inapata IP.
+Zima Wi-Fi ya Airtel router kwa wateja ikiwa inaruhusu watu kuingia kwenye intaneti bila kupitia Lema Fast WiFi.
+Hakikisha DHCP na NAT zinafanya kazi.
+Hatua ya 2: Omada Network Application
+Fungua Omada Network Application v6.3.
+Adopt EAP772-Outdoor.
+Hakikisha AP inaonekana online.
+Tengeneza SSID Lema Fast WiFi.
+Weka captive portal kwenye SSID hiyo.
+Chagua external portal na uweke anwani ya portal yako.
+Tengeneza Hotspot Operator.
+Hakikisha controller inaruhusu external portal authentication.
+Hatua ya 3: Lema Fast WiFi backend
+
+Weka:
+
+OMADA_URL
+OMADA_ID
+OMADA_OPERATOR
+OMADA_OPERATOR_PASSWORD
+
+Kisha tumia kitufe cha kujaribu muunganisho wa Omada kwenye dashboard.
+
+Hapa tunahitaji kuona uthibitisho wa login, cookie na CSRF token. Si ujumbe wa jumla unaosema tu kwamba muunganisho umefanikiwa.
+
+Hatua ya 4: Captive portal
+
+Tumia simu ambayo haijaunganishwa kwenye Wi-Fi hiyo awali.
+
+Jiunge na SSID.
+Jaribu kufungua tovuti ya HTTP.
+Hakikisha portal ya Lema Fast WiFi inafunguka.
+Hakikisha URL imebeba taarifa sahihi za mteja na AP.
+Hakikisha portal inaonyesha vifurushi na bei.
+Jaribu vocha ya majaribio.
+Hakikisha backend inathibitisha vocha.
+Hakikisha Omada inaruhusu kifaa.
+Hakikisha simu inaweza kufungua intaneti.
+
+Tahadhari: Captive portal haiwezi kulazimisha kila programu au kila tovuti kufunguka moja kwa moja kwenye portal kwa kila simu. Kwa hiyo, jaribio la HTTP pamoja na kuangalia hali ya client kwenye Omada ni muhimu.
+
+12. Tatizo la kuendesha Omada kwenye kompyuta huku backend ikiwa kwenye hosting
+
+Hili ni muhimu sana kwa mpango wako wa kuhamia cloud baadaye.
+
+Kuna hali mbili tofauti:
+
+Hali A: Backend na Omada Controller ziko kwenye kompyuta au mtandao wa ndani mmoja.
+
+Hii ndiyo hali rahisi zaidi kwa majaribio. Backend inaweza kuwasiliana na controller kupitia anwani yake ya ndani ikiwa kompyuta inaweza kuifikia.
+
+Hali B: Backend iko kwenye hosting ya nje, lakini Omada Controller iko kwenye kompyuta yako.
+
+Katika hali hii, hosting ya nje haiwezi kufikia IP ya ndani ya controller moja kwa moja.
+
+Kwa hiyo, lazima kuwe na njia salama ya mawasiliano kati ya backend na controller. Usifungue controller kwa intaneti bila ulinzi unaofaa.
+
+Kwa majaribio, unaweza kuendesha backend kwenye kompyuta hiyo hiyo au kwenye mashine iliyo kwenye mtandao huo huo, kisha kutumia portal inayofikiwa na simu.
+
+Kumbuka kwamba simu ya mteja haiwezi kutumia localhost ya kompyuta yako kufungua portal. Anuani ya portal lazima ifikiwe na simu, na usanidi wa HTTPS/captive portal lazima uwe sahihi.
+
+13. Kuhamia Omada Cloud baadaye
+
+Kuna tofauti muhimu kati ya:
+
+Omada Cloud Access: kusimamia controller yako ya ndani kwa njia ya cloud.
+Omada Cloud-Based Controller: kutumia controller inayosimamiwa kwenye cloud.
+
+Kuingia kwenye akaunti ya Omada Cloud hakumaanishi moja kwa moja kwamba backend yako sasa inaweza kufikia API ya controller kupitia cloud.
+
+Tunapaswa kujua aina ya controller utakayotumia baada ya majaribio, kisha kurekebisha mipangilio ya OMADA_URL na OMADA_ID na kuthibitisha namna ya kuwasiliana na API yake.
+
+Sitapendekeza kuhamisha mfumo mzima kabla ya majaribio ya local kukamilika.
+
+14. Ukaguzi wa vipengele vingine vilivyomo kwenye ZIP
+
+Mradi una vipengele vingi zaidi ya captive portal. Hivi ndivyo ninavyovipanga kwa ukaguzi wa mwisho.
+
+Faili au sehemu	Kazi	Kazi iliyobaki
+src/App.tsx	Kuunganisha kurasa na mfumo mzima	Kuhakikisha navigation na authentication haziruhusu kufikia sehemu zilizolindwa bila ruhusa.
+src/components/system/AdminDashboard.tsx	Dashboard ya msimamizi	Kukagua kila API call, taarifa zinazoonyeshwa na hatua zinazoweza kubadilisha data.
+src/components/system/AdminLogin.tsx	Login	Kuunganisha authentication salama ya backend na session management.
+src/components/system/CustomerPortal.tsx	Portal ya mteja	Kuondoa mafanikio ya malipo yanayotengenezwa kwenye frontend na kuunganisha flow halisi ya backend.
+src/context/HotspotContext.tsx	State na data ya mfumo	Kuondoa utegemezi wa localStorage kwa data muhimu za biashara.
+src/components/system/BillingModule.tsx	Billing	Kuthibitisha hesabu, historia ya malipo na hali za vocha.
+src/components/system/SaasResellerModule.tsx	Usimamizi wa wateja wa mfumo	Kuhakikisha kila biashara ina data na credentials zake.
+src/components/system/ClientSelfOnboarding.tsx	Kujiandikisha kwa wateja wa mfumo	Kuhakikisha usajili unatengeneza tenant halisi kwenye database.
+src/components/system/AntiTetheringManager.tsx	Kuzuia matumizi mabaya ya vocha	Kuthibitisha kwamba sera zinafanya kazi kwenye mtandao halisi.
+src/components/system/NetworkDiagnosticsModule.tsx	Uchunguzi wa mtandao	Kuthibitisha kuwa matokeo yanatokana na vipimo halisi badala ya data za mfano.
+src/components/system/SmartBandwidthEngine.tsx	Usimamizi wa bandwidth	Kuhakikisha speed limits zinatumwa na kukubaliwa na Omada.
+src/components/system/InventoryModule.tsx	Usimamizi wa vifaa	Kuhakikisha status na taarifa za vifaa zinatoka kwenye controller/database.
+src/components/system/TowerManagementModule.tsx	Usimamizi wa minara/vituo	Kukagua kama ni kipengele unachohitaji kwa deployment yako ya sasa.
+src/components/system/WhatsAppBotSuite.tsx	WhatsApp	Kuthibitisha webhook, credentials na delivery ya ujumbe.
+src/components/system/SmsTemplateConfigPanel.tsx	SMS	Kuthibitisha integration ya mtoa huduma wa SMS.
+src/components/system/GisMapModule.tsx	Ramani	Kuthibitisha chanzo cha coordinates na data za vifaa.
+src/components/system/VoucherQrScannerModal.tsx	Kusoma vocha za QR	Kuhakikisha QR inasomwa na kupelekwa kwenye uthibitishaji wa backend.
+src/components/system/SmartApScriptModal.tsx	Mwongozo/script za vifaa	Kuhakikisha maelekezo hayaendani na vifaa au usanidi ambao hautumii.
+src/db/schema.ts	Muundo wa database	Kuongeza tables zinazokosekana na kuweka constraints muhimu.
+src/db/init.ts	Kuanzisha tables	Kuhakikisha schema inalingana na migration za database.
+omada.ts	Omada integration	Kufanya majaribio ya API, authorization na disconnect.
+server.ts	Backend	Kurekebisha malipo, security, persistence na API flow.
+render.yaml	Deployment	Kuthibitisha mazingira ya uzalishaji, database na command za kuanzisha server.
+
+Hii ni ramani ya ukaguzi wa vipengele, si uthibitisho kwamba kila module kwenye jedwali imekaguliwa mstari kwa mstari.
+
+Nimeweza kufanya ukaguzi wa awali wa code muhimu, lakini bado sijakamilisha ukaguzi wa kina wa kila mstari wa AdminDashboard.tsx, CustomerPortal.tsx na modules nyingine zote.
+
+Pia, nilijaribu kuandaa mazingira ya kuendesha ukaguzi wa TypeScript, lakini usakinishaji wa dependencies haukukamilika kwa muda ulioruhusiwa. Kwa hiyo, bado sina matokeo yaliyothibitishwa ya npm run build au npm run lint.
+
+15. Mpango ninaopendekeza wa kukamilisha Lema Fast WiFi
+
+Ningependa tufanye kazi kwa awamu ili tusiharibu sehemu ambazo tayari zinafanya kazi.
+
+Awamu ya 1: Kurekebisha msingi wa mfumo
+Kuondoa credentials za msingi zilizowekwa kwenye code.
+Kuondoa malipo ya majaribio yanayoweza kuonekana kama malipo halisi.
+Kuhamisha oda na vocha kwenye database.
+Kurekebisha flow ya CustomerPortal.tsx.
+Kuhakikisha vocha inatengenezwa na backend pekee.
+Kuweka uthibitishaji salama wa webhook.
+Awamu ya 2: Kukamilisha Omada integration
+Kuweka OMADA_URL na OMADA_ID.
+Kuunda Hotspot Operator.
+Kuthibitisha controller login.
+Kuthibitisha captive portal.
+Kuthibitisha client authorization.
+Kuthibitisha session expiry na disconnect.
+Kuthibitisha speed limits.
+Awamu ya 3: Kukamilisha mobile money
+Kuamua gateway na njia zinazoungwa mkono.
+Kukamilisha sandbox tests.
+Kuthibitisha webhook.
+Kujaribu malipo yaliyofanikiwa, yaliyoshindwa na yaliyochelewa.
+Kuhakikisha muamala mmoja hautoi vocha nyingi.
+Awamu ya 4: Majaribio kwenye vifaa halisi
+
+Tutatumia:
+
+Airtel router.
+TP-Link Omada EAP772-Outdoor.
+Omada Network Application v6.3.0.1.1.1.
+Simu ya mteja.
+Backend ya Lema Fast WiFi.
+Database ya majaribio.
+
+Tutajaribu mteja kuingia, kununua kifurushi, kuidhinishwa, kutumia intaneti, kuisha muda na kuunganishwa tena.
+
+Awamu ya 5: Kuhamia cloud
+
+Baada ya majaribio kufaulu:
+
+Tutaweka backend kwenye hosting ya uzalishaji.
+Tutahakikisha database ni ya kudumu.
+Tutaweka domain na HTTPS.
+Tutahamia aina ya Omada Cloud Controller utakayochagua.
+Tutathibitisha API na captive portal tena.
+Tutaanza majaribio ya mwisho ya malipo halisi.
+Awamu ya 6: Kuufanya mfumo uwe bidhaa ya kuuza
+
+Kwa sababu lengo lako ni kuuza Lema Fast WiFi kwa wateja wengine kwa ada ya mwezi, tutahakikisha mfumo una:
+
+Tenant tofauti kwa kila biashara.
+Mpangilio wa router/controller kwa kila tenant.
+Taarifa za malipo zilizotengwa kwa kila biashara.
+Usimamizi wa ada ya mwezi.
+Uzuiaji wa tenant mmoja kuona taarifa za mwingine.
+Mfumo wa kuanzisha na kusitisha huduma kwa mujibu wa usajili.
+Hitimisho langu
+
+Lema Fast WiFi ina msingi mzuri wa UI na sehemu ya Omada API, lakini bado haijawa tayari kwa matumizi ya kibiashara yenye malipo halisi.
+
+Mapungufu ya kwanza kabisa ni:
+
+Malipo yanaweza kuonekana yamefanikiwa bila uthibitisho wa gateway.
+Vocha na sessions zinategemea sana frontend na data za muda.
+Kuna udhaifu katika uthibitishaji wa webhook na credentials za msingi.
+Data muhimu haijahifadhiwa kikamilifu kwenye database.
+Omada authorization inahitaji majaribio ya moja kwa moja kwenye controller yako.
+
+Ningependa tuanze kwa kukamilisha ukaguzi wa kina wa server.ts, omada.ts, CustomerPortal.tsx na HotspotContext.tsx, kisha tuandae marekebisho ya code kwa mpangilio wa kipaumbele.
+
+Hatua hiyo itatuwezesha kutenganisha mambo matatu: code inayofanya kazi, code inayohitaji kurekebishwa, na vipengele ambavyo bado havijajengwa kabisa.

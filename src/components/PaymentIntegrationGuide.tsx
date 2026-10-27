@@ -65,7 +65,7 @@ app.post('/api/zeno-callback', async (req, res) => {
     console.log(\`✅ Malipo ya Tsh \${amount} yamepokelewa kutoka \${phone_number}\`);
 
     // A: Tengeneza Vocha ya Muda
-    const voucherCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const voucherCode = '84920194';
     
     // B: Washa Mtandao Moja kwa Moja kwenye Gateway Router
     await activateGatewayUser(phone_number, voucherCode, amount);

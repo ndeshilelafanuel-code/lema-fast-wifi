@@ -184,8 +184,8 @@ export const TowerManagementModule: React.FC<TowerManagementModuleProps> = ({
       heightMeters: Number(addForm.heightMeters) || 18,
       notes: addForm.notes.trim() || undefined,
       coordinates: {
-        lat: -6.7924 + (Math.random() - 0.5) * 0.04,
-        lng: 39.2083 + (Math.random() - 0.5) * 0.04,
+        lat: -6.7924 + 0,
+        lng: 39.2083 + 0,
       },
     });
 

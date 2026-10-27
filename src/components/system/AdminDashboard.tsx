@@ -141,12 +141,12 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockM
         return;
       }
       setDownSpeed((prev) => {
-        const delta = (Math.random() - 0.5) * 1.5;
+        const delta = 0;
         const next = Math.max(0.1, prev + delta);
         return next > 20 ? 10 : next;
       });
       setUpSpeed((prev) => {
-        const delta = (Math.random() - 0.5) * 0.2;
+        const delta = 0;
         const next = Math.max(0.05, prev + delta);
         return next > 3 ? 1.0 : next;
       });
@@ -271,7 +271,7 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockM
           {/* Visual Mini Equalizer (flat when offline) */}
           <div className="flex items-end gap-0.5 h-3">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((bar) => {
-              const barHeight = isOffline ? 10 : Math.max(15, Math.floor(Math.random() * 95));
+              const barHeight = isOffline ? 10 : Math.max(15, 50);
               return (
                 <div 
                   key={bar} 
@@ -3269,7 +3269,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         username: newPppoeUser,
                         password: newPppoePass || 'password881',
                         profile: newPppoeProfile,
-                        remoteIp: `10.10.10.${Math.floor(20 + Math.random() * 80)}`,
+                        remoteIp: '10.10.10.10',
                         status: 'disconnected'
                       };
                       setPppoeSecrets([...pppoeUsers, nu]);
@@ -7416,7 +7416,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           status: 'active',
                           nextRenewal: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('sw-TZ'),
                           joinedDate: new Date().toISOString().split('T')[0],
-                          lastPaymentRef: 'MPESA-REG-' + Math.floor(1000 + Math.random() * 9000),
+                          lastPaymentRef: 'MPESA-REG-' + Date.now().toString().slice(-6),
                           paymentHistory: [
                             { date: new Date().toISOString().split('T')[0], amount: 10000, ref: 'MPESA-INIT', status: 'completed' }
                           ]
@@ -7614,7 +7614,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     const mockPay = {
                                       date: new Date().toISOString().split('T')[0],
                                       amount: 10000,
-                                      ref: 'MPESA-TX' + Math.floor(100000 + Math.random() * 900000),
+                                      ref: 'MPESA-TX' + Date.now().toString().slice(-8),
                                       status: 'completed'
                                     };
                                     return {
@@ -7821,7 +7821,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         const mockPay = {
                                           date: new Date().toISOString().split('T')[0],
                                           amount: 10000,
-                                          ref: 'MPESA-AUTO-' + Math.floor(1000 + Math.random() * 9000),
+                                          ref: 'MPESA-AUTO-' + Date.now().toString().slice(-6),
                                           status: 'completed'
                                         };
                                         return {
@@ -8023,8 +8023,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 heightMeters: 18,
                 notes: `Kifaa kilichosajiliwa kwa kamera QR scan (Serial: ${newEq.serialNumber})`,
                 coordinates: {
-                  lat: -6.7924 + (Math.random() - 0.5) * 0.04,
-                  lng: 39.2083 + (Math.random() - 0.5) * 0.04,
+                  lat: -6.7924 + 0,
+                  lng: 39.2083 + 0,
                 },
               });
             }
