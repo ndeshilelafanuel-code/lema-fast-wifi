@@ -355,11 +355,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         const finalRedirect = omadaParams.redirectUrl || omadaParams.target || 'http://connectivitycheck.gstatic.com/generate_204';
         setTimeout(() => {
           try {
-            if (omadaParams.redirectUrl || omadaParams.target) {
-              window.location.href = finalRedirect;
-            }
+            window.location.href = finalRedirect;
           } catch (e) {}
-        }, 1500);
+        }, 1200);
         return { success: true, message: data.message || 'Umefanikiwa kuunganishwa! Furahia intaneti ya kasi.', session: data.session };
       }
 

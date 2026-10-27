@@ -502,29 +502,42 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
     ? Math.min(p.durationMs, (currentConfig.slidingLeaseMinutes || 10) * 60 * 1000)
     : p.durationMs;
 
+  // Calculate duration in minutes as required by Omada ExtPortal API v2
+  const durationMinutes = Math.max(1, Math.round(effectiveDurationMs / 60000));
+
   let session = await getOperatorSession();
 
-  const send = (sess: OmadaSession) =>
-    call(
+  const send = (sess: OmadaSession) => {
+    const authPayload: any = {
+      clientMac: clientMacFormatted,
+      clientIp: p.clientIp || '',
+      apMac: apMacFormatted,
+      ssidName: p.ssidName || 'Lema Fast WiFi',
+      radioId: Number(p.radioId) || 0,
+      time: durationMinutes, // Duration in minutes (e.g. 1440 for 24h)
+      authType: 4, // External Portal Authentication
+      originUrl: '',
+      totalTrafficLimitBytes: 0,
+      site: currentConfig.siteId || 'Default',
+    };
+
+    // Only set speed limit fields if explicitly defined > 0.
+    // In Omada Controller v5/v6, sending 0 limits speed to 0 Kbps (blocks internet)!
+    if (p.downKbps && p.downKbps > 0) {
+      authPayload.downloadRateLimitKbps = Math.round(p.downKbps);
+    }
+    if (p.upKbps && p.upKbps > 0) {
+      authPayload.uploadRateLimitKbps = Math.round(p.upKbps);
+    }
+
+    return call(
       'POST',
       `/${id}/api/v2/hotspot/extPortal/auth`,
-      {
-        clientMac: clientMacFormatted,
-        clientIp: p.clientIp || '',
-        apMac: apMacFormatted,
-        ssidName: p.ssidName || 'Lema Fast WiFi',
-        radioId: Number(p.radioId) || 0,
-        time: Math.round(effectiveDurationMs), // Duration in milliseconds
-        authType: 4, // External Portal Authentication
-        originUrl: '',
-        totalTrafficLimitBytes: 0,
-        downloadRateLimitKbps: p.downKbps || 0,
-        uploadRateLimitKbps: p.upKbps || 0,
-        site: currentConfig.siteId || 'Default',
-      },
+      authPayload,
       { 'Csrf-Token': sess.csrf },
       sess
     );
+  };
 
   let r = await send(session);
 
