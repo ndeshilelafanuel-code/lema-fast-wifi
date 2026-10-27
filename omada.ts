@@ -507,22 +507,26 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
 
   let session = await getOperatorSession();
 
-  const send = (sess: OmadaSession) => {
+  const send = async (sess: OmadaSession) => {
+    const macHyphen = clientMacFormatted.replace(/:/g, '-');
+    const macColon = clientMacFormatted.replace(/-/g, ':');
+    const apHyphen = apMacFormatted.replace(/:/g, '-');
+
     const authPayload: any = {
-      clientMac: clientMacFormatted,
+      clientMac: macHyphen,
+      mac: macColon,
       clientIp: p.clientIp || '',
-      apMac: apMacFormatted,
+      apMac: apHyphen,
       ssidName: p.ssidName || 'Lema Fast WiFi',
       radioId: Number(p.radioId) || 0,
-      time: durationMinutes, // Duration in minutes (e.g. 1440 for 24h)
-      authType: 4, // External Portal Authentication
+      time: durationMinutes,
+      duration: durationMinutes,
+      authType: 4,
       originUrl: '',
       totalTrafficLimitBytes: 0,
       site: currentConfig.siteId || 'Default',
     };
 
-    // Only set speed limit fields if explicitly defined > 0.
-    // In Omada Controller v5/v6, sending 0 limits speed to 0 Kbps (blocks internet)!
     if (p.downKbps && p.downKbps > 0) {
       authPayload.downloadRateLimitKbps = Math.round(p.downKbps);
     }
@@ -530,13 +534,33 @@ export async function omadaAuthorize(p: OmadaAuthParams) {
       authPayload.uploadRateLimitKbps = Math.round(p.upKbps);
     }
 
-    return call(
+    // Primary Call: extPortal/auth
+    const res = await call(
       'POST',
       `/${id}/api/v2/hotspot/extPortal/auth`,
       authPayload,
       { 'Csrf-Token': sess.csrf },
       sess
     );
+
+    // Secondary Sync Call: hotspot/guests/auth to guarantee AP firewall port unblock
+    try {
+      await call(
+        'POST',
+        `/${id}/api/v2/hotspot/guests/auth`,
+        {
+          mac: macColon,
+          clientMac: macHyphen,
+          time: durationMinutes,
+          authType: 4,
+          apMac: apHyphen,
+        },
+        { 'Csrf-Token': sess.csrf },
+        sess
+      );
+    } catch (e) {}
+
+    return res;
   };
 
   let r = await send(session);

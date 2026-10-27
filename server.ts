@@ -1594,14 +1594,42 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Nambari ya vocha inahitajika.' });
   }
 
-  const effectiveClientMac = String(clientMac || macAddress || '').trim().toUpperCase();
-  const effectiveApMac = String(apMac || '').trim().toUpperCase();
+  let effectiveClientMac = String(clientMac || macAddress || '').trim().toUpperCase();
+  let effectiveApMac = String(apMac || '').trim().toUpperCase();
+  let effectiveClientIp = String(clientIp || ipAddress || req.ip || '').trim();
 
-  if (!effectiveClientMac || effectiveClientMac === 'UNKNOWN' || !effectiveApMac) {
+  if (!effectiveClientMac || effectiveClientMac === 'UNKNOWN') {
     return res.status(400).json({
       success: false,
-      message: 'Anwani ya kifaa (Client MAC) na Anwani ya AP (AP MAC) zinahitajika ili kuwasha vocha.'
+      message: 'Anwani ya kifaa (Client MAC) inahitajika ili kuwasha vocha.'
     });
+  }
+
+  // Auto-discover live AP MAC or Client IP from Omada Controller if missing in portal request
+  if (!effectiveApMac || !effectiveClientIp) {
+    try {
+      const liveClients = await getOmadaClients();
+      const normClientMac = effectiveClientMac.replace(/[^0-9A-FA-F]/g, '');
+      const matched = liveClients.find((c) => (c.mac || '').replace(/[^0-9A-FA-F]/g, '') === normClientMac || (c.ip && c.ip === effectiveClientIp));
+      if (matched) {
+        if (!effectiveApMac && matched.apMac) effectiveApMac = matched.apMac;
+        if (!effectiveClientIp && matched.ip) effectiveClientIp = matched.ip;
+      }
+    } catch (e) {}
+  }
+
+  // Fallback to active AP hardware if AP MAC is still missing
+  if (!effectiveApMac) {
+    const liveDevs = await getOmadaDevices().catch(() => []);
+    if (liveDevs.length > 0) {
+      effectiveApMac = liveDevs[0].mac;
+    } else if (savedHardware.length > 0) {
+      effectiveApMac = savedHardware[0].macAddress;
+    }
+  }
+
+  if (!effectiveClientIp) {
+    effectiveClientIp = '192.168.88.150';
   }
 
   // Reject blocked/blacklisted MAC address
@@ -1612,7 +1640,7 @@ app.post('/api/v1/vouchers/redeem', async (req, res) => {
     });
   }
 
-  const effectiveClientIp = String(clientIp || ipAddress || req.ip || '192.168.88.150').trim();
+  // effectiveClientIp already assigned above
 
   loadSavedVouchers();
   const found: any = savedVouchers.find((v) => v.code === trimmed);
