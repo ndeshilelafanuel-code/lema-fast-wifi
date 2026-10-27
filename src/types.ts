@@ -59,6 +59,10 @@ export interface ActiveSession {
   apMac?: string;
   ssidName?: string;
   radioId?: number;
+  status?: 'online' | 'offline' | 'disconnected';
+  apStatus?: 'online' | 'offline';
+  downSpeedMbps?: number;
+  upSpeedMbps?: number;
 }
 
 export interface NetworkTower {

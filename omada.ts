@@ -1135,3 +1135,89 @@ export async function getOmadaDevices(): Promise<Array<{ mac: string; name: stri
     return [];
   }
 }
+
+export interface OmadaClientInfo {
+  mac: string;
+  name?: string;
+  ip?: string;
+  apMac?: string;
+  apName?: string;
+  ssid?: string;
+  wireless?: boolean;
+  trafficDown: number;
+  trafficUp: number;
+  activityDownKbps?: number;
+  activityUpKbps?: number;
+  uptimeSec?: number;
+  authStatus?: number;
+}
+
+/**
+ * Real-Time Client Monitoring: Fetch live connected wireless clients from Omada Controller
+ */
+export async function getOmadaClients(): Promise<OmadaClientInfo[]> {
+  if (!currentConfig.omadaUrl || !currentConfig.operatorUser) {
+    return [];
+  }
+
+  try {
+    const id = await resolveControllerId();
+    let sess: OmadaSession | null = null;
+    try {
+      sess = await getOperatorSession();
+    } catch {
+      return [];
+    }
+
+    let siteIds = ['Default', 'default'];
+    if (currentConfig.siteId) {
+      siteIds.unshift(currentConfig.siteId);
+    }
+
+    const clientsList: OmadaClientInfo[] = [];
+
+    for (const site of siteIds) {
+      try {
+        const endpoints = [
+          `/${id}/api/v2/sites/${site}/clients?currentPage=1&currentPageSize=100`,
+          `/${id}/api/v2/sites/${site}/cmd/clients?currentPage=1&currentPageSize=100`,
+          `/${id}/api/v2/clients`,
+        ];
+
+        for (const ep of endpoints) {
+          const res = await call('GET', ep, undefined, { 'Csrf-Token': sess.csrf }, sess);
+          const rawClients = res.json?.result?.data || (Array.isArray(res.json?.result) ? res.json.result : []);
+          if (Array.isArray(rawClients) && rawClients.length > 0) {
+            for (const c of rawClients) {
+              const mac = (c.mac || c.macAddress || '').trim().toUpperCase();
+              if (mac) {
+                clientsList.push({
+                  mac,
+                  name: c.name || c.hostName || c.model || '',
+                  ip: c.ip || c.ipAddress || '',
+                  apMac: (c.apMac || '').trim().toUpperCase(),
+                  apName: c.apName || '',
+                  ssid: c.ssid || '',
+                  wireless: c.wireless !== false,
+                  trafficDown: Number(c.trafficDown || c.down || 0),
+                  trafficUp: Number(c.trafficUp || c.up || 0),
+                  activityDownKbps: Number(c.activityDown || c.downRate || 0),
+                  activityUpKbps: Number(c.activityUp || c.upRate || 0),
+                  uptimeSec: Number(c.uptime || c.duration || 0),
+                  authStatus: Number(c.authStatus !== undefined ? c.authStatus : 2),
+                });
+              }
+            }
+            if (clientsList.length > 0) break;
+          }
+        }
+      } catch (e) {}
+      if (clientsList.length > 0) break;
+    }
+
+    return clientsList;
+  } catch (err: any) {
+    console.warn('[Omada Clients Sync] Could not query Omada clients:', err.message);
+    return [];
+  }
+}

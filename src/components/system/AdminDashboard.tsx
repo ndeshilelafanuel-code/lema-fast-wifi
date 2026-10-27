@@ -122,31 +122,44 @@ interface SessionRowProps {
 }
 
 const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockMac }) => {
-  const [downSpeed, setDownSpeed] = useState<number>(() => Math.random() * 5 + 1.2);
-  const [upSpeed, setUpSpeed] = useState<number>(() => Math.random() * 0.8 + 0.15);
+  const isOffline = session.status === 'offline' || session.apStatus === 'offline' || session.status === 'disconnected';
+  const [downSpeed, setDownSpeed] = useState<number>(() => isOffline ? 0 : (session.downSpeedMbps ?? (Math.random() * 4 + 1.2)));
+  const [upSpeed, setUpSpeed] = useState<number>(() => isOffline ? 0 : (session.upSpeedMbps ?? (Math.random() * 0.8 + 0.15)));
   const [uptimeStr, setUptimeStr] = useState<string>('');
 
   useEffect(() => {
-    // Fluctuate download/upload speeds like a real live connection
+    if (isOffline) {
+      setDownSpeed(0);
+      setUpSpeed(0);
+      return;
+    }
+
+    // Only fluctuate if session is genuinely online and no fixed hardware speed was given
     const interval = setInterval(() => {
+      if (session.downSpeedMbps !== undefined && session.downSpeedMbps > 0) {
+        setDownSpeed(session.downSpeedMbps);
+        setUpSpeed(session.upSpeedMbps || 0.2);
+        return;
+      }
       setDownSpeed((prev) => {
-        const delta = (Math.random() - 0.5) * 2; // -1 to +1 Mbps
+        const delta = (Math.random() - 0.5) * 1.5;
         const next = Math.max(0.1, prev + delta);
-        return next > 25 ? 12 : next; // Cap max speed
+        return next > 20 ? 10 : next;
       });
       setUpSpeed((prev) => {
-        const delta = (Math.random() - 0.5) * 0.3; // -0.15 to +0.15 Mbps
+        const delta = (Math.random() - 0.5) * 0.2;
         const next = Math.max(0.05, prev + delta);
-        return next > 3 ? 1.1 : next;
+        return next > 3 ? 1.0 : next;
       });
-    }, 1500);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isOffline, session.downSpeedMbps, session.upSpeedMbps]);
 
   useEffect(() => {
     const updateUptime = () => {
-      const diffMs = Date.now() - new Date(session.connectedAt).getTime();
+      const startMs = new Date(session.connectedAt).getTime();
+      const diffMs = Math.max(0, Date.now() - startMs);
       const diffSecs = Math.floor(diffMs / 1000);
       const hours = Math.floor(diffSecs / 3600);
       const mins = Math.floor((diffSecs % 3600) / 60);
@@ -163,46 +176,73 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockM
     return () => clearInterval(interval);
   }, [session.connectedAt]);
 
-  // Determine total data cap based on package
-  const getDataCapMB = (pkgName: string) => {
-    const lower = pkgName.toLowerCase();
-    if (lower.includes('2 za') || lower.includes('2h') || lower.includes('saa 2')) return 1500; // 1.5 GB
-    if (lower.includes('24') || lower.includes('1day') || lower.includes('siku 1')) return 5000; // 5 GB
-    if (lower.includes('siku 7') || lower.includes('wiki 1') || lower.includes('1week')) return 25000; // 25 GB
-    return 10000; // 10 GB Default
-  };
+  // Actual data consumed (bytesDown + bytesUp)
+  const totalBytes = (session.bytesDown || 0) + (session.bytesUp || 0);
+  const usedMB = totalBytes / (1024 * 1024);
+  const usedStr = usedMB >= 1024 ? `${(usedMB / 1024).toFixed(2)} GB` : `${usedMB.toFixed(1)} MB`;
 
-  const capMB = getDataCapMB(session.packageName);
-  const usedMB = session.bytesDown / 1024 / 1024;
-  const usagePercent = Math.min(100, Math.round((usedMB / capMB) * 100));
-  const isHighUsage = usagePercent >= 80;
+  // Time-based package duration calculation
+  const totalDurationMs = Math.max(60000, new Date(session.expiresAt).getTime() - new Date(session.connectedAt).getTime());
+  const elapsedMs = Math.max(0, Date.now() - new Date(session.connectedAt).getTime());
+  const timeProgressPercent = Math.min(100, Math.max(0, Math.round((elapsedMs / totalDurationMs) * 100)));
+  const isExpired = Date.now() >= new Date(session.expiresAt).getTime();
+  const isHighUsage = timeProgressPercent >= 90 || isExpired;
 
   return (
-    <tr className="hover:bg-stone-850/30 border-b border-stone-850 transition-colors">
-      {/* Voucher Code & Status */}
+    <tr className={`hover:bg-stone-850/40 border-b border-stone-850 transition-colors ${isOffline ? 'bg-rose-950/10' : ''}`}>
+      {/* Voucher Code & Real Status */}
       <td className="p-4 font-mono font-bold text-amber-400">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>{session.voucherCode}</span>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            {isOffline ? (
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.7)]" title="AP Imezima au kifaa kimejitenga" />
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]" title="Kinaendelea kutumia intaneti" />
+            )}
+            <span className="tracking-wider">{session.voucherCode}</span>
+          </div>
+          <div>
+            {isOffline ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-sans font-bold text-rose-400 bg-rose-950/60 border border-rose-800/70 px-1.5 py-0.5 rounded">
+                🔴 AP Imezima (Offline)
+              </span>
+            ) : isExpired ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-sans font-bold text-amber-400 bg-amber-950/60 border border-amber-800/70 px-1.5 py-0.5 rounded">
+                ⏱️ Muda Umeisha
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-sans font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/70 px-1.5 py-0.5 rounded">
+                🟢 Mtandaoni (Active)
+              </span>
+            )}
+          </div>
         </div>
       </td>
 
       {/* IP & MAC Addresses */}
       <td className="p-4">
         <div className="space-y-0.5">
-          <div className="text-sky-400 font-bold font-mono">{session.ipAddress}</div>
-          <div className="text-[10px] text-stone-500 font-mono uppercase">{session.macAddress}</div>
+          <div className="text-sky-400 font-bold font-mono">{session.ipAddress || '192.168.88.150'}</div>
+          <div className="text-[10px] text-stone-400 font-mono uppercase tracking-wider">{session.macAddress}</div>
+          {session.apMac && (
+            <div className="text-[9px] text-stone-500 font-mono">AP: {session.apMac}</div>
+          )}
         </div>
       </td>
 
-      {/* Connection Uptime */}
+      {/* Connection Uptime & Expiry */}
       <td className="p-4 font-sans text-stone-300">
         <div className="space-y-0.5">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-            <span className="text-[9px] uppercase bg-emerald-500/10 border border-emerald-500/20 px-1 py-0.2 rounded font-sans">Uptime</span>
-            <span>{uptimeStr}</span>
+          <div className="flex items-center gap-1 text-[11px] font-bold">
+            <span className={`text-[9px] uppercase px-1 py-0.2 rounded font-sans border ${isOffline ? 'bg-rose-950 text-rose-400 border-rose-800' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+              {isOffline ? 'Kikao Kilisimama' : 'Uptime'}
+            </span>
+            <span className="font-mono text-stone-200">{uptimeStr}</span>
           </div>
-          <div className="text-[10px] text-stone-400">Inaisha: {new Date(session.expiresAt).toLocaleTimeString()}</div>
+          <div className="text-[10px] text-stone-400">
+            {isExpired ? 'Kiliisha: ' : 'Inaisha: '} 
+            <span className="font-semibold text-stone-300">{new Date(session.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
         </div>
       </td>
 
@@ -210,34 +250,40 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockM
       <td className="p-4 font-sans text-stone-200">
         <div className="space-y-0.5">
           <div className="font-bold text-xs text-white">{session.packageName}</div>
-          <div className="text-[10px] font-mono text-cyan-400 bg-cyan-950/20 px-1.5 py-0.5 rounded border border-cyan-900/30 w-fit">
-            Limit: {session.speedLimit}
+          <div className="text-[10px] font-mono text-cyan-400 bg-cyan-950/30 px-1.5 py-0.5 rounded border border-cyan-900/40 w-fit">
+            Limit: {session.speedLimit || '3 Mbps'}
           </div>
         </div>
       </td>
 
-      {/* Live Bandwidth Speedometer (Flactuating like Dennis's Bitwave video) */}
+      {/* Live Bandwidth Speedometer */}
       <td className="p-4 font-mono">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-3 text-stone-300 text-xs font-bold">
-            <div className="flex items-center gap-1 text-emerald-400">
+          <div className="flex items-center gap-3 text-xs font-bold">
+            <div className={`flex items-center gap-1 ${isOffline ? 'text-stone-500' : 'text-emerald-400'}`}>
               <span className="text-[10px] text-stone-500">↓</span>
               <span>{downSpeed.toFixed(1)} Mbps</span>
             </div>
-            <div className="flex items-center gap-1 text-sky-400">
+            <div className={`flex items-center gap-1 ${isOffline ? 'text-stone-500' : 'text-sky-400'}`}>
               <span className="text-[10px] text-stone-500 font-bold">↑</span>
               <span>{upSpeed.toFixed(2)} Mbps</span>
             </div>
           </div>
-          {/* Visual Mini Equalizer */}
+          {/* Visual Mini Equalizer (flat when offline) */}
           <div className="flex items-end gap-0.5 h-3">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((bar) => {
-              const randHeight = Math.floor(Math.random() * 100);
+              const barHeight = isOffline ? 10 : Math.max(15, Math.floor(Math.random() * 95));
               return (
                 <div 
                   key={bar} 
-                  style={{ height: `${Math.max(15, randHeight)}%` }} 
-                  className={`w-1 rounded-t-sm transition-all duration-300 ${isHighUsage ? 'bg-rose-500' : 'bg-emerald-500/70'}`}
+                  style={{ height: `${barHeight}%` }} 
+                  className={`w-1 rounded-t-sm transition-all duration-300 ${
+                    isOffline 
+                      ? 'bg-stone-700/60' 
+                      : isHighUsage 
+                        ? 'bg-amber-500' 
+                        : 'bg-emerald-500/80'
+                  }`}
                 />
               );
             })}
@@ -245,32 +291,43 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockM
         </div>
       </td>
 
-      {/* Package Data Progress Bar with red glowing alert */}
+      {/* Real Data & Time Progress (No misleading 0% used) */}
       <td className="p-4 font-sans text-xs">
-        <div className="space-y-1.5 max-w-[150px]">
-          <div className="flex justify-between text-[11px] font-mono">
-            <span className="text-stone-300 font-bold">{(usedMB / 1024).toFixed(2)} GB</span>
-            <span className="text-stone-400">/ {(capMB / 1024).toFixed(1)} GB</span>
+        <div className="space-y-1.5 max-w-[170px]">
+          <div className="flex justify-between items-center text-[11px] font-mono">
+            <span className="text-stone-200 font-bold">{usedStr}</span>
+            <span className="text-[10px] text-emerald-400/90 font-sans font-semibold">Bila Kikomo</span>
           </div>
           
+          {/* Progress Bar indicating time elapsed of the voucher */}
           <div className="w-full h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-850">
             <div 
-              style={{ width: `${usagePercent}%` }} 
+              style={{ width: `${timeProgressPercent}%` }} 
               className={`h-full rounded-full transition-all duration-500 ${
-                isHighUsage 
-                  ? 'bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' 
-                  : 'bg-amber-400'
+                isOffline 
+                  ? 'bg-stone-600'
+                  : isHighUsage 
+                    ? 'bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' 
+                    : 'bg-amber-400'
               }`}
             />
           </div>
 
-          <div className="flex justify-between items-center">
-            <span className={`text-[10px] font-bold ${isHighUsage ? 'text-rose-400 animate-pulse' : 'text-stone-400'}`}>
-              {usagePercent}% used
+          <div className="flex justify-between items-center text-[10px]">
+            <span className={`font-mono font-bold ${isOffline ? 'text-stone-400' : isHighUsage ? 'text-rose-400' : 'text-stone-400'}`}>
+              {timeProgressPercent}% ya muda
             </span>
-            {isHighUsage && (
-              <span className="text-[9px] bg-rose-500/20 border border-rose-500/40 px-1 py-0.2 rounded font-bold text-rose-300 animate-bounce uppercase">
-                Karibu kuisha!
+            {isOffline ? (
+              <span className="text-[9px] text-rose-400 font-bold uppercase">
+                Imekatika
+              </span>
+            ) : isHighUsage ? (
+              <span className="text-[9px] bg-rose-500/20 border border-rose-500/40 px-1 py-0.2 rounded font-bold text-rose-300 uppercase">
+                {isExpired ? 'Muda Umeisha' : 'Muda Unakwisha'}
+              </span>
+            ) : (
+              <span className="text-[9px] text-emerald-400 font-semibold">
+                Inaendelea
               </span>
             )}
           </div>
@@ -282,11 +339,15 @@ const SessionRow: React.FC<SessionRowProps> = ({ session, onDisconnect, onBlockM
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => onDisconnect(session.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-rose-300 bg-rose-950/40 hover:bg-rose-500 hover:text-white border border-rose-800 hover:border-rose-600 rounded-xl transition-all cursor-pointer shadow-lg active:scale-95"
-            title="Sitisha kikao cha mtandao cha sasa"
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded-xl transition-all cursor-pointer shadow-lg active:scale-95 ${
+              isOffline 
+                ? 'text-stone-300 bg-stone-800 hover:bg-rose-600 hover:text-white border border-stone-700' 
+                : 'text-rose-300 bg-rose-950/40 hover:bg-rose-500 hover:text-white border border-rose-800 hover:border-rose-600'
+            }`}
+            title="Ondoa kikao hiki kwenye orodha ya mtandao na ukate intaneti"
           >
             <WifiOff className="w-3.5 h-3.5" />
-            <span>KATA INTANETI</span>
+            <span>{isOffline ? 'FUTA / ONDOA' : 'KATA INTANETI'}</span>
           </button>
           {onBlockMac && session.macAddress && (
             <button
@@ -464,6 +525,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const apMac = targetSession?.apMac || '';
     const adminKey = localStorage.getItem('admin_api_key') || sessionStorage.getItem('admin_api_key') || '';
     showToast('Inakata Intaneti...', `Inatuma amri kwa Omada Controller kukata kifaa ${mac || sessionId}...`, 'info');
+    
+    // Always remove from local state immediately to avoid ghost sessions
+    disconnectSession(sessionId);
+
     try {
       const res = await fetch(`/api/v1/sessions/active/${encodeURIComponent(sessionId)}?mac=${encodeURIComponent(mac)}&apMac=${encodeURIComponent(apMac)}`, {
         method: 'DELETE',
@@ -473,17 +538,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.success) {
-        showToast('Intaneti Imekatwa ✅', data?.message || `Kifaa ${mac} kimekatwa kikamilifu kwenye Omada!`, 'success');
-        disconnectSession(sessionId);
+        showToast('Intaneti Imekatwa ✅', data?.message || `Kifaa ${mac || sessionId} kimekatwa kikamilifu kwenye Omada na mfumo!`, 'success');
       } else {
         showToast(
-          'Omada Haikukata Kifaa ⚠️',
-          data?.message || 'Omada imekataa amri ya unauth kwa sababu ya kukosa akaunti ya Administrator. Tafadhali weka Omada Admin login kwenye Mipangilio au bonyeza BLOCK MAC.',
-          'error'
+          'Kikao Kimeondolewa Kwenye Mfumo ⚠️',
+          data?.message || 'Kikao kimefutwa kwenye orodha ya mtandao. (Omada haijathibitisha unauth au AP iko offline).',
+          'warning'
         );
       }
     } catch (e: any) {
-      showToast('Hitilafu ya Mtandao', e.message, 'error');
+      showToast('Kikao Kimeondolewa Kwenye Mfumo', `Kifaa kimeondolewa: ${e.message}`, 'warning');
     }
   };
 

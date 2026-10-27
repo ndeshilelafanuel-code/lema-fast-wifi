@@ -1029,193 +1029,229 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({
         </div>
 
         {/* ACTIVE SESSION DASHBOARD (If User Is Connected) */}
-        {currentClientSession ? (
-          <div className="py-6 space-y-5">
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
-              <h3 className="text-sm font-bold text-white">
-                {lang === 'sw' ? 'Umeunganishwa Mtandaoni!' : 'You Are Online!'}
-              </h3>
-              <p className="text-xs text-emerald-300">
-                Kifurushi Chako: <strong>{currentClientSession.packageName}</strong>
-              </p>
-              <div className="pt-2 space-y-2">
-                <button
-                  type="button"
-                  onClick={handleOpenInternet}
-                  className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-stone-950 font-black text-xs rounded-xl shadow-md transition-all uppercase tracking-wide cursor-pointer animate-pulse"
-                >
-                  <Zap className="w-4 h-4 fill-stone-950" />
-                  <span>Fungua Intaneti / Anza Kuvinjari ➔</span>
-                </button>
+        {currentClientSession ? (() => {
+          const isApOffline = currentClientSession.status === 'offline' || currentClientSession.apStatus === 'offline';
+          const totalBytesUsed = (currentClientSession.bytesDown || 0) + (currentClientSession.bytesUp || 0);
+          const usedMb = totalBytesUsed / (1024 * 1024);
+          const usedDataStr = usedMb >= 1024 ? `${(usedMb / 1024).toFixed(2)} GB` : `${usedMb.toFixed(1)} MB`;
+          
+          const sessionStartMs = new Date(currentClientSession.connectedAt).getTime();
+          const sessionEndMs = new Date(currentClientSession.expiresAt).getTime();
+          const totalDurationMs = Math.max(60000, sessionEndMs - sessionStartMs);
+          const elapsedMs = Math.max(0, Date.now() - sessionStartMs);
+          const timeProgress = Math.min(100, Math.max(0, Math.round((elapsedMs / totalDurationMs) * 100)));
 
-                <button
-                  type="button"
-                  onClick={() => setShowOmadaHelpGuide((prev) => !prev)}
-                  className="w-full text-center text-[10px] text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
-                >
-                  {showOmadaHelpGuide ? '▲ Ficha Maelekezo ya Omada' : '❓ Simu bado inaandika "Sign in to network"? Bofya hapa'}
-                </button>
-
-                {showOmadaHelpGuide && (
-                  <div className="p-3 bg-stone-900 border border-stone-800 rounded-xl text-left text-[11px] text-stone-300 space-y-2 animate-in fade-in duration-150">
-                    <p className="font-bold text-amber-400">Hatua za Kufungua Moja kwa Moja kwenye Kompyuta:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-stone-300">
-                      <li>Kwenye Kompyuta yako yenye <strong>Omada Controller</strong>, nenda kushoto kwenye <strong>Clients</strong>.</li>
-                      <li>Tafuta kifaa chenye MAC: <code className="text-emerald-300 bg-stone-950 px-1 rounded">{clientMac}</code> (IP: {clientIp}).</li>
-                      <li>Bonyeza kitufe cha <strong>"Authorize"</strong> (alama ya kufuli) kuruhusu simu ipate intaneti mara moja!</li>
-                      <li>Kwenye <strong>Hotspot ➔ Portal ➔ Edit</strong>, hakikisha umechagua <strong>"No Authentication"</strong> badala ya RADIUS.</li>
-                    </ol>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* EXPIRY ALERT & ONE-CLICK TOP-UP BANNER */}
-            {timeLeftSec > 0 && timeLeftSec <= 900 && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 to-amber-950/90 border-2 border-rose-500/80 shadow-xl text-white space-y-3 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between">
+          return (
+            <div className="py-6 space-y-5">
+              {/* AP Offline Alert Banner */}
+              {isApOffline ? (
+                <div className="p-4 rounded-2xl bg-rose-950/80 border-2 border-rose-500/80 text-rose-200 space-y-2 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2">
-                    <span className="p-1.5 rounded-lg bg-rose-500 text-white animate-pulse">
-                      <Bell className="w-4 h-4" />
-                    </span>
-                    <div>
-                      <h4 className="text-xs font-black uppercase tracking-wide text-rose-300">
-                        Tahadhari: Kifurushi Kinakaribia Kuisha!
-                      </h4>
-                      <p className="text-[10px] text-stone-300 font-mono">
-                        Muda uliosalia: <strong className="text-amber-300 font-bold">{formatTime(timeLeftSec)}</strong>
-                      </p>
+                    <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-rose-300">
+                      🔴 AP Imezima / Hakuna Mawimbi (Offline)
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-stone-200 leading-relaxed">
+                    Kifaa cha kurusha intaneti (Access Point) kimezima au hakina umeme kwa sasa. Bando lako bado lipo salama na intaneti itarejea mara moja AP itakapowashwa tena.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                  <h3 className="text-sm font-bold text-white">
+                    {lang === 'sw' ? 'Umeunganishwa Mtandaoni!' : 'You Are Online!'}
+                  </h3>
+                  <p className="text-xs text-emerald-300">
+                    Kifurushi Chako: <strong>{currentClientSession.packageName}</strong>
+                  </p>
+                  <div className="pt-2 space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenInternet}
+                      className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-stone-950 font-black text-xs rounded-xl shadow-md transition-all uppercase tracking-wide cursor-pointer animate-pulse"
+                    >
+                      <Zap className="w-4 h-4 fill-stone-950" />
+                      <span>Fungua Intaneti / Anza Kuvinjari ➔</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowOmadaHelpGuide((prev) => !prev)}
+                      className="w-full text-center text-[10px] text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
+                    >
+                      {showOmadaHelpGuide ? '▲ Ficha Maelekezo ya Omada' : '❓ Simu bado inaandika "Sign in to network"? Bofya hapa'}
+                    </button>
+
+                    {showOmadaHelpGuide && (
+                      <div className="p-3 bg-stone-900 border border-stone-800 rounded-xl text-left text-[11px] text-stone-300 space-y-2 animate-in fade-in duration-150">
+                        <p className="font-bold text-amber-400">Hatua za Kufungua Moja kwa Moja kwenye Kompyuta:</p>
+                        <ol className="list-decimal list-inside space-y-1 text-stone-300">
+                          <li>Kwenye Kompyuta yako yenye <strong>Omada Controller</strong>, nenda kushoto kwenye <strong>Clients</strong>.</li>
+                          <li>Tafuta kifaa chenye MAC: <code className="text-emerald-300 bg-stone-950 px-1 rounded">{clientMac}</code> (IP: {clientIp}).</li>
+                          <li>Bonyeza kitufe cha <strong>"Authorize"</strong> (alama ya kufuli) kuruhusu simu ipate intaneti mara moja!</li>
+                          <li>Kwenye <strong>Hotspot ➔ Portal ➔ Edit</strong>, hakikisha umechagua <strong>"No Authentication"</strong> badala ya RADIUS.</li>
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* EXPIRY ALERT & ONE-CLICK TOP-UP BANNER */}
+              {!isApOffline && timeLeftSec > 0 && timeLeftSec <= 900 && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 to-amber-950/90 border-2 border-rose-500/80 shadow-xl text-white space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-rose-500 text-white animate-pulse">
+                        <Bell className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wide text-rose-300">
+                          Tahadhari: Kifurushi Kinakaribia Kuisha!
+                        </h4>
+                        <p className="text-[10px] text-stone-300 font-mono">
+                          Muda uliosalia: <strong className="text-amber-300 font-bold">{formatTime(timeLeftSec)}</strong>
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <p className="text-[11px] text-stone-200 leading-tight">
-                  Usikatikiwe mtandao ukiwa katikati ya shughuli zako! Ongeza muda papo hapo kwa mbofyo 1 bila kubadili nenosiri:
-                </p>
+                  <p className="text-[11px] text-stone-200 leading-tight">
+                    Usikatikiwe mtandao ukiwa katikati ya shughuli zako! Ongeza muda papo hapo kwa mbofyo 1 bila kubadili nenosiri:
+                  </p>
 
-                {/* 1-Click Renewal Bundles */}
-                <div className="grid grid-cols-3 gap-2">
-                  {settings.packages.slice(0, 3).map((pkg) => (
+                  {/* 1-Click Renewal Bundles */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {settings.packages.slice(0, 3).map((pkg) => (
+                      <button
+                        key={pkg.id}
+                        onClick={() => handleQuickTopUp(pkg.id)}
+                        className="p-2.5 rounded-xl bg-stone-900 hover:bg-amber-500 hover:text-stone-950 border border-stone-700/80 text-center transition-all cursor-pointer group"
+                      >
+                        <span className="block text-[10px] font-bold text-stone-400 group-hover:text-stone-900">
+                          {pkg.name}
+                        </span>
+                        <span className="block text-xs font-black text-amber-400 group-hover:text-stone-950">
+                          Tsh {pkg.price.toLocaleString()}
+                        </span>
+                        <span className="block text-[9px] text-emerald-400 group-hover:text-stone-900 font-bold">
+                          +Ongeza Sasa
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* SMS / WhatsApp Reminder Dispatch button */}
+                  <div className="pt-1 flex items-center justify-between text-[11px]">
+                    <span className="text-stone-400 text-[10px]">Unataka kikumbusho kwa ujumbe?</span>
                     <button
-                      key={pkg.id}
-                      onClick={() => handleQuickTopUp(pkg.id)}
-                      className="p-2.5 rounded-xl bg-stone-900 hover:bg-amber-500 hover:text-stone-950 border border-stone-700/80 text-center transition-all cursor-pointer group"
+                      onClick={handleSendSmsReminder}
+                      disabled={smsReminderSent}
+                      className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer disabled:opacity-50"
                     >
-                      <span className="block text-[10px] font-bold text-stone-400 group-hover:text-stone-900">
-                        {pkg.name}
-                      </span>
-                      <span className="block text-xs font-black text-amber-400 group-hover:text-stone-950">
-                        Tsh {pkg.price.toLocaleString()}
-                      </span>
-                      <span className="block text-[9px] text-emerald-400 group-hover:text-stone-900 font-bold">
-                        +Ongeza Sasa
-                      </span>
+                      {smsReminderSent ? '✓ Kikumbusho Kimetumwa' : '📲 Nitumie Kikumbusho cha SMS'}
                     </button>
-                  ))}
+                  </div>
+                </div>
+              )}
+
+              {/* REAL-TIME TIMESTAMPS & BALANCE METERS */}
+              <div className="grid grid-cols-2 gap-3 text-center">
+                {/* Card 1: Time Left */}
+                <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
+                  <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Muda Uliobaki</span>
+                  <span className={`text-sm font-black font-mono block ${isApOffline ? 'text-stone-400' : 'text-amber-400 animate-pulse'}`}>
+                    {formatTime(timeLeftSec)}
+                  </span>
                 </div>
 
-                {/* SMS / WhatsApp Reminder Dispatch button */}
-                <div className="pt-1 flex items-center justify-between text-[11px]">
-                  <span className="text-stone-400 text-[10px]">Unataka kikumbusho kwa ujumbe?</span>
-                  <button
-                    onClick={handleSendSmsReminder}
-                    disabled={smsReminderSent}
-                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer disabled:opacity-50"
-                  >
-                    {smsReminderSent ? '✓ Kikumbusho Kimetumwa' : '📲 Nitumie Kikumbusho cha SMS'}
-                  </button>
+                {/* Card 2: Bando la MB / Data Consumed */}
+                <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
+                  <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Data Iliyotumika</span>
+                  <span className="text-sm font-black font-mono text-emerald-400 block">
+                    {usedDataStr}
+                  </span>
                 </div>
               </div>
-            )}
 
-            {/* REAL-TIME TIMESTAMPS & BALANCE METERS */}
-            <div className="grid grid-cols-2 gap-3 text-center">
-              {/* Card 1: Time Left */}
-              <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
-                <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Muda Uliobaki</span>
-                <span className="text-sm font-black font-mono text-amber-400 block animate-pulse">
-                  {formatTime(timeLeftSec)}
-                </span>
+              {/* Session Info */}
+              <div className="flex items-center justify-between text-[11px] px-2.5 bg-stone-900/80 p-2 rounded-xl border border-stone-800 text-stone-300">
+                 <span>IP: <strong className="font-mono text-stone-200">{clientIp}</strong></span>
+                 <div className="flex items-center gap-1.5">
+                   <span className="font-mono text-stone-200">MAC: {clientMac}</span>
+                   {isApOffline ? (
+                     <span className="text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 rounded font-bold">
+                       🔴 AP Offline
+                     </span>
+                   ) : omadaParams.clientMac ? (
+                     <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">
+                       ✓ Omada
+                     </span>
+                   ) : null}
+                 </div>
               </div>
 
-              {/* Card 2: Bando la MB */}
-              <div className="p-3.5 bg-stone-850 border border-stone-800 rounded-xl space-y-1">
-                <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">Bando la MB</span>
-                <span className="text-sm font-black font-mono text-emerald-400 block">
-                  {currentClientSession ? `${(currentClientSession.bytesDown / 1024 / 1024).toFixed(1)} MB` : '0 MB'}
-                </span>
+              {/* Data & Time Usage Progress Bar */}
+              <div className="bg-stone-850 rounded-xl p-4 border border-stone-800 space-y-2">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-stone-400">Muda Uliotumika:</span>
+                  <span className="text-white font-mono font-bold">
+                    {timeProgress}% ({formatTime(Math.floor(elapsedMs / 1000))} uliopita)
+                  </span>
+                </div>
+                <div className="w-full bg-stone-900 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${isApOffline ? 'bg-stone-600' : 'bg-emerald-400'}`} 
+                    style={{ width: `${timeProgress}%` }} 
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Session Info */}
-            <div className="flex items-center justify-between text-[11px] px-2.5 bg-stone-900/80 p-2 rounded-xl border border-stone-800 text-stone-300">
-               <span>IP: <strong className="font-mono text-stone-200">{clientIp}</strong></span>
-               <div className="flex items-center gap-1.5">
-                 <span className="font-mono text-stone-200">MAC: {clientMac}</span>
-                 {omadaParams.clientMac && (
-                   <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded font-bold">
-                     ✓ Omada
-                   </span>
-                 )}
-               </div>
-            </div>
-
-            {/* Data Usage Progress Bar */}
-            <div className="bg-stone-850 rounded-xl p-4 border border-stone-800 space-y-2">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-stone-400">Matumizi ya Data:</span>
-                <span className="text-white font-mono font-bold">
-                  {currentClientSession ? (currentClientSession.bytesDown / 1024 / 1024).toFixed(1) : '0'} MB
-                </span>
-              </div>
-              <div className="w-full bg-stone-900 h-1.5 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-400 h-full transition-all duration-300" 
-                  style={{ width: `100%` }} 
+              {/* Smart Dynamic Bandwidth & Bursting Visualization */}
+              {!isApOffline && (
+                <BandwidthVisualizationWidget
+                  sustainedSpeedMbps={3}
+                  burstSpeedMbps={15}
+                  burstDurationSec={10}
+                  isCompact={true}
                 />
+              )}
+
+              <div className="bg-stone-850 rounded-xl p-4 border border-stone-800 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-stone-800 pb-2">
+                  <span className="text-stone-400">Namba ya Vocha / Code:</span>
+                  <span className="font-mono font-bold text-amber-400">{currentClientSession.voucherCode}</span>
+                </div>
+                <div className="flex justify-between border-b border-stone-800 pb-2">
+                  <span className="text-stone-400">Anwani ya IP (IP Address):</span>
+                  <span className="font-mono text-stone-300">{currentClientSession.ipAddress}</span>
+                </div>
+                <div className="flex justify-between border-b border-stone-800 pb-2">
+                  <span className="text-stone-400">Kasi ya Intaneti (Speed):</span>
+                  <span className={`font-mono font-bold ${isApOffline ? 'text-stone-400' : 'text-emerald-400'}`}>
+                    {isApOffline ? '0 Mbps (AP Imezima)' : (currentClientSession.speedLimit || '3 Mbps')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-400">Hali ya AP na Mtandao:</span>
+                  <span className={`font-bold flex items-center gap-1 ${isApOffline ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    <span className={`w-2 h-2 rounded-full ${isApOffline ? 'bg-rose-500' : 'bg-emerald-400 animate-pulse'}`} />
+                    {isApOffline ? '🔴 AP Imezima (Hakuna Mawimbi)' : '🟢 Mawimbi Yapo (Active)'}
+                  </span>
+                </div>
               </div>
+
+              <button
+                onClick={() => disconnectSession(currentClientSession.id)}
+                className="w-full py-2.5 px-4 text-xs font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/60 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Tenganisha Mtandao (Disconnect)</span>
+              </button>
             </div>
-
-            {/* Smart Dynamic Bandwidth & Bursting Visualization */}
-            <BandwidthVisualizationWidget
-              sustainedSpeedMbps={3}
-              burstSpeedMbps={15}
-              burstDurationSec={10}
-              isCompact={true}
-            />
-
-            <div className="bg-stone-850 rounded-xl p-4 border border-stone-800 space-y-2.5 text-xs">
-              <div className="flex justify-between border-b border-stone-800 pb-2">
-                <span className="text-stone-400">Namba ya Vocha / Code:</span>
-                <span className="font-mono font-bold text-amber-400">{currentClientSession.voucherCode}</span>
-              </div>
-              <div className="flex justify-between border-b border-stone-800 pb-2">
-                <span className="text-stone-400">Anwani ya IP (IP Address):</span>
-                <span className="font-mono text-stone-300">{currentClientSession.ipAddress}</span>
-              </div>
-              <div className="flex justify-between border-b border-stone-800 pb-2">
-                <span className="text-stone-400">Kasi ya Intaneti (Speed):</span>
-                <span className="font-mono text-emerald-400 font-bold">{currentClientSession.speedLimit}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-stone-400">Hali ya Token (Accounting):</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Live Syncing Active
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => disconnectSession(currentClientSession.id)}
-              className="w-full py-2.5 px-4 text-xs font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/60 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Tenganisha Mtandao (Disconnect)</span>
-            </button>
-          </div>
-        ) : (
+          );
+        })() : (
           /* NOT CONNECTED: LOGIN & PAYMENT FORMS */
           <div className="py-5 space-y-4">
             {/* Status alerts */}

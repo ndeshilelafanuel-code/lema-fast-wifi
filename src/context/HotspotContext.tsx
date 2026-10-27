@@ -268,35 +268,31 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
             const serverSessions = Array.from(map.values());
             if (isMounted) {
-              setActiveSessions((prev) => {
-                const nowMs = Date.now();
-                const mergedMap = new Map<string, ActiveSession>();
-                // Include valid server sessions
-                for (const s of serverSessions) {
-                  const expMs = new Date(s.expiresAt).getTime();
-                  if (isNaN(expMs) || expMs > nowMs) {
-                    const key = (s.macAddress || s.id).toUpperCase();
-                    mergedMap.set(key, s);
-                  }
+              const nowMs = Date.now();
+              const validServerSessions = serverSessions.filter((s) => {
+                const expMs = new Date(s.expiresAt).getTime();
+                return isNaN(expMs) || expMs > nowMs;
+              });
+
+              setActiveSessions(validServerSessions);
+              try {
+                localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(validServerSessions));
+              } catch {}
+
+              // Keep currentClientSession synchronized: if server deleted it or it expired, clear it!
+              setCurrentClientSession((curr) => {
+                if (!curr) return null;
+                const currMac = (curr.macAddress || '').trim().toUpperCase();
+                const matched = validServerSessions.find(
+                  (s) => s.id === curr.id || (currMac && (s.macAddress || '').trim().toUpperCase() === currMac)
+                );
+                if (!matched || matched.status === 'disconnected') {
+                  try {
+                    localStorage.removeItem('wifi_hotspot_my_session');
+                  } catch {}
+                  return null;
                 }
-                // Merge valid local sessions that might be pending server sync
-                for (const s of prev) {
-                  const expMs = new Date(s.expiresAt).getTime();
-                  if (isNaN(expMs) || expMs > nowMs) {
-                    const key = (s.macAddress || s.id).toUpperCase();
-                    if (!mergedMap.has(key)) {
-                      mergedMap.set(key, s);
-                      if (adminKey) {
-                        fetch('/api/v1/sessions/active', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
-                          body: JSON.stringify(s),
-                        }).catch(() => {});
-                      }
-                    }
-                  }
-                }
-                return Array.from(mergedMap.values());
+                return matched;
               });
             }
           }
@@ -979,17 +975,24 @@ export const HotspotProvider: React.FC<{ children: React.ReactNode }> = ({ child
       );
     }
 
-    setActiveSessions((prev) =>
-      prev.filter(
-        (s) => s.id !== sessionId && s.macAddress?.toUpperCase() !== sessionId.toUpperCase()
-      )
-    );
+    setActiveSessions((prev) => {
+      const filtered = prev.filter(
+        (s) => s.id !== sessionId && s.macAddress?.toUpperCase() !== sessionId.toUpperCase() && (!mac || s.macAddress?.toUpperCase() !== mac.toUpperCase())
+      );
+      try {
+        localStorage.setItem('wifi_hotspot_sessions', JSON.stringify(filtered));
+      } catch {}
+      return filtered;
+    });
 
     if (
       currentClientSession?.id === sessionId ||
       (mac && currentClientSession?.macAddress?.toUpperCase() === mac.toUpperCase())
     ) {
       setCurrentClientSession(null);
+      try {
+        localStorage.removeItem('wifi_hotspot_my_session');
+      } catch {}
     }
 
     // Send DELETE to server API so Omada Controller is instructed to terminate internet access
