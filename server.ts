@@ -35,7 +35,7 @@ const parsePort = (): number => {
       if (!isNaN(p)) return p;
     }
   }
-  if (process.env.PORT) {
+  if (process.env.PORT && process.env.NODE_ENV === 'production') {
     const p = parseInt(process.env.PORT, 10);
     if (!isNaN(p)) return p;
   }
